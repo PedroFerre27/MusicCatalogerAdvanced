@@ -1,0 +1,10 @@
+# Librerie richieste per MP3 Cataloger Avanzato
+eyed3>=0.9.6
+mutagen>=1.47.0
+musicbrainzngs>=0.7.1
+requests>=2.28.0
+Pillow>=9.0.0
+
+# Opzionali per funzionalità avanzate
+# librosa>=0.9.0  # Per analisi BPM audio (richiede ffmpeg)
+# spotipy>=2.20.0  # Per integrazione Spotify API
