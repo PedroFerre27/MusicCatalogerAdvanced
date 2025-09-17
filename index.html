@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Cataloger Advanced</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f9;
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        pre {
+            background-color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        code {
+            font-family: monospace;
+        }
+        a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>MP3 Cataloger - Catalogatore MP3 per Genere</h1>
+
+    <p>Un programma Python per catalogare automaticamente i file MP3 per genere, spostandoli in cartelle dedicate e aggiornando i metadati mancanti.</p>
+
+    <h2>Funzionalità</h2>
+    <ul>
+        <li><strong>Catalogazione automatica</strong>: Organizza i file MP3 in cartelle per genere</li>
+        <li><strong>Aggiornamento metadati</strong>: Completa automaticamente titolo, artista, genere, anno e BPM</li>
+        <li><strong>Normalizzazione generi</strong>: Standardizza i nomi dei generi musicali</li>
+        <li><strong>Gestione duplicati</strong>: Evita sovrascritture rinominando i file</li>
+        <li><strong>Logging dettagliato</strong>: Registra tutte le operazioni con livelli INFO, WARNING ed ERROR</li>
+        <li><strong>Report finale</strong>: Genera un report JSON con statistiche e file non catalogati</li>
+    </ul>
+
+    <h2>Installazione</h2>
+    <h3>Prerequisiti</h3>
+    <ul>
+        <li>Python 3.6 o superiore (spuntare l’opzione:✔️ "Add Python to PATH")</li>
+        <li>pip (gestore pacchetti Python)</li>
+    </ul>
+
+    <h3>Installazione delle dipendenze</h3>
+    <pre><code>pip install eyed3 mutagen musicbrainzngs requests Pillow</code></pre>
+    <pre><code>pip install librosa spotipy</code></pre>
+
+    <h2>Utilizzo</h2>
+    <h3>Metodo 1: Script batch (Windows)</h3>
+    <ol>
+        <li>Posiziona <code>mp3_cataloger.py</code> e <code>run_cataloger.bat</code> nella stessa cartella</li>
+        <li>Esegui <code>run_cataloger.bat</code></li>
+        <li>Inserisci il percorso della cartella con i file MP3</li>
+    </ol>
+
+    <h3>Metodo 2: Linea di comando</h3>
+    <p># Installa dipendenze</p>
+    <pre><code>pip install ...</code></pre>
+
+    <hr>
+
+    <h2>Informazioni tecniche</h2>
+    <h3>Note V001:</h3>
+    <h4>MusicBrainz - Estrazione Generi Potenziata:</h4>
+    <ul>
+        <li>Tag del Recording: Estrae generi direttamente dal brano</li>
+        <li>Tag dell'Artista: Estrae generi dall'artista principale</li>
+        <li>Filtro Intelligente: Distingue tra generi musicali reali e tag generici</li>
+        <li>Priorità per Generi Latini: Da priorità a salsa, bachata, merengue, etc.</li>
+    </ul>
+
+    <h4>Last.fm - Estrazione Generi Multipla:</h4>
+    <ul>
+        <li>Tag del Track: Generi specifici del brano</li>
+        <li>Tag dell'Artista: Generi dall'artista (fallback)</li>
+        <li>Tag dell'Album: Generi dall'album (se disponibile)</li>
+        <li>Chiamate API Multiple: Fino a 3 chiamate per completezza massima</li>
+    </ul>
+
+    <h4>Funzioni di Supporto Aggiunte:</h4>
+    <ul>
+        <li><code>_is_music_genre_tag()</code>: Filtra tag che sono realmente generi musicali</li>
+        <li><code>_select_primary_genre()</code>: Seleziona il genere più rilevante da una lista</li>
+    </ul>
+
+    <hr>
+
+    <h2>Generi supportati</h2>
+    <p>Il programma normalizza automaticamente questi generi:</p>
+    <ul>
+        <li>Rock, Pop, Jazz, Classical</li>
+        <li>Hip Hop, Electronic, Dance</li>
+        <li>Country, Blues, R&B, Reggae</li>
+        <li>Folk, Metal, Punk, Alternative</li>
+        <li>Indie, Soundtrack, World Music</li>
+        <li>Ambient, Experimental</li>
+    </ul>
+
+    <h2>File di output</h2>
+    <h3>Log file</h3>
+    <ul>
+        <li>Nome: <code>mp3_cataloger_YYYYMMDD_HHMMSS.log</code></li>
+        <li>Contiene: Tutte le operazioni con timestamp e livelli di log</li>
+    </ul>
+    <h3>Report JSON</h3>
+    <ul>
+        <li>Nome: <code>cataloging_report_YYYYMMDD_HHMMSS.json</code></li>
+        <li>Contiene: Statistiche complete e lista dei file non catalogati</li>
+    </ul>
+
+    <h2>Risoluzione problemi</h2>
+    <h3>File non catalogati</h3>
+    <p>I file rimangono nella directory principale se:</p>
+    <ul>
+        <li>Non hanno metadati di genere</li>
+        <li>Il genere non può essere normalizzato</li>
+        <li>Si verificano errori durante la lettura</li>
+    </ul>
+    <h3>Errori comuni</h3>
+    <ul>
+        <li><strong>"eyed3 non installato"</strong>: Installa con <code>pip install eyed3</code></li>
+        <li><strong>"mutagen non installato"</strong>: Installa con <code>pip install mutagen</code></li>
+        <li><strong>"Percorso non esiste"</strong>: Verifica il percorso della directory</li>
+    </ul>
+    <h3>Caratteri speciali</h3>
+    <p>I nomi delle cartelle vengono automaticamente puliti da caratteri non validi (<code>&lt;&gt;:"/\|?*</code>)</p>
+
+    <h2>Sicurezza</h2>
+    <p>Il programma non sovrascrive i file originali senza prima averne verificato il nome.</p>
+
+</body>
+</html>
