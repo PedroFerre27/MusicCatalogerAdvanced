@@ -1,0 +1,39 @@
+# Build artifacts (rigenerati da source)
+dist/
+build/
+*.spec.bak
+
+# Output PyInstaller
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Dati persistenti utente (vanno preservati LOCALMENTE, non committati)
+data/
+*.log
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Icona generata da build_ico.py (rigenerabile)
+/icons/music_cataloger.ico
+
+# File temporanei updater
+music_cataloger_updater.bat
+music_cataloger_updater.log
+
+# File di test
+test_output/
