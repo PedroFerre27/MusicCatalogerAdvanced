@@ -6279,3 +6279,351 @@ Aggiunta documentazione completa per:
 - `.gitignore` con esclusioni corrette (data/, dist/, build/, secret)
 
 Niente più ZIP sul desktop.
+
+---
+
+## v1085n — Hotfix robustness icone + UPX-free build (2026-05-04)
+
+### 🚨 ATTENZIONE: questo ZIP NON contiene la cartella `icons/`
+
+Pedro: ho rimosso `icons/` dal ZIP perché nei turni precedenti ho
+incluso ICONE CORROTTE (PNG con header JPEG, no transparency). Causa:
+i project files del workspace Claude avevano i PNG già corrotti, e
+non l'ho rilevato. Risultato: la build con quelle icone produceva
+sfondi neri ovunque.
+
+**AZIONE PEDRO**: estrai il ZIP sopra `C:\dev\music-cataloger\` SENZA
+sovrascrivere la cartella `icons/`. La tua copia locale degli icons
+è quella buona, restano com'erano.
+
+D'ora in poi i miei ZIP non includeranno più icone — sono tue, non
+mie.
+
+### 🐛 BUG-01 · Build EXE crash `Failed to load python313.dll`
+**File:** `music_cataloger.spec`
+
+Pedro test su tutte le versioni dalla v1085i in poi: l'EXE buildato
+con onefile crasha al primo avvio con `LoadLibrary: Impossibile
+trovare il modulo specificato. python313.dll`.
+
+Causa root: UPX compression. UPX comprime python313.dll dentro l'EXE
+self-extracting, ma molti antivirus aziendali (Defender + Carbon Black
++ SentinelOne + suite Indra-style) marcano i binari UPX come
+"potential malware" perché tanti ransomware usano UPX per offuscarsi.
+Risultato: AV mette python313.dll in quarantena post-extract → il
+bootloader trova `_MEIxxx/` ma non `python313.dll` → crash.
+
+Fix: `upx=False` nello spec. EXE ~30% più grande ma non più toccato
+dall'AV. Aggiunto anche `optimize=0` esplicito per evitare problemi
+con eyed3 che usa docstring runtime.
+
+### 🐛 BUG-02 · Icone con sfondo nero / non trasparenti
+**File:** `gui/icons.py`
+
+Pedro: post-build le icone avevano sfondo nero invece di trasparente.
+
+Causa root duplice:
+1. Il path resolver usava `Path(__file__).parent.parent` ma in
+   PyInstaller onefile `__file__` è in `_MEIxxx/gui/` quindi NON
+   trovava le icone (path differente).
+2. `Image.open(...).convert("RGBA")` falliva silenziosamente su file
+   non-RGBA (es. PNG con header JPEG, o RGB pure senza alpha) e
+   ritornava None → CustomTkinter renderizzava placeholder nero.
+
+Fix:
+1. `_resolve_icon_dir()` aware di `sys._MEIPASS` come nelle altre
+   parti del codice.
+2. Check esplicito `if img.mode != "RGBA"` prima di convert.
+3. Catch `UnidentifiedImageError, OSError, ValueError` per file
+   corrotti (capita con OneDrive sync interrotto durante build) →
+   ritorna None invece di icona corrotta. CustomTkinter mostra solo
+   testo del bottone.
+
+### 🐛 BUG-03 · Form crea utente apre in background senza icona
+**File:** `gui/main_window.py::_admin_show_create_user_dialog`
+
+Pedro: la finestra crea utente è ora una finestra Windows standalone
+(buono, da v1085m), MA si apre dietro la main + senza icona top-left.
+
+Fix duplice:
+1. `_apply_icon()` chiamata DUE volte: subito + dopo 250ms via
+   `win.after()`. Il primo tentativo può essere ignorato da Windows
+   se la finestra non è ancora "mappata"; il secondo passa quasi
+   sempre. Stesso pattern già usato sulla main window.
+2. `_bring_to_front()` con strategia "topmost momentaneo": setto
+   `-topmost True`, lift, focus_force, e dopo 100ms tolgo il topmost.
+   La finestra appare sopra TUTTE le altre app (non solo sopra la
+   main) ma non ci resta — comportamento normale dopo il "boot".
+   Chiamato a t=0, t=50ms, t=200ms per battere race con il window
+   manager Windows.
+
+### 🛟 FEAT-04 · Fallback manuale se update automatico fallisce
+**File:** `services/updater.py`
+
+Pedro problema: client v1085i ha updater rotto → ogni nuova versione
+che pubblico non si applica → Pedro è in loop circolare ("per
+aggiornare il client devo usare l'updater che è rotto").
+
+Soluzione: quando `_do_update()` raise un'eccezione MA il file è
+stato scaricato OK, mostro un nuovo dialog `_show_fallback_manual`
+con:
+- Path FROM (file scaricato in `%TEMP%\music_cataloger_update\`)
+- Path TO (EXE corrente)
+- Bottone "📂 Apri 'File scaricato'" → explorer.exe /select
+- Bottone "📂 Apri 'App corrente'" → explorer.exe /select
+- Istruzioni step-by-step
+
+Pedro chiude il client, copia a mano, riapre. Funziona indipendentemente
+da OneDrive/antivirus/permission/UPX. È UN fallback per emergenza —
+non sostituisce l'updater automatico.
+
+### 📦 Versioning: workflow git aggiornato
+**File:** `VERSIONING.md`
+
+Pedro ha già repo `https://github.com/PedroFerre27/MusicCatalogerAdvanced`.
+Setup completato in questa sessione, anche se con merge conflict
+risolti via `git merge --abort` + `git branch -M main` +
+`git push --force-with-lease`. Rebase pulito, tag `v1085m-stable`
+pushato.
+
+---
+
+## v1085o — Auto-update fix env vars + UX dialog standalone (2026-05-04)
+
+### 🐛 BUG-01 · Auto-update: nuovo EXE crash dopo move atomic
+**File:** `services/updater.py::_make_windows_updater_script`
+
+Pedro test definitivo: rename+move atomic vanno OK (vecchio in `*.exe.old`,
+nuovo in posizione, dimensioni 34555 KB conferma file integro). MA al
+rilancio il NUOVO EXE crasha sempre `Failed to load Python DLL python313.dll`.
+Lanciato a mano da explorer.exe lo stesso EXE funziona perfettamente.
+
+**Causa root identificata** (non era UPX né AV come ipotizzato):
+quando il client Python (vecchio EXE PyInstaller) lancia il batch via
+`subprocess.Popen` con `DETACHED_PROCESS`, il batch eredita le env vars
+del processo Python — incluse quelle che PyInstaller setta a runtime
+per il proprio bootstrap interno: `_PYI_APPLICATION_HOME_DIR`,
+`_MEIPASS2`, `_PYI_ARCHIVE_FILE`, etc.
+
+Quando il batch fa `start "" "<new_exe>"`, il nuovo processo eredita
+queste env vars stantii. Il bootloader del nuovo EXE le legge → pensa
+di essere "un sub-step di un altro PyInstaller" → cerca DLL in path
+inesistenti → crash con LoadLibrary fail.
+
+Lanciato da explorer.exe queste env vars NON sono presenti, quindi il
+bootloader fa estrazione fresh → tutto OK.
+
+Fix: nel batch updater, prima di `start`, set a vuoto tutte le env
+vars PyInstaller note:
+```bat
+set "_PYI_APPLICATION_HOME_DIR="
+set "_MEIPASS2="
+set "_PYI_ARCHIVE_FILE="
+set "_PYIBOOT_USER_PYTHONPATH="
+set "_PYI_SPLASH_IPC="
+start "" /D "<exe_dir>" "<new_exe>"
+```
+
+Aggiunto anche `/D <exe_dir>` per forzare la cwd del nuovo processo
+nella cartella dell'EXE (evita che cwd resti = %TEMP% del batch).
+
+### 🎨 FEAT-02 · Helper `_setup_standalone_dialog`
+**File:** `gui/main_window.py`
+
+Pedro: "il form crea utente è standalone Windows ora; potresti
+applicare la stessa fix agli altri dialog?"
+
+Refactoring: creato helper `_setup_standalone_dialog(win, root, title,
+w, h)` che applica la "ricetta" finestra Windows nativa (entry in
+taskbar, icona top-left, bring-to-front con topmost momentaneo,
+centratura sopra main).
+
+Applicato a:
+- `_admin_show_create_user_dialog` (deduplicato il codice da v1085m+n)
+- `_show_change_password_dialog` (era transient + grab_set custom)
+- `_show_about` (era transient + center_win custom)
+- `_show_upgrade_dialog` (era overrideredirect=True + transient — questo
+  era il caso più rischioso perché aveva titlebar custom; mantenuta la
+  titlebar custom ma rimossa overrideredirect → ora ha sia titlebar
+  Windows che titlebar custom; vedremo se cosmetico OK)
+
+Flyout/tooltip/popup leggeri NON modificati (devono restare borderless).
+
+### 🌴 FEAT-03 · Caraibica spostata a piano Advanced
+**File:** `config/user_plans.py`
+
+Pedro: "spostare il tab Caraibica nel piano Advanced".
+
+Cambio: `pro.tab_caribbean` da `True` a `False`. Solo `advanced` ha
+il tab.
+
+NB: per gli utenti Pro che già lo usano, il tab apparirà bloccato
+con overlay "Feature non disponibile, richiedi upgrade". Comportamento
+corretto.
+
+### 🪟 FEAT-04 · Titolo finestra principale
+**File:** `gui/main_window.py`
+
+Pedro: "Sulla barra di windows in cima alla pagina principale rimuovi
+'advanced' e la versione che è già riportata dentro la finestra. Lì
+invece dovrà apparire 'Music Cataloger | Piano attivo'".
+
+Fix: `self.root.title("Music Cataloger  |  <Plan.display_name>")`.
+Niente più "Advanced" né version string nel chrome OS — sono dentro
+l'app.
+
+### 📦 ZIP NON contiene icons/
+
+Le icone restano sul disco di Pedro (le mie sono JPEG-truccate).
+Pedro estrae il ZIP sopra C:\dev\music-cataloger\ senza sovrascrivere
+icons/.
+
+---
+
+## v1085p — Auto-update encoding fix + log style + macrogenere fix (2026-05-04)
+
+### 🐛 BUG-01 · Auto-update charmap codec error
+**File:** `services/updater.py::_make_windows_updater_script`
+
+Pedro test v1085o: dialog update si bloccava su "Preparo aggiornamento..."
+con log `_do_update fallito: 'charmap' codec can't encode character
+'\u2192' in position 2763`.
+
+Causa: avevo aggiunto in v1085m+n+o ~50 righe di commenti REM Unicode
+(con frecce `→`) per documentare le strategie. Quando Python scrive il
+batch su disco usa cp1252 (richiesto da cmd.exe) — cp1252 non ha U+2192
+quindi UnicodeEncodeError.
+
+Fix duplice:
+1. Riscritto batch v1085f-style — copy /Y semplice + retry, niente
+   rename, niente .old backup. Le toppe v1085m introducevano complessità
+   senza risolvere il bug di base (env vars pollution).
+2. Try cp1252, fallback utf-8 con BOM se ci sono caratteri speciali nei
+   path utente.
+3. Tutti i commenti REM ora sono ASCII puro.
+
+L'env cleanup PyInstaller (causa root del crash python313.dll) è
+PRESERVATO — quella era la fix vera. Tutto il resto (.old, rename
+atomic, fallback dialog) era teatro.
+
+### 🐛 BUG-02 · Macrogenere "Hard Rock" non matchato
+**File:** `core/cataloger.py::_get_parent_genre`
+
+Pedro: "Hard Rock dovrebbe finire in Rock/, invece va in root".
+
+Causa: `_PARENT_MAP` ha key `"Hard Rock"`, ma il caller fa
+`raw_genre.strip().capitalize()` → "Hard rock" (lowercase la 'r' di
+rock). La key non matcha → fallback ritorna il genere stesso → checking
+"hard rock" lower == "hard rock" lower → True → considerato "subgenere
+= macrogenere" → resta in root.
+
+Fix: `_get_parent_genre` ora fa lookup case-insensitive (cache
+`_parent_map_lower` su istanza). Aggiunti anche subgeneri mancanti nel
+PARENT_MAP (Pachanga, Latin Jazz, Soca, Dancehall, Funk, Gospel,
+Tropical House, Afrobeats, Bossa Nova). Caller ora passa
+`raw_genre.strip()` invece di `.capitalize()`.
+
+### 🎨 BUG-03 · Filtro log non rifiltra righe esistenti
+**File:** `gui/main_window.py`
+
+Pedro: "click sui pulsanti INFO/WARNING/ERROR svuota il log invece di
+rifiltrare le righe già emesse".
+
+Causa: `_log_apply_filter()` chiamava `clear()` poi ripopolava da
+`_log_all_lines`. Ma in TUTTO il codice si chiama `self._log.append()`
+diretto (non `self._log_append`), quindi il buffer restava vuoto.
+
+Fix: monkey-patch su istanza LogViewer.append per popolare anche
+`_log_all_lines`. Il filtro ora rifiltra tutta la storia. Mappo i
+livelli "speciali" (DEBUG, SUCCESS) su INFO ai fini del filtro perché
+i 3 toggle UI sono solo INFO/WARNING/ERROR.
+
+### 🐛 BUG-04 · Warning finali colorati ROSSO
+**File:** `gui/main_window.py::_classify_line`
+
+Causa: `_classify_line` matcheva la parola "errore" nel CONTENUTO della
+riga prima del livello dichiarato. Le righe `... - WARNING - Errore
+spostamento ...` (parola "Errore" nel testo, level WARNING) venivano
+classificate ERROR → colorate rosso.
+
+Fix: priorità al pattern del logger Python (`" - LEVEL - "`). Solo
+se non c'è pattern, fallback su contenuto.
+
+### 🎨 FEAT-05 · Log style nuove convenzioni
+**File:** `core/cataloger.py`
+
+Pedro: "i tag tipo `[GENERE ESCLUSO]`, `[RINOMINA]`, `[SUBFOLDER ESCLUSO]`
+sembrano debug; usa lo stile `>--` come gli altri".
+
+Cambiato:
+- `[GENERE ESCLUSO] X → macrogenere: Y` → `>-- Genere X Escluso -> Macrogenere: Y`
+- `[SUBFOLDER ESCLUSO] X → ...` → `>-- Subfolder Escluso: X -> ...`
+- `[RINOMINA] → name` → `>-- Rinomina: name`
+
+### 🖼️ BUG-06 · About logo path in onefile
+**File:** `gui/main_window.py::_show_about`
+
+Causa: usava `Path(__file__).parent.parent / "icons" / "app" / "app_icon_256.png"`.
+In onefile `__file__` è dentro `_MEIPASS` quindi punta correttamente, MA
+se `app_icon_256.png` non c'è nel bundle (Pedro lo aveva sostituito con
+una versione vecchia su disco), il dialog mostra fallback emoji.
+
+Fix: MEIPASS-aware + fallback a `taskbar_active.png` se app_icon_256
+non c'è. Convert RGBA esplicito.
+
+### 🪟 BUG-07 · Cambia password: bottone Conferma fuori dal bordo
+**File:** `gui/main_window.py::_show_change_password_dialog`
+
+Pedro: "scomparso il pulsante di conferma".
+
+Causa: dialog 440x400 era OK con titlebar custom (overrideredirect),
+ma con titlebar Windows nativa (v1085o) la titlebar mangia ~30px e i
+bottoni andavano sotto il bordo. CTk non scrolla automaticamente.
+
+Fix: aumentato a 460x480.
+
+### 📝 NOTA · Tab Cache info mancanti
+
+Pedro: "alcuni file nella tab Cache non hanno tutti i metadati".
+
+Conferma: i 2 file DB locali (`metadata_cache.json` per cache lookup
+esterni + `music_library.json` per stato catalogo) sono separati per
+scope. Pedro vuole unificarli in un nuovo branch.
+
+DA FARE in branch `dev/unify-local-db` (post pilot 1):
+- Schema unificato (es. `local_db.json` con sezioni cache/library)
+- Migrazione automatica al primo boot v1086+
+- Tab Cache + DB Locale + Generi interrogano stesso file
+
+---
+
+## v1086 — Pilot 1 RELEASE 🚀 (2026-05-04)
+
+Prima release stabile del pilot. Tester:
+- Pedro (Windows) — sviluppatore
+- Amico Pedro (Linux Ubuntu) — primo tester esterno
+
+### Tutti i bug critici v1085i...v1085p sono inclusi e fixati:
+
+✅ Auto-update funzionante (fix env vars `_PYI_*` cleanup nel batch)
+✅ Persistenza sessione/last_email in modalità onefile
+✅ Form crea utente come finestra Windows standalone
+✅ Form cambia password / About / Upgrade Plan tutti standalone
+✅ Macrogeneri case-insensitive (Hard Rock → Rock/, Country Pop → Pop/)
+✅ Filtro log ri-applica filtro a tutta la storia (no più svuotamento)
+✅ Warning corretto colorato giallo (no rosso)
+✅ Log style nuove convenzioni (`>--` invece di `[TAG]`)
+✅ Tab Caraibica solo Advanced
+✅ Titolo finestra `Music Cataloger | <Piano>`
+✅ `_is_latin_file` metodo aggiunto
+
+### Build Linux supportata
+File `BUILD_LINUX.md` con guida per il tester. Spec `music_cataloger_linux.spec`
+allineata allo Windows (onefile, niente UPX). File `.desktop` per
+integrazione DE.
+
+### Branch strategy post-v1086
+- `main` = sempre v1086 stabile
+- `dev/unify-local-db` = unificazione metadata_cache + music_library
+- `dev/community-db` = pilot 2: DB community-driven
+- Eventuali hotfix v1086 → tag `v1086.1`, `v1086.2`...

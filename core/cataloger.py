@@ -601,10 +601,10 @@ class MusicCataloger:
                     if parent.lower() == genre.strip().lower():
                         # v1068: genere escluso senza macrogenere alternativo
                         # → lascia nella directory radice come non catalogato
-                        self.logger.info(f"   [GENERE ESCLUSO] {genre} → non catalogato (lasciato in root)")
+                        self.logger.info(f"   >-- Genere {genre} Escluso -> non catalogato (lasciato in root)")
                         return False   # non spostare il file
                     else:
-                        self.logger.info(f"   [GENERE ESCLUSO] {genre} → macrogenere: {parent}")
+                        self.logger.info(f"   >-- Genere {genre} Escluso -> Macrogenere: {parent}")
                         genre = parent
                         raw_genre = parent.lower()
 
@@ -614,19 +614,22 @@ class MusicCataloger:
                     # v1071b: subgenere escluso
                     # Regola: se macrogenere ATTIVO → file va nel macrogenere
                     #         se macrogenere ESCLUSO → file rimane in root
-                    sub_name = raw_genre.strip().capitalize()
+                    # v1085p: passo raw_genre.strip() invece di .capitalize() —
+                    # _get_parent_genre ora fa lookup case-insensitive quindi
+                    # "hard rock" / "HARD ROCK" / "Hard Rock" matchano tutti.
+                    sub_name = raw_genre.strip()
                     parent = self._get_parent_genre(sub_name)
                     parent_lower = parent.lower()
                     if parent_lower in excluded_lower or parent_lower == sub_name.lower():
                         # Macrogenere escluso o subgenere = macrogenere → resta in root
                         self.logger.info(
-                            f"   [SUBFOLDER ESCLUSO] {raw_genre} → macrogenere {parent} anche escluso → root"
+                            f"   >-- Subfolder Escluso: {sub_name} -> macrogenere {parent} anche escluso -> root"
                         )
                         return False
                     else:
                         # Macrogenere attivo → sposta nel macrogenere senza subfolder
                         self.logger.info(
-                            f"   [SUBFOLDER ESCLUSO] {raw_genre} → usa solo {parent} (no subfolder)"
+                            f"   >-- Subfolder Escluso: {sub_name} -> usa solo {parent} (no subfolder)"
                         )
                         genre = parent
                         raw_genre = ""  # vuoto = nessuna subfolder
@@ -695,7 +698,7 @@ class MusicCataloger:
                     if str(new_path) != str(destination):
                         if not new_path.exists():
                             destination.rename(new_path)
-                            self.logger.info(f"   [RINOMINA] → {new_name}")
+                            self.logger.info(f"   >-- Rinomina: {new_name}")
                             destination = new_path
                         else:
                             # File con il nome target esiste già: log e non sovrascrivere
@@ -1250,7 +1253,10 @@ class MusicCataloger:
     # ─── CACHE & REPORT ─────────────────────────────────────────────────
 
     def _get_parent_genre(self, genre: str) -> str:
-        """v1059: dato un genere/subgenere, restituisce il macrogenere padre."""
+        """v1059: dato un genere/subgenere, restituisce il macrogenere padre.
+        v1085p: lookup case-insensitive — fix per "Hard Rock" / "Country Pop"
+        / "Death Metal" che con .capitalize() diventavano "Hard rock" e
+        non venivano matchati nel dizionario."""
         _PARENT_MAP = {
             # Latin subgeneri → Latin
             "Salsa": "Latin", "Salsa Romantica": "Latin", "Salsa Choke": "Latin",
@@ -1258,7 +1264,8 @@ class MusicCataloger:
             "Merengue": "Latin", "Reggaeton": "Latin", "Cumbia": "Latin",
             "Tropical": "Latin", "Mambo": "Latin", "Timba": "Latin",
             "Vallenato": "Latin", "Bolero": "Latin", "Boogaloo": "Latin",
-            "Cha Cha Cha": "Latin",
+            "Cha Cha Cha": "Latin", "Pachanga": "Latin", "Latin Jazz": "Latin",
+            "Soca": "Latin", "Dancehall": "Latin",
             # Rock
             "Alternative": "Rock", "Indie": "Rock", "Metal": "Rock",
             "Death Metal": "Rock", "Punk": "Rock", "Grunge": "Rock",
@@ -1271,10 +1278,11 @@ class MusicCataloger:
             "House": "Electronic", "Techno": "Electronic", "Trance": "Electronic",
             "Ambient": "Electronic", "Drum and Bass": "Electronic",
             "Dubstep": "Electronic", "EDM": "Electronic", "Synthwave": "Electronic",
+            "Tropical House": "Electronic",
             # Pop & R&B
             "Dance Pop": "Pop", "R&B": "Pop", "Hip Hop": "Pop",
             "Trap": "Pop", "Vocal": "Pop", "K-Pop": "Pop", "J-Pop": "Pop",
-            "Country": "Pop", "Country Pop": "Pop",
+            "Country": "Pop", "Country Pop": "Pop", "Funk": "Pop", "Gospel": "Pop",
             # Soundtrack
             "Anime": "Soundtrack", "TV Soundtrack": "Soundtrack",
             "Video Game": "Soundtrack", "Trailer Music": "Soundtrack",
@@ -1282,11 +1290,16 @@ class MusicCataloger:
             # World — i subgeneri rimangono in World ma World stesso non ha padre
             "Flamenco": "World", "Reggae": "World", "Folk": "World",
             "African": "World", "Brazilian": "World", "Celtic": "World",
-            "Middle Eastern": "World",
+            "Middle Eastern": "World", "Afrobeats": "World", "Bossa Nova": "World",
             # World come macrogenere → nessun padre, resta World
             "World": "World",
         }
-        return _PARENT_MAP.get(genre, genre)  # fallback: usa il genere stesso
+        # v1085p: lookup case-insensitive. Costruisco mappa lowercase
+        # ma mantengo i valori originali (case-corretto) per output pulito.
+        # Cache su classe per evitare di ricostruire ad ogni call.
+        if not hasattr(self, "_parent_map_lower"):
+            self._parent_map_lower = {k.lower(): v for k, v in _PARENT_MAP.items()}
+        return self._parent_map_lower.get(genre.strip().lower(), genre)
 
     def load_cache(self):
         cache_file = self.data_dir / "metadata_cache.json"

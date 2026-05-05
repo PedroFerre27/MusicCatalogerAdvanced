@@ -185,101 +185,91 @@ def _make_windows_updater_script(current_exe: Path, new_exe: Path) -> Path:
     Crea un batch script che aspetta che l'EXE corrente sia chiuso, poi
     lo sostituisce col nuovo e riavvia. Ritorna il path dello script.
 
-    Il batch viene creato in temp con nome univoco. Il client lo lancia
-    e poi termina — Windows continua a eseguire il batch dopo che l'EXE
-    chiude i suoi handle.
+    v1085p: torno alla strategia v1085f (copy /Y semplice) + env vars
+    PyInstaller cleanup. Le strategie rename-and-replace e i 50 righe
+    di commenti REM Unicode introdotti in v1085m...o creavano problemi
+    nuovi (cp1252 encoding error sulla freccia U+2192) senza risolvere
+    il bug di base.
+
+    Cosa cambia rispetto a v1085f:
+    - Aggiunto env cleanup PyInstaller (causa root crash python313.dll)
+    - Logging completo per debug
+    - Solo ASCII nei commenti REM (cp1252 limit)
     """
     if sys.platform != "win32":
         raise RuntimeError("Updater batch script disponibile solo su Windows")
 
     script_path = Path(tempfile.gettempdir()) / "music_cataloger_updater.bat"
     log_file = Path(tempfile.gettempdir()) / "music_cataloger_updater.log"
-    # Path del backup del vecchio EXE — sarà cancellato al boot della
-    # nuova versione (ved. updater.cleanup_old_backup)
-    old_backup = current_exe.with_suffix(current_exe.suffix + ".old")
-    # v1085m: strategia rename-and-replace invece di copy.
-    # Causa del bug "Failed to load python313.dll" in v1085l:
-    # con PyInstaller ONEFILE, il vecchio EXE in esecuzione tiene un
-    # lock sul proprio file E sulla _MEIxxx temp dir. Fare `copy /Y`
-    # mentre il processo si stava chiudendo creava una race condition:
-    # a volte la copy avveniva con il bootloader ancora "agganciato",
-    # producendo un EXE corrotto sui ~31 MB iniziali.
-    #
-    # Nuova strategia (atomica):
-    #   1. Aspetta che il vecchio EXE NON sia in lock
-    #   2. RINOMINA il vecchio in *.exe.old (operazione atomica filesystem)
-    #   3. SPOSTA il nuovo in posizione del vecchio (atomico)
-    #   4. Lancia il nuovo
-    #   5. Al boot del nuovo, updater.cleanup_old_backup() rimuove .exe.old
-    #
-    # Perché funziona: rename è atomico e non legge/scrive il contenuto;
-    # quindi non collide col bootloader PyInstaller in chiusura.
+
+    # Strategia: copy /Y semplice come v1085f con retry per gestire lock.
+    # Niente rename, niente .old backup, niente roba "atomica":
+    # PyInstaller onefile gestisce gia' il proprio lock automaticamente
+    # perche' il vecchio EXE chiude i suoi handle prima che il batch
+    # parta (il batch aspetta 2 sec per sicurezza).
     content = f"""@echo off
-REM Music Cataloger auto-updater (v1085m: rename-and-replace strategy)
-REM Atteso da: {current_exe}
-REM Nuovo file: {new_exe}
+REM Music Cataloger auto-updater (v1085p: stile v1085f + env cleanup)
 
 setlocal
 set LOG="{log_file}"
 echo. >> %LOG%
 echo ============================================== >> %LOG%
-echo [%DATE% %TIME%] Avvio updater v1085m >> %LOG%
+echo [%DATE% %TIME%] Avvio updater v1085p >> %LOG%
 echo   current_exe = {current_exe} >> %LOG%
 echo   new_exe     = {new_exe} >> %LOG%
-echo   old_backup  = {old_backup} >> %LOG%
+
 echo Music Cataloger - aggiornamento in corso...
-timeout /t 3 /nobreak >nul
+REM Aspetto 2 sec che il vecchio processo abbia chiuso tutti i handle
+timeout /t 2 /nobreak >nul
 
-REM Step 1: aspetto che il vecchio EXE non sia in lock.
-REM Test del lock = provo a rinominarlo: se ci riesco, non è in uso.
+REM Retry copy fino a 30 sec (in caso di OneDrive/AV transient lock)
 set RETRIES=0
-:WAIT_UNLOCK
-REM Pulisco eventuale .old da update precedente fallito
-if exist "{old_backup}" del /F /Q "{old_backup}" >> %LOG% 2>&1
-
-REM Tento rename atomico — se il file è in lock fallisce
-ren "{current_exe}" "{current_exe.name}.old" >> %LOG% 2>&1
-if %errorlevel%==0 goto MOVE_NEW
-
+:RETRY
+echo [%DATE% %TIME%] Tentativo %RETRIES% copy >> %LOG%
+copy /Y "{new_exe}" "{current_exe}" >> %LOG% 2>&1
+if %errorlevel%==0 goto SUCCESS
 set /a RETRIES+=1
-echo [%DATE% %TIME%] Tentativo %RETRIES%: vecchio EXE ancora in lock >> %LOG%
-if %RETRIES% GEQ 30 goto FAIL_LOCK
+if %RETRIES% GEQ 30 goto FAIL
 timeout /t 1 /nobreak >nul
-goto WAIT_UNLOCK
+goto RETRY
 
-:MOVE_NEW
-echo [%DATE% %TIME%] Vecchio EXE rinominato in .old, sposto il nuovo >> %LOG%
-move /Y "{new_exe}" "{current_exe}" >> %LOG% 2>&1
-if %errorlevel% neq 0 goto FAIL_MOVE
+:SUCCESS
+echo [%DATE% %TIME%] Copy OK >> %LOG%
+del "{new_exe}" >nul 2>&1
 
-echo [%DATE% %TIME%] SUCCESS - nuovo EXE in posizione, rilancio >> %LOG%
+REM ENV CLEANUP critico: il batch eredita env vars PyInstaller dal
+REM processo Python che lo ha lanciato. Se le passa al nuovo EXE,
+REM il bootloader si confonde e cerca DLL in path inesistenti.
+REM Fix: clear tutte le env vars PyInstaller note.
+set "_PYI_APPLICATION_HOME_DIR="
+set "_MEIPASS2="
+set "_PYI_ARCHIVE_FILE="
+set "_PYIBOOT_USER_PYTHONPATH="
+set "_PYI_SPLASH_IPC="
+echo [%DATE% %TIME%] env vars PyInstaller cleared >> %LOG%
+
 echo Aggiornamento completato. Riavvio in corso...
-REM Aspetto un altro secondo per essere sicuri che il nuovo file sia
-REM "stabile" sul filesystem (antivirus/OneDrive possono aver appena
-REM fatto un'apertura per scansione)
-timeout /t 1 /nobreak >nul
-start "" "{current_exe}"
+REM /D forza la cwd nella cartella dell'EXE (no eredita %TEMP% del batch)
+start "" /D "{current_exe.parent}" "{current_exe}"
+echo [%DATE% %TIME%] start emesso, errorlevel=%errorlevel% >> %LOG%
 echo [%DATE% %TIME%] Updater terminato OK >> %LOG%
 exit /b 0
 
-:FAIL_LOCK
-echo [%DATE% %TIME%] FAIL - vecchio EXE rimane in lock dopo 30 tentativi >> %LOG%
-echo ERRORE: l'eseguibile vecchio sembra ancora in uso.
-echo Chiudi manualmente Music Cataloger e riprova.
-echo Log: %LOG%
-pause
-exit /b 1
-
-:FAIL_MOVE
-echo [%DATE% %TIME%] FAIL - move del nuovo EXE fallito >> %LOG%
-REM Tento rollback: rinomino .old di nuovo a .exe
-ren "{current_exe}.old" "{current_exe.name}" >> %LOG% 2>&1
-echo ERRORE: impossibile installare la nuova versione.
-echo Log: %LOG%
+:FAIL
+echo [%DATE% %TIME%] FAIL - copy non riuscita dopo 30 tentativi >> %LOG%
+echo ERRORE: impossibile aggiornare l'eseguibile.
+echo Log dettagliato in %LOG%
 pause
 exit /b 1
 """
-    script_path.write_text(content, encoding="cp1252")
+    # cp1252 funziona perche' ho rimosso tutti i caratteri non-ASCII
+    # dai commenti. Ma se in futuro qualcuno aggiunge accenti nei path
+    # (es. "C:\\Users\\Pedro Marqueš\\..."), cp1252 fallisce. Quindi
+    # provo cp1252, poi fallback a utf-8 con BOM.
+    try:
+        script_path.write_text(content, encoding="cp1252")
+    except UnicodeEncodeError:
+        script_path.write_text("\ufeff" + content, encoding="utf-8")
     return script_path
 
 
@@ -439,6 +429,7 @@ def _show_update_dialog(api_client, parent_window, info: dict, local_ver: str):
         btn_no.configure(state="disabled")
 
         def _worker():
+            new_exe_path = None  # tracking per fallback manuale
             try:
                 # Risolvi URL completo se relativo
                 exe_url = info.get("exe_url", "")
@@ -461,6 +452,7 @@ def _show_update_dialog(api_client, parent_window, info: dict, local_ver: str):
                     expected_sha256=info.get("sha256"),
                     progress_cb=_on_progress,
                 )
+                new_exe_path = new_exe   # salvato per fallback
                 win.after(0, lambda: status_var.set("Preparo l'aggiornamento..."))
 
                 current_exe = get_current_exe_path()
@@ -485,11 +477,33 @@ def _show_update_dialog(api_client, parent_window, info: dict, local_ver: str):
                     )),
                 ))
             except Exception as e:
-                win.after(0, lambda: (
-                    status_var.set(f"Errore: {e}"),
-                    btn_yes.configure(state="normal", text="Riprova"),
-                    btn_no.configure(state="normal"),
-                ))
+                _log(f"_do_update fallito: {e}")
+                # v1085n: in caso di errore, mostra il path dell'EXE
+                # scaricato (se c'è) così l'utente può sostituirlo a mano.
+                # Questo è il fallback per uscire dal "loop circolare":
+                # client rotto → updater rotto → client non si aggiorna.
+                fallback_msg = f"Errore aggiornamento: {e}"
+                if new_exe_path and new_exe_path.exists():
+                    current = get_current_exe_path()
+                    fallback_msg = (
+                        f"L'aggiornamento automatico è fallito.\n\n"
+                        f"Errore: {e}\n\n"
+                        f"PROCEDURA MANUALE:\n"
+                        f"1. Chiudi questa finestra\n"
+                        f"2. Chiudi Music Cataloger\n"
+                        f"3. Copia il file scaricato sopra quello corrente:\n"
+                        f"   FROM: {new_exe_path}\n"
+                        f"   TO:   {current}\n"
+                        f"4. Riapri Music Cataloger"
+                    )
+                    win.after(0, lambda: _show_fallback_manual(
+                        win, parent_window, new_exe_path, current, str(e)))
+                else:
+                    win.after(0, lambda: (
+                        status_var.set(fallback_msg),
+                        btn_yes.configure(state="normal", text="Riprova"),
+                        btn_no.configure(state="normal"),
+                    ))
 
         threading.Thread(target=_worker, daemon=True).start()
 
@@ -518,3 +532,87 @@ def _show_update_dialog(api_client, parent_window, info: dict, local_ver: str):
             text_color="#d84545"
         ).pack(side="bottom", pady=(0, 8))
         win.protocol("WM_DELETE_WINDOW", lambda: None)  # blocca X
+
+
+def _show_fallback_manual(parent_dialog, main_window,
+                           new_exe_path: Path, current_exe: Path,
+                           error_msg: str) -> None:
+    """v1085n: dialog di fallback quando l'update automatico fallisce.
+
+    Mostra path FROM/TO e apre cartella di entrambi al click. L'utente
+    può sostituire il file a mano. Necessario per uscire dal loop
+    "updater rotto → client non si aggiorna mai".
+    """
+    import customtkinter as ctk
+    import subprocess as _sub
+
+    # Distruggo il dialog di update (con il "Scarico..." in error state)
+    try: parent_dialog.destroy()
+    except Exception: pass
+
+    fb = ctk.CTkToplevel(main_window)
+    fb.title("Aggiornamento manuale richiesto")
+    fb.geometry("640x420")
+    fb.resizable(False, False)
+    try:
+        from gui.app_icon import set_window_icon
+        set_window_icon(fb)
+    except Exception: pass
+    try:
+        fb.lift(); fb.focus_force()
+    except Exception: pass
+
+    # Header
+    ctk.CTkLabel(fb, text="⚠  Aggiornamento automatico fallito",
+                 font=("Segoe UI", 14, "bold"),
+                 text_color="#e8a62b").pack(pady=(20, 6))
+
+    # Errore
+    ctk.CTkLabel(fb, text=f"Errore: {error_msg}",
+                 font=("Segoe UI", 9),
+                 text_color="#999999",
+                 wraplength=580).pack(pady=(0, 16))
+
+    # Istruzioni
+    instructions = (
+        "Per applicare l'aggiornamento manualmente:\n\n"
+        "  1. Chiudi Music Cataloger (questa finestra + finestra principale)\n"
+        "  2. Apri la cartella 'File scaricato' (sotto)\n"
+        "  3. Copia il file Music_Cataloger_*.exe\n"
+        "  4. Apri la cartella 'App corrente' (sotto)\n"
+        "  5. Incolla sostituendo il file esistente\n"
+        "  6. Riapri Music Cataloger"
+    )
+    ctk.CTkLabel(fb, text=instructions, font=("Consolas", 9),
+                 justify="left", anchor="w").pack(padx=24, pady=(0, 16),
+                                                   fill="x")
+
+    # Path display
+    paths_frame = ctk.CTkFrame(fb, fg_color="#1a1a2e")
+    paths_frame.pack(padx=24, pady=(0, 16), fill="x")
+    ctk.CTkLabel(paths_frame, text=f"FROM: {new_exe_path}",
+                 font=("Consolas", 8), text_color="#88c0d0",
+                 wraplength=580).pack(padx=12, pady=(8, 4), anchor="w")
+    ctk.CTkLabel(paths_frame, text=f"TO:   {current_exe}",
+                 font=("Consolas", 8), text_color="#a3be8c",
+                 wraplength=580).pack(padx=12, pady=(0, 8), anchor="w")
+
+    # Btn row
+    btn_row = ctk.CTkFrame(fb, fg_color="transparent")
+    btn_row.pack(pady=(0, 16))
+
+    def _open_folder(path: Path):
+        try:
+            _sub.Popen(["explorer", "/select,", str(path)])
+        except Exception as e:
+            _log(f"open_folder failed: {e}")
+
+    ctk.CTkButton(btn_row, text="📂  Apri 'File scaricato'", width=200,
+                  command=lambda: _open_folder(new_exe_path)
+                  ).pack(side="left", padx=4)
+    ctk.CTkButton(btn_row, text="📂  Apri 'App corrente'", width=200,
+                  command=lambda: _open_folder(current_exe)
+                  ).pack(side="left", padx=4)
+    ctk.CTkButton(btn_row, text="Chiudi", width=100,
+                  fg_color="transparent", text_color="#999",
+                  command=fb.destroy).pack(side="left", padx=4)

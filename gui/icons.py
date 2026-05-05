@@ -1,11 +1,26 @@
 """
 icons.py — v1073: mappa icone custom completa (62 PNG)
+
+v1085n: path resolution robusto che gestisce sia modalità script
+che PyInstaller onefile (sys._MEIPASS).
 """
+import sys
 from pathlib import Path
 from functools import lru_cache
 import customtkinter as ctk
 
-_ICON_DIR = Path(__file__).parent.parent / "icons" / "app"
+
+def _resolve_icon_dir() -> Path:
+    """v1085n: in PyInstaller onefile, le risorse sono in sys._MEIPASS,
+    non in `Path(__file__).parent.parent`. In modalità script normale
+    invece sì."""
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        return Path(meipass) / "icons" / "app"
+    return Path(__file__).parent.parent / "icons" / "app"
+
+
+_ICON_DIR = _resolve_icon_dir()
 
 _ICON_MAP = {
     # ── Stat bar ─────────────────────────────────────────────────────────
@@ -80,7 +95,19 @@ _ICON_MAP = {
 
 @lru_cache(maxsize=256)
 def get_icon(name: str, size: int = 32) -> "ctk.CTkImage | None":
-    from PIL import Image
+    """v1085n: caricamento icone più robusto.
+
+    Cambiamenti:
+    - Verifica che il PNG abbia transparency (RGBA mode) prima di
+      restituirlo. Se è in modalità RGB pura senza alpha → conversione
+      esplicita aggiungendo canale alpha pieno (255) per evitare
+      sfondi neri/bianchi su tema scuro.
+    - Se PIL.Image.open() fallisce o il file è troncato/corrotto
+      (capita con OneDrive sync), ritorna None invece di immagine
+      nera. CustomTkinter mostrerà solo testo del bottone — meglio
+      che icona corrotta.
+    """
+    from PIL import Image, UnidentifiedImageError
     png_name = _ICON_MAP.get(name, name)
     png_path = _ICON_DIR / f"{png_name}.png"
     if not png_path.exists():
@@ -88,10 +115,20 @@ def get_icon(name: str, size: int = 32) -> "ctk.CTkImage | None":
     if not png_path.exists():
         return None
     try:
-        img = Image.open(str(png_path)).convert("RGBA")
+        img = Image.open(str(png_path))
+        # Forza conversione RGBA per garantire canale alpha.
+        # Se il PNG è già RGBA, convert("RGBA") è no-op.
+        # Se è RGB (no alpha) o L (grayscale), aggiunge alpha=255.
+        if img.mode != "RGBA":
+            img = img.convert("RGBA")
         img = img.resize((size, size), Image.LANCZOS)
         return ctk.CTkImage(light_image=img, dark_image=img, size=(size, size))
-    except Exception:
+    except (UnidentifiedImageError, OSError, ValueError) as e:
+        # File corrotto/incompleto (es. OneDrive sync interrotto durante build)
+        print(f"[icons] Icona corrotta per '{name}' ({png_path}): {e}")
+        return None
+    except Exception as e:
+        print(f"[icons] Errore caricamento '{name}': {e}")
         return None
 
 

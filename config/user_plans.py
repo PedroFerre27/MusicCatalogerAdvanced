@@ -76,7 +76,7 @@ PLAN_FEATURES = {
         "tab_quality":   True,
         "tab_cache":     True,
         "tab_advanced":  False,   # solo Advanced
-        "tab_caribbean": True,    # ⭐ spostato da Advanced a Pro
+        "tab_caribbean": False,   # v1085o: spostato in Advanced (era Pro)
         # Maintenance base
         "maint_duplicates":   True,
         "maint_integrity":    False,   # solo Advanced

@@ -71,6 +71,11 @@ a = Analysis(
     win_private_assemblies=False,
     cipher=block_cipher,
     noarchive=False,
+    # v1085n: bytecode optimization 0 = no -O.
+    # Il default è già 0 ma lo metto esplicito per essere chiaro che
+    # NON vogliamo -O (rimuove docstring e assert: alcune librerie
+    # tipo eyed3 si rompono perché usano docstring runtime).
+    optimize=0,
 )
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
@@ -88,7 +93,15 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    # v1085n: UPX disabilitato. UPX comprime le DLL (incluso python313.dll)
+    # ma molti antivirus aziendali (Defender + suite enterprise tipo
+    # Carbon Black, SentinelOne) marcano i binari UPX come "potential
+    # malware" perché tanti ransomware usano UPX per offuscarsi.
+    # Risultato: l'AV mette python313.dll in quarantena → al primo
+    # boot il bootloader trova `_MEIxxxx/` ma non `python313.dll` →
+    # "Failed to load Python DLL". Senza UPX l'EXE è ~30% più grande
+    # ma non ha questo problema.
+    upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,

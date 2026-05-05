@@ -71,6 +71,63 @@ PALETTE = {
     "log_result":    "#3A7055",   # \\-- risultato: verde grigio
 }
 
+
+def _setup_standalone_dialog(win, root, title: str,
+                              w: int, h: int, center_on_root: bool = True):
+    """v1085o: helper per configurare un CTkToplevel come finestra Windows
+    STANDALONE (con propria entry in taskbar, propria icona, gestione
+    z-order nativa). Usato per i dialog "modali importanti".
+
+    Sostituisce il pattern overrideredirect=True + transient che creava
+    finestre senza titlebar e legate alla main — le quali su Windows
+    tendevano a nascondersi sotto la main al re-focus dell'utente.
+
+    Strategia:
+    - title visibile in taskbar (entry separata in alt+tab)
+    - icona via app_icon.set_window_icon (chiamata 2 volte: subito + dopo
+      250ms, perché Windows ignora il primo set se la finestra non è
+      ancora stata mappata)
+    - bring-to-front "topmost momentaneo": setto -topmost True, lift,
+      focus_force, dopo 100ms tolgo il topmost. Risultato: appare sopra
+      tutte le app al primo show, poi z-order normale.
+    - centratura sopra la main window
+    """
+    win.title(title)
+    win.geometry(f"{w}x{h}")
+    win.resizable(False, False)
+    win.configure(fg_color=PALETTE["bg"])
+
+    def _apply_icon():
+        try:
+            from gui.app_icon import set_window_icon
+            set_window_icon(win)
+        except Exception: pass
+    _apply_icon()
+    try: win.after(250, _apply_icon)
+    except Exception: pass
+
+    def _bring_to_front():
+        try:
+            win.lift()
+            win.attributes("-topmost", True)
+            win.focus_force()
+            win.after(100, lambda: win.attributes("-topmost", False))
+        except Exception: pass
+    _bring_to_front()
+    try:
+        win.after(50, _bring_to_front)
+        win.after(200, _bring_to_front)
+    except Exception: pass
+
+    if center_on_root:
+        try:
+            root.update_idletasks()
+            rx = root.winfo_x(); ry = root.winfo_y()
+            rw = root.winfo_width(); rh = root.winfo_height()
+            win.geometry(f"{w}x{h}+{rx + (rw-w)//2}+{ry + (rh-h)//2}")
+        except Exception: pass
+
+
 FONT_TITLE = ("Segoe UI", 20, "bold")
 FONT_HEAD  = ("Segoe UI", 13, "bold")
 FONT_BODY  = ("Segoe UI", 11)
@@ -274,7 +331,9 @@ class MusicCatalogerGUI:
         self.api_client = api_client
         self.user_info  = user_info or {}
         self.root = root
-        self.root.title(f"Music Cataloger Advanced  {APP_VERSION}")
+        # v1085o: titolo barra "Music Cataloger | <Piano>" (no Advanced/version,
+        # già visibili dentro l'app)
+        self.root.title("Music Cataloger")
         # Icona finestra e taskbar — helper gestisce PyInstaller bundle
         try:
             from gui.app_icon import set_window_icon
@@ -1082,19 +1141,14 @@ class MusicCatalogerGUI:
         win_h = min(680, sh - 80)
 
         win = ctk.CTkToplevel(self.root)
-        win.transient(self.root)
-        win.configure(fg_color=PALETTE["bg"])
-        try:
-            win.overrideredirect(True)
-        except Exception:
-            pass
+        # v1085o: finestra Windows standalone (era overrideredirect+transient)
+        _setup_standalone_dialog(win, self.root, "Upgrade Plan",
+                                  win_w, win_h, center_on_root=False)
+        # Centro su schermo (override del centering del helper, perché qui
+        # è un dialog grande, vogliamo centrato sullo schermo, non sulla main)
         win.geometry(f"{win_w}x{win_h}+{(sw-win_w)//2}+{(sh-win_h)//2}")
         try:
             win.grab_set()
-        except Exception:
-            pass
-        try:
-            win.focus_set()
         except Exception:
             pass
 
@@ -1361,24 +1415,14 @@ class MusicCatalogerGUI:
             return
 
         win = ctk.CTkToplevel(self.root)
-        win.title("Cambia password")
-        win.geometry("440x400")
-        win.resizable(False, False)
-        win.transient(self.root)
+        # v1085o: finestra standalone Windows con icona/topmost/center
+        # v1085p: aumentata altezza 400→480 perche' titlebar Windows nativa
+        # mangia ~30px e i bottoni andavano sotto il bordo
+        _setup_standalone_dialog(win, self.root, "Cambia password", 460, 480)
         try:
             win.grab_set()
         except Exception:
             pass
-        win.configure(fg_color=PALETTE["bg"])
-        self._set_win_icon(win)
-
-        # Centra sulla main window
-        self.root.update_idletasks()
-        mx = self.root.winfo_x()
-        my = self.root.winfo_y()
-        mw = self.root.winfo_width()
-        mh = self.root.winfo_height()
-        win.geometry(f"440x400+{mx + (mw-440)//2}+{my + (mh-400)//2}")
 
         # Header
         ctk.CTkLabel(win, text="🔒  Cambia password",
@@ -2505,6 +2549,26 @@ class MusicCatalogerGUI:
         self._log.grid(row=1, column=0, padx=4, pady=(0, 4), sticky="nsew")
         self._log_all_lines: list = []  # buffer di tutte le righe per il filtro
 
+        # v1085p: wrappo LogViewer.append per popolare anche _log_all_lines.
+        # In tutto il codice esistente si chiama self._log.append(...) diretto,
+        # bypassando il buffer. Risultato: il filtro _log_apply_filter
+        # svuotava il log (clear + ripopola da buffer vuoto).
+        # Soluzione: monkey-patch sull'istanza che intercetta le chiamate
+        # e scrive sia nel widget sia nel buffer. Levels DEBUG/SUCCESS sono
+        # mappati a INFO per il filtro (i 3 toggle sono INFO/WARNING/ERROR).
+        _orig_append = self._log.append
+        def _wrapped_append(text, level="INFO", _orig=_orig_append):
+            # Mappa livelli "speciali" sui 3 filtri base
+            filter_lv = level
+            if level not in ("INFO", "WARNING", "ERROR"):
+                # DEBUG, SUCCESS, etc → li tratto come INFO ai fini del filtro
+                filter_lv = "INFO"
+            self._log_all_lines.append((text, filter_lv))
+            # Visualizza solo se il filtro lo permette
+            if self._log_filter.get(filter_lv, True):
+                _orig(text, level)
+        self._log.append = _wrapped_append
+
         # ── Tab 2: DB Locale ─────────────────────────────────────────────
         tab_db = self._tabview.add("  DB Locale")
         tab_db.columnconfigure(0, weight=1)
@@ -2549,9 +2613,9 @@ class MusicCatalogerGUI:
         try:
             from config.user_plans import get_plan as _get_plan
             _plan = _get_plan()
-            self.root.title(
-                f"Music Cataloger Advanced  {APP_VERSION}  |  {_plan.display_name}"
-            )
+            # v1085o: titolo "Music Cataloger | <Piano>" — niente "Advanced",
+            # niente versione (sono dentro l'app, non utili nel chrome OS)
+            self.root.title(f"Music Cataloger  |  {_plan.display_name}")
         except Exception:
             pass
 
@@ -4670,39 +4734,10 @@ class MusicCatalogerGUI:
 
         DLG_W, DLG_H = 460, 580
         win = ctk.CTkToplevel(self.root)
-        win.title("Crea nuovo utente")
-        win.geometry(f"{DLG_W}x{DLG_H}")
-        win.resizable(False, False)
-        # v1085m: dialog "standalone" con titlebar Windows nativa.
-        # Niente overrideredirect=True, niente transient: questo lo fa
-        # apparire come finestra separata in taskbar (con propria icona,
-        # propria entry alt+tab) e Windows gestisce automaticamente:
-        # - minimize/restore
-        # - z-order
-        # - clic in taskbar per portare in front
-        # - non resta sopra altre app quando l'utente cambia finestra
-        # È la stessa strategia della finestra "Catalogazione completata".
-        win.configure(fg_color=PALETTE["bg"])
-        # Imposta icona della finestra usando lo stesso meccanismo della main
-        try:
-            from gui.app_icon import set_window_icon
-            set_window_icon(win)
-        except Exception:
-            pass
-        try:
-            win.lift()
-            win.focus_force()
-        except Exception:
-            pass
-        # Centra sopra root
-        try:
-            self.root.update_idletasks()
-            rx = self.root.winfo_x(); ry = self.root.winfo_y()
-            rw = self.root.winfo_width(); rh = self.root.winfo_height()
-            win.geometry(f"{DLG_W}x{DLG_H}+{rx + (rw-DLG_W)//2}"
-                         f"+{ry + (rh-DLG_H)//2}")
-        except Exception:
-            pass
+        # v1085o: helper standalone (sostituisce il blocco custom v1085m+n
+        # che era qui — stessa logica, deduplicata)
+        _setup_standalone_dialog(win, self.root, "Crea nuovo utente",
+                                  DLG_W, DLG_H)
 
         # Niente più titlebar custom (uso quella nativa Windows)
 
@@ -6009,14 +6044,24 @@ class MusicCatalogerGUI:
         self.root.after(80, self._poll_queue)
 
     def _classify_line(self, line: str) -> str:
-        # v1029: ERROR prima di WARNING per evitare che errori vengano colorati giallo
+        # v1085p: priorita' al level dichiarato dal logger Python.
+        # Il pattern `YYYY-MM-DD HH:MM:SS,ms - LEVEL - msg` e' affidabile.
+        # Solo se non c'e' il pattern, fallback su contenuto.
         ll = line.lower()
-        if " - error" in ll or "errore" in ll or "✗" in line or "error:" in ll:
+        # Match esplicito sui livelli dichiarati (formato logging Python)
+        if " - error - " in ll:
             return "ERROR"
-        if " - warning" in ll or "avviso" in ll or "⚠" in line or "warning:" in ll:
+        if " - warning - " in ll:
             return "WARNING"
-        if " - debug" in ll:
+        if " - debug - " in ll:
             return "DEBUG"
+        if " - info - " in ll:
+            return "INFO"
+        # Fallback su contenuto (per righe non standard, es. token speciali)
+        if "✗" in line or "error:" in ll:
+            return "ERROR"
+        if "⚠" in line or "warning:" in ll:
+            return "WARNING"
         if "completat" in ll or "✓" in line or "successo" in ll:
             return "SUCCESS"
         return "INFO"
@@ -6636,12 +6681,15 @@ class MusicCatalogerGUI:
             messagebox.showerror("Errore", str(e))
 
     def _log_apply_filter(self):
-        """v1068: riapplica il filtro livello al log completo."""
+        """v1068: riapplica il filtro livello al log completo.
+        v1085p: bypass del wrapper per non duplicare nel buffer."""
         self._log.clear()
         lines = getattr(self, "_log_all_lines", [])
+        # Wrapper lasciato senza buffer write, scrive solo se passa filtro
+        _native = LogViewer.append  # metodo non-bound della classe
         for text, level in lines:
             if self._log_filter.get(level, True):
-                self._log.append(text, level)
+                _native(self._log, text, level)
 
     def _log_append(self, text: str, level: str = "INFO"):
         """v1068: aggiunge al buffer e al log (rispettando il filtro)."""
@@ -6704,22 +6752,34 @@ class MusicCatalogerGUI:
     def _show_about(self):
         """v1075: About ridisegnata — logo app reale (niente emoji) e testo
         sintetico atemporale. Il dettaglio delle versioni vive in UPGRADES.md.
-        v1076: finestra centrata a schermo."""
+        v1076: finestra centrata a schermo.
+        v1085o: finestra Windows standalone (entry in taskbar, icona top-left)."""
         win = ctk.CTkToplevel(self.root)
-        win.title("About")
-        self._set_win_icon(win)                # v1074: icona uniforme (v1076: con retry)
-        win.resizable(False, False)
-        win.transient(self.root)
-        self._center_win(win, 460, 440)        # v1076: centrato sullo schermo
+        # v1085o: helper standalone (era transient + grab_set + center custom)
+        _setup_standalone_dialog(win, self.root, "About", 460, 440)
         win.grab_set()
 
         # ── Logo app (PNG 256) al posto dell'emoji ──────────────────────────
         _logo_done = False
         try:
             from PIL import Image as _PilImg
-            logo_path = Path(__file__).parent.parent / "icons" / "app" / "app_icon_256.png"
+            # v1085p: MEIPASS-aware path (uguale logica di gui/icons.py)
+            _meipass = getattr(sys, "_MEIPASS", None)
+            if _meipass:
+                logo_path = Path(_meipass) / "icons" / "app" / "app_icon_256.png"
+            else:
+                logo_path = Path(__file__).parent.parent / "icons" / "app" / "app_icon_256.png"
+            # Fallback a taskbar_active.png se app_icon_256 non c'è
+            # (Pedro ha quella icona, è quella vera)
+            if not logo_path.exists():
+                if _meipass:
+                    logo_path = Path(_meipass) / "icons" / "app" / "taskbar_active.png"
+                else:
+                    logo_path = Path(__file__).parent.parent / "icons" / "app" / "taskbar_active.png"
             if logo_path.exists():
-                _img = _PilImg.open(str(logo_path)).convert("RGBA")
+                _img = _PilImg.open(str(logo_path))
+                if _img.mode != "RGBA":
+                    _img = _img.convert("RGBA")
                 _img = _img.resize((72, 72), _PilImg.LANCZOS)
                 _ctk_logo = ctk.CTkImage(light_image=_img, dark_image=_img, size=(72, 72))
                 _logo_lbl = ctk.CTkLabel(win, image=_ctk_logo, text="")
@@ -6733,7 +6793,7 @@ class MusicCatalogerGUI:
             # Fallback: emoji se il PNG non c'è o PIL non disponibile
             ctk.CTkLabel(win, text="🎵", font=("Segoe UI", 48)).pack(pady=(30, 4))
 
-        ctk.CTkLabel(win, text="Music Cataloger Advanced", font=FONT_TITLE).pack()
+        ctk.CTkLabel(win, text="Music Cataloger", font=FONT_TITLE).pack()
         ctk.CTkLabel(win, text=f"{APP_VERSION} — CustomTkinter",
                      font=FONT_SMALL, text_color=PALETTE["text_dim"]).pack(pady=(4, 12))
         ctk.CTkFrame(win, height=1, fg_color=PALETTE["border"]).pack(fill="x", padx=30)
