@@ -6505,11 +6505,12 @@ class MusicCatalogerGUI:
         'beatport':        ("Beatport",     "BPM, genere elettronica",                     False),
         'getsong':         ("GetSong",      "BPM alternativo",                             False),
         'discogs_enabled': ("Discogs",      "jazz/classica/vinili (token gratuito)",       True),
-        # v1086.1 rev3: AcoustID non e' ancora integrato nella cascata
-        # search_all (fingerprint-only, richiede fpcalc.exe + token + chiamata
-        # per file invece che per query). Il toggle resta visibile per UX
-        # consistency ma la label avvisa che e' inattivo.
-        'acoustid_enabled': ("AcoustID",    "fingerprint (non ancora integrato — pilot 2)", True),
+        # v1086.1 rev3: AcoustID rimossa dalla UI temporaneamente.
+        # Il toggle e la BooleanVar 'acoustid_enabled' restano in
+        # _meta_sources per compat con sources_prefs.json esistenti, ma
+        # _SOURCE_META non la elenca → _redraw_sources_list la skippa.
+        # Verra' reintrodotta quando saremo pronti a integrarla davvero
+        # nella cascata fingerprint.
     }
 
     def _redraw_sources_list(self):
@@ -6521,43 +6522,45 @@ class MusicCatalogerGUI:
         for w in self._sources_list_container.winfo_children():
             w.destroy()
 
-        # Ridisegno ogni sorgente in ordine
-        for idx, key in enumerate(self._sources_order):
-            meta = self._SOURCE_META.get(key)
-            if meta is None:
-                continue
-            name, desc, requires_token = meta
-            var = self._meta_sources.get(key)
-            if var is None:
-                continue
+        # Ridisegno ogni sorgente in ordine.
+        # v1086.1 rev3: la numerazione visibile (1, 2, 3...) e' separata
+        # dall'indice nella lista perche' alcune keys (es. acoustid_enabled)
+        # possono essere temporaneamente nascoste (skip se non in _SOURCE_META).
+        # Inoltre le frecce ↑/↓ devono guardare ai vicini VISIBILI, non a tutti.
+        visible_keys = [k for k in self._sources_order
+                         if self._SOURCE_META.get(k) is not None
+                         and self._meta_sources.get(k) is not None]
+        for visible_idx, key in enumerate(visible_keys):
+            name, desc, requires_token = self._SOURCE_META[key]
+            var = self._meta_sources[key]
 
             row = ctk.CTkFrame(self._sources_list_container, fg_color="transparent")
             row.pack(fill="x", padx=4, pady=1)
 
-            # Bottone ↑ (disabilitato per il primo)
+            # Bottone ↑ (disabilitato per il primo VISIBILE)
             btn_up = ctk.CTkButton(
                 row, text="▲", width=28, height=24,
                 font=(FONT_SMALL[0], FONT_SMALL[1] - 1),
                 fg_color=PALETTE["surface"], hover_color=PALETTE["primary_hover"],
                 text_color=PALETTE["text"],
                 command=lambda k=key: self._move_source(k, -1),
-                state="normal" if idx > 0 else "disabled",
+                state="normal" if visible_idx > 0 else "disabled",
             )
             btn_up.pack(side="left", padx=(8, 1))
 
-            # Bottone ↓ (disabilitato per l'ultimo)
+            # Bottone ↓ (disabilitato per l'ultimo VISIBILE)
             btn_down = ctk.CTkButton(
                 row, text="▼", width=28, height=24,
                 font=(FONT_SMALL[0], FONT_SMALL[1] - 1),
                 fg_color=PALETTE["surface"], hover_color=PALETTE["primary_hover"],
                 text_color=PALETTE["text"],
                 command=lambda k=key: self._move_source(k, +1),
-                state="normal" if idx < len(self._sources_order) - 1 else "disabled",
+                state="normal" if visible_idx < len(visible_keys) - 1 else "disabled",
             )
             btn_down.pack(side="left", padx=(1, 6))
 
-            # Checkbox + label numerata "N. Nome — desc"
-            label = f"{idx + 1}.  {name}  —  {desc}"
+            # Checkbox + label numerata "N. Nome — desc" (numerazione visibile)
+            label = f"{visible_idx + 1}.  {name}  —  {desc}"
             color = PALETTE["success"] if requires_token else PALETTE["text"]
             cb = ctk.CTkCheckBox(
                 row, variable=var, text=label, font=FONT_SMALL,
@@ -6569,17 +6572,28 @@ class MusicCatalogerGUI:
 
     def _move_source(self, key: str, direction: int):
         """v1086.1: muove la sorgente `key` di `direction` posizioni
-        (-1 = su, +1 = giu) nella lista _sources_order, poi ridisegna e salva."""
+        nella lista _sources_order, poi ridisegna e salva.
+        v1086.1 rev3: lo swap deve avvenire col PROSSIMO ELEMENTO VISIBILE
+        (skippando keys nascoste come acoustid_enabled), altrimenti le
+        frecce ↑↓ apparirebbero "rotte" quando il vicino e' nascosto."""
         try:
             idx = self._sources_order.index(key)
         except ValueError:
             return
-        new_idx = idx + direction
-        if new_idx < 0 or new_idx >= len(self._sources_order):
-            return
+        # Trova il prossimo indice visibile in direction
+        n = len(self._sources_order)
+        target_idx = idx + direction
+        while 0 <= target_idx < n:
+            target_key = self._sources_order[target_idx]
+            if (self._SOURCE_META.get(target_key) is not None
+                    and self._meta_sources.get(target_key) is not None):
+                break  # trovato vicino visibile
+            target_idx += direction
+        if target_idx < 0 or target_idx >= n:
+            return  # nessun vicino visibile in quella direzione
         # Swap
-        self._sources_order[idx], self._sources_order[new_idx] = (
-            self._sources_order[new_idx], self._sources_order[idx]
+        self._sources_order[idx], self._sources_order[target_idx] = (
+            self._sources_order[target_idx], self._sources_order[idx]
         )
         self._save_sources_prefs()
         self._redraw_sources_list()

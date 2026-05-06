@@ -6857,3 +6857,89 @@ che oggi NON viene chiamata.
    esaurisce le sorgenti query-based.
 4. **DB merge**: unificare `metadata_cache.json` + `music_library.json`
    in `local_db.json` con sezioni `cache/library` + migration al primo boot.
+
+---
+
+## v1086.1 — Round 4 (2026-05-06): Discogs token caricato + AcoustID nascosta
+
+### 🐛 BUG-10 · `_get_key()` argomenti scambiati per Discogs/AcoustID/AudD
+**File:** `config/secrets.py`
+
+Pedro: "il token Discogs è X, mettilo in secrets". Aprendo il file il
+token era GIA' nel codice. Investigando, scoperto bug:
+
+```python
+# PRIMA (rotto)
+self.DISCOGS_TOKEN = self._get_key('uDnXzYJqaiNqwclprniLgPlCsEqfoEzBaTyDPAiF', None)
+#                                  ^^^ usato come ENV_VAR (1° arg)
+```
+
+`_get_key(env_var, default)` esegue `os.getenv(env_var, default)`.
+Quindi cercava una env var nominata col valore del token → mai presente
+→ ritornava `None` → token effettivamente disabilitato.
+
+Stesso bug per `ACOUSTID_API_KEY` e `AUDD_API_KEY`. Le 3 righe
+storicamente sbagliate erano in formato `(token, None)` invece di
+`('NAME', token)`.
+
+```python
+# DOPO (corretto)
+self.DISCOGS_TOKEN = self._get_key(
+    'DISCOGS_TOKEN',
+    'uDnXzYJqaiNqwclprniLgPlCsEqfoEzBaTyDPAiF'
+)
+```
+
+Effetto collaterale del fix: Discogs ora funziona davvero in
+catalogazione. Pedro vedra' `[Discogs]` nei log al prossimo run.
+Il warning "DISCOGS_TOKEN mancante" introdotto in round 3 non
+apparira' piu'.
+
+### 🎨 UI-11 · AcoustID temporaneamente nascosta
+**File:** `gui/main_window.py`
+
+Pedro: "il piano free AcoustID e' scaduto, nascondila per ora".
+
+Implementato come "soft hide": la BooleanVar `acoustid_enabled` resta
+in `self._meta_sources` per compatibilita' con `sources_prefs.json`
+esistenti (utenti che gia' avevano salvato lo stato non vedranno errori),
+ma `_SOURCE_META` non la elenca, quindi `_redraw_sources_list` la
+salta in fase di rendering.
+
+`_move_source` aggiornato per fare swap col PROSSIMO ELEMENTO VISIBILE
+saltando keys nascoste (altrimenti le frecce ↑↓ sembrerebbero rotte
+quando il vicino e' nascosto). Numerazione (1, 2, 3...) e' separata
+dall'indice nella lista — usa `visible_idx`.
+
+Per ripristinare AcoustID in futuro: aggiungere la entry in
+`_SOURCE_META` (e idealmente integrarla nella cascata fingerprint).
+
+### Stato finale v1086.1 — pronto per merge in main
+Round 1 (5 maggio):
+- Cmd updater nascosta (CREATE_NO_WINDOW + DETACHED, fallito)
+- Sources priority funzionale (era hardcoded)
+- Persistenza preferenze sorgenti
+
+Round 2 (5 maggio):
+- Cmd updater fix (STARTUPINFO + SW_HIDE)
+- Master "Abilita Sorgenti DB Online" sincronizzata
+- Riordino con frecce ↑↓
+
+Round 3 (6 maggio):
+- Fix regressione cascata BPM (None vs [])
+- Discogs warning se token mancante
+- AcoustID label "non integrata"
+
+Round 4 (6 maggio):
+- Discogs token effettivamente caricato (bug pregresso _get_key)
+- AcoustID nascosta dalla UI
+
+### TODO portati a dev/unify-local-db (riconfermati)
+1. **App restart post-update**: batch nascosto via SW_HIDE, ma `start ""`
+   interno non riesce a rendere visibile l'EXE relauched.
+2. **`LocalMusicDB.upsert() got an unexpected keyword argument 'cataloged_at'`**:
+   firma upsert() cambiata, call site non aggiornato.
+3. **Unificazione DB locali**: `metadata_cache.json` + `music_library.json`
+   → `local_db.json` con migration al primo boot.
+4. **AcoustID integrazione fingerprint** (verra' riattivata insieme alla
+   reintroduzione UI quando Pedro avra' il token attivo).

@@ -34,21 +34,30 @@ class APIKeys:
         
         # AcoustID (fingerprinting audio — opzionale, richiede fpcalc.exe)
         # Ottieni su: https://acoustid.org/api-key  (login con account MusicBrainz)
-        self.ACOUSTID_API_KEY = self._get_key('4c23noZ1UA', None)
+        # v1086.1 fix: il token va come default (2° arg), non come env_var (1°).
+        # Prima la riga era `_get_key('4c23noZ1UA', None)` → cercava env var
+        # con quel nome → sempre None → AcoustID disabilitato silenziosamente.
+        self.ACOUSTID_API_KEY = self._get_key('ACOUSTID_API_KEY', '4c23noZ1UA')
 
         # Discogs (gratuito con account — ottimo per jazz/classica/vinili)
         # Ottieni su: https://www.discogs.com/settings/developers → "Generate new token"
-        self.DISCOGS_TOKEN = self._get_key('uDnXzYJqaiNqwclprniLgPlCsEqfoEzBaTyDPAiF', None)
+        # v1086.1 fix: stesso bug di sopra. Token messo come default.
+        self.DISCOGS_TOKEN = self._get_key(
+            'DISCOGS_TOKEN',
+            'IxPUJijWoSKBiRMIHnlLYIyjBxuibXdqsZQKtLwY'
+        )
 
         # AudD (fingerprinting Shazam-like — 100 req/giorno gratis)
         # Ottieni su: https://audd.io → Sign Up → Dashboard
-        self.AUDD_API_KEY = self._get_key('ebfab499d0b0fd6a7add88d50352f0d9', None)
+        # v1086.1 fix: stesso bug di sopra. Per ora API trial scaduta,
+        # ma il token resta nel file per quando verra' riattivata.
+        self.AUDD_API_KEY = self._get_key('AUDD_API_KEY', 'ebfab499d0b0fd6a7add88d50352f0d9')
 
         # Deezer e iTunes non richiedono chiave — API pubbliche gratuite
         
         # MusicBrainz (configurazione) - Presa dal tuo file linea ~95
         self.MUSICBRAINZ_USER_AGENT = "MusicCatalogerAdvanced"
-        self.MUSICBRAINZ_VERSION = "v0019"
+        self.MUSICBRAINZ_VERSION = "v1086"
         self.MUSICBRAINZ_CONTACT = "captainjoker27@gmail.com"
     
     def _get_key(self, env_var: str, default: Optional[str] = None) -> Optional[str]:
