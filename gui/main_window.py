@@ -4476,7 +4476,12 @@ class MusicCatalogerGUI:
             text_color=PALETTE["text"],
             command=self._admin_refresh_stats,
         ).pack(side="right", padx=12, pady=(0, 8))
-        self.root.after(300, self._admin_refresh_stats)
+        # v1086.1 round 4: i 5 refresh iniziali (stats/requests/users/
+        # registration/audit) erano schedulati con after(200..600) singolarmente.
+        # Bug: a volte al primo avvio i timer scattavano prima che il widget
+        # fosse "mapped" e il thread worker fallliva silenziosamente, lasciando
+        # "Caricamento…" finche' l'utente non clicca Aggiorna.
+        # Fix: niente after qui — vedi _admin_kickoff_initial_load alla fine.
 
         # ── v1085h: Crea utente (admin) ────────────────────────────
         frm_create = section_factory(
@@ -4524,9 +4529,7 @@ class MusicCatalogerGUI:
         # Container per la lista (popolato da _admin_refresh_requests)
         self._admin_list_frame = ctk.CTkFrame(frm, fg_color="transparent")
         self._admin_list_frame.pack(fill="x", padx=12, pady=(4, 12))
-
-        # Carica al primo build
-        self.root.after(200, self._admin_refresh_requests)
+        # v1086.1 round 4: kickoff iniziale spostato in _admin_kickoff_initial_load
 
         # ── v0.0.2.5: Sezione "Utenti registrati" ─────────────────
         frm_users = section_factory(
@@ -4552,8 +4555,7 @@ class MusicCatalogerGUI:
         self._admin_users_list_frame = ctk.CTkFrame(frm_users,
                                                      fg_color="transparent")
         self._admin_users_list_frame.pack(fill="x", padx=12, pady=(4, 12))
-
-        self.root.after(400, self._admin_refresh_users)
+        # v1086.1 round 4: kickoff iniziale spostato in _admin_kickoff_initial_load
 
         # ── v1085g: Sezione "Stato registrazione" ──────────────────
         frm_reg = section_factory(
@@ -4572,9 +4574,7 @@ class MusicCatalogerGUI:
             command=self._admin_toggle_registration,
         )
         self._admin_reg_btn.pack(side="right")
-
-        # Carica lo stato corrente al primo build
-        self.root.after(500, self._admin_refresh_registration_status)
+        # v1086.1 round 4: kickoff iniziale spostato in _admin_kickoff_initial_load
 
         # ── v1085g: Sezione "Audit log" ───────────────────────────
         frm_audit = section_factory(
@@ -4601,7 +4601,38 @@ class MusicCatalogerGUI:
                                                      fg_color="transparent")
         self._admin_audit_list_frame.pack(fill="x", padx=12, pady=(4, 12))
 
-        self.root.after(600, self._admin_refresh_audit)
+        # v1086.1 round 4: kickoff iniziale unificato.
+        # PRIMA: 5 chiamate `after(200..600, _admin_refresh_*)` separate, una
+        # per ciascuna sezione admin (stats, requests, users, registration,
+        # audit). A volte al primo avvio scattavano prima che i widget fossero
+        # "mapped" sullo schermo, lasciando "Caricamento…" finche' l'utente
+        # non cliccava il bottone Aggiorna.
+        # FIX: una sola `after_idle()` che kickoffa tutto in sequenza dopo
+        # che Tk ha finito i mount. Inoltre `after(2500)` come ultimo safety
+        # net se per qualche motivo `after_idle` non scattasse.
+        self.root.after_idle(self._admin_kickoff_initial_load)
+        self.root.after(2500, self._admin_kickoff_initial_load)
+
+    def _admin_kickoff_initial_load(self):
+        """v1086.1 round 4: kickoff dei refresh admin al primo avvio.
+        Idempotente: chiama tutti i refresh, ognuno e' protetto da
+        `if self.api_client is None: return`. Se viene chiamato due volte
+        (after_idle + after(2500) safety net), nessun problema — la seconda
+        chiamata semplicemente fa un nuovo fetch dei dati che e' OK."""
+        if not hasattr(self, "_admin_kickoff_done"):
+            self._admin_kickoff_done = False
+        # Solo logging: chiamata multipla e' safe
+        try:
+            self._admin_refresh_stats()
+            self._admin_refresh_requests()
+            self._admin_refresh_users()
+            self._admin_refresh_registration_status()
+            self._admin_refresh_audit()
+            self._admin_kickoff_done = True
+        except Exception as e:
+            # Se manca un attributo perche' siamo in mezzo all'init, ignora.
+            # Il safety net dopo 2500ms riprovera'.
+            print(f"[admin] kickoff retry: {e}")
 
     def _admin_refresh_registration_status(self):
         """v1085g: aggiorna label e testo bottone in base allo stato server."""

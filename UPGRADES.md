@@ -6943,3 +6943,47 @@ Round 4 (6 maggio):
    → `local_db.json` con migration al primo boot.
 4. **AcoustID integrazione fingerprint** (verra' riattivata insieme alla
    reintroduzione UI quando Pedro avra' il token attivo).
+
+---
+
+## v1086.1 — Round 4 (continuato): fix admin first-load
+
+### 🐛 BUG-12 · Sezioni admin "Caricamento…" al primo avvio
+**File:** `gui/main_window.py`
+
+Pedro: "nella round 3 hai reintrodotto il bug del caricamento delle
+finestre admin al primo avvio, devo cliccare Aggiorna per vedere i dati".
+
+Causa probabile: i 5 refresh admin erano schedulati con
+`self.root.after(200..600, _admin_refresh_*)` separatamente. Al primo
+avvio, alcuni timer scattavano prima che il widget fosse "mapped" sullo
+schermo (Tk window non ancora visibile, init main loop non finito).
+I worker thread partivano, le chiamate HTTP forse partivano anche, ma
+il `_safe_after(0, render)` ricavato non aveva un widget attached
+correttamente e il render falliva silenziosamente.
+
+Fix: rimosse le 5 chiamate `after(N, _admin_refresh_*)` da dentro
+`_build_admin_section`. Aggiunto un metodo unificato
+`_admin_kickoff_initial_load()` che chiama tutti e 5 i refresh in
+sequenza. Schedulato con due livelli di sicurezza:
+- `self.root.after_idle(...)` → garantito quando Tk e' in idle
+  (cioe' tutti i widget sono mount-completati)
+- `self.root.after(2500, ...)` → safety net, riprova dopo 2.5s se
+  per qualche motivo `after_idle` non scattasse (es. main loop
+  bloccato da update_check)
+
+Il kickoff e' idempotente: una seconda chiamata semplicemente rifa
+i fetch HTTP, il widget viene aggiornato (e' lo stesso comportamento
+del bottone Aggiorna).
+
+### 📝 Stato finale v1086.1 — pronto per merge in main
+Round 1 (5 maggio): cmd updater fix attempt 1, sources priority funzionale, persistenza prefs
+Round 2 (5 maggio): cmd updater fix attempt 2 (SW_HIDE), master sync, frecce ↑↓
+Round 3 (6 maggio): fix regressione cascata BPM, warning Discogs/AcoustID, label AcoustID
+Round 4 (6 maggio): Discogs token caricato (bug pregresso _get_key), AcoustID nascosta UI, **admin first-load fix**
+
+### 🚧 TODO portati a dev/unify-local-db (riconfermati, AcoustID rimandato)
+1. **App restart post-update** (UX critica)
+2. **`LocalMusicDB.upsert() cataloged_at`** (bug pregresso, log puliti)
+3. **Unificazione DB locali** metadata_cache + music_library
+4. ~~AcoustID integration~~ — rimandato finche' Pedro avra' il token attivo
