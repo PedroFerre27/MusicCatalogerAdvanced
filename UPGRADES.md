@@ -6627,3 +6627,233 @@ integrazione DE.
 - `dev/unify-local-db` = unificazione metadata_cache + music_library
 - `dev/community-db` = pilot 2: DB community-driven
 - Eventuali hotfix v1086 → tag `v1086.1`, `v1086.2`...
+
+---
+
+## v1086.1 — Sources priority funzionale + cmd window nascosta (2026-05-05)
+
+Branch: `dev/sources-priority`
+
+### 🐛 BUG-01 · Cmd window updater visibile e fastidiosa
+**File:** `services/updater.py`
+
+Pedro: "l'update apre una finestra cmd e non la chiude".
+
+Causa: lancio batch via `cmd /c start "" /MIN <bat>` con
+DETACHED_PROCESS (0x08). `/MIN` minimizza la console ma resta visibile
+in taskbar e flasha all'avvio. Inoltre il `:FAIL` usava `pause`,
+causando blocco indefinito se la console fosse riapparsa.
+
+Fix:
+- `subprocess.Popen([str(script)], creationflags=CREATE_NO_WINDOW |
+  DETACHED_PROCESS)` — niente wrapper cmd /c, niente /MIN: la console
+  e' completamente nascosta.
+- Tolto `pause` dal :FAIL. Errori vanno solo nel %LOG%.
+- Tolti `echo` verso stdout (la console e' nascosta, sono inutili).
+
+### 🎯 FEAT-02 · Sources priority funzionale (era hardcoded)
+**Files:** `services/external_apis.py`, `services/bpm_services.py`,
+          `core/cataloger.py`, `run_cataloger.py`, `gui/main_window.py`
+
+Pedro segnala: "le checkbox priorita' sorgenti nel tab Avanzate sono
+solo visuali, deselezionarle non ha effetto sul flow".
+
+**Vero**: la cascata `ExternalAPIs.search_all` era hardcoded:
+musicbrainz → deezer → itunes → lastfm → discogs. Le BooleanVar
+`self._meta_sources` esistevano nella UI ma non venivano mai propagate
+al subprocess cataloger.
+
+Pipeline implementata (UI → subprocess):
+
+```
+GUI._meta_sources (BooleanVar dict)
+  └→ build_cmd() filtra per .get() → --metadata-sources [list ordinata]
+                                      --bpm-sources [list]
+                                      --no-external (se tutti deselezionati)
+       └→ run_cataloger.py argparse
+            └→ MusicCataloger(metadata_sources=..., bpm_sources=...)
+                 └→ ExternalAPIs(enabled_sources=[...])
+                 └→ BPMServices(enabled_sources=[...])
+                      └→ search_all() / estimate_bpm() filtrano cascata
+```
+
+Sorgenti riconosciute:
+- **Metadata** (search_all): musicbrainz, deezer, itunes, lastfm, discogs
+- **BPM** (estimate_bpm): getsong, beatport (TuneBat e SongBPM sempre
+  attivi come fallback automatici)
+- **AcoustID/AudD**: fingerprint-only, gestiti separatamente per file
+
+Casi limite:
+- Lista vuota da UI → `--no-external` (= cascata DB esterni saltata)
+- Typo / sorgente sconosciuta → filtrata silenziosamente
+- Ordine UI preservato = priorita' cascata
+
+### 💾 FEAT-03 · Persistenza preferenze sorgenti
+**File:** `gui/main_window.py`
+
+Le selezioni delle 9 checkbox sources ora persistono tra sessioni in
+`data/sources_prefs.json`. Implementato via:
+- `_load_sources_prefs()` chiamato all'init (default values fallback)
+- `var.trace_add("write", _save_sources_prefs)` su ogni BooleanVar
+  → autosave ad ogni click utente
+
+### 🧪 Test pipeline
+Smoke test in subprocess Python verifica:
+- CLI accetta `--metadata-sources` e `--bpm-sources`
+- ExternalAPIs valida lista (filtra typo, fallback a default se vuoto)
+- BPMServices stesso
+- Ordine preservato dalla UI alla cascata
+
+Test reali (con Pedro):
+- [ ] Catalogazione con TUTTI gli enabled → log mostra tutte le sorgenti
+- [ ] Solo Discogs+AcoustID enabled → MusicBrainz/Deezer/iTunes/Lastfm SKIPPATI
+- [ ] Tutti disabilitati → no_external, niente chiamate
+- [ ] Riavvia client → checkbox restano come selezionate ultima volta
+
+---
+
+## v1086.1 — Round 2 (2026-05-05): cmd hidden + master sync + riordino frecce
+
+Test feedback Pedro su v1086.1 round 1:
+1. Cmd visibile durante update → CREATE_NO_WINDOW + DETACHED non bastava
+2. Master "Abilita Sorgenti DB Online" non sincronizzata con checkbox Avanzate
+3. Riordino priorita' tramite "ordine di selezione" non intuitivo → frecce ↑↓
+
+### 🐛 BUG-04 · Cmd window visibile (v1086.1 round 1 fallito)
+**File:** `services/updater.py`
+
+Problema: `subprocess.Popen([bat], creationflags=CREATE_NO_WINDOW |
+DETACHED_PROCESS)` produceva ancora finestra cmd visibile. Causa: per
+i `.bat` file, DETACHED_PROCESS stacca dalla console del padre ma il
+batch interpreter (cmd.exe) crea comunque la propria console. I due
+flag insieme non interagiscono come previsto.
+
+Fix: uso `STARTUPINFO` con `STARTF_USESHOWWINDOW` + `wShowWindow=SW_HIDE`,
+piu' `creationflags=CREATE_NO_WINDOW`. Aggiunto reindirizzamento
+stdin/stdout/stderr a DEVNULL per evitare che il batch erediti handle
+del processo padre in chiusura. Lo `start "" /D ... <exe>` interno al
+batch ottiene la sua propria configurazione di finestra (visibile),
+quindi l'app relauchata appare normalmente.
+
+### ✨ FEAT-05 · Master "Abilita Sorgenti DB Online" sincronizzata
+**File:** `gui/main_window.py`
+
+Problema: la master in pannello sinistro era indipendente dalle 9
+checkbox in tab Avanzate. Pedro: "se disabilito tutti i DB online da
+avanzate, la master rimane attiva".
+
+Implementazione:
+- `_on_ext_db_toggle()` ora setta effettivamente le 9 BooleanVar:
+  - master OFF → salva stato corrente (`_sources_pre_disable_state`),
+    spegne tutte le sources
+  - master ON → ripristina lo stato salvato; se assente, riaccende
+    solo le free-tier (token rimangono off di default)
+- `_on_source_changed(key)` (nuovo trace handler) propaga al contrario:
+  - Se utente accende una sorgente da Avanzate con master OFF → master ON
+  - Se utente spegne l'ultima sorgente accesa → master OFF
+- Guard `_syncing_master` evita loop infiniti durante la sincronizzazione
+  programmatica master ↔ children
+
+### ✨ FEAT-06 · Riordino priorita' tramite frecce ↑↓
+**File:** `gui/main_window.py`
+
+Pedro suggerimento (analogia con tab Caraibica): "sarebbe meglio
+gestirlo come si è gestita la priorità di classificazione per la
+caraibica, la differenza è che si sposta la checkbox in su o giù".
+
+Implementazione:
+- Nuovo attributo classe `_SOURCE_META`: dict {key → (nome, descrizione,
+  richiede_token)} per tutte le 8 sorgenti
+- Nuovo state `self._sources_order`: lista ordinata persistita in
+  `data/sources_prefs.json` sotto chiave `_order`
+- `_redraw_sources_list()`: ridisegna dinamicamente le righe sources.
+  Ogni riga ha [▲][▼][☑] N. Nome — desc. Frecce ai bordi disabilitate
+  (su per primo elemento, giu per ultimo). Token-tier (Discogs,
+  AcoustID) marcate in verde.
+- `_move_source(key, ±1)`: swap nella lista, salva, ridisegna
+- `build_cmd()` aggiornato: `--metadata-sources` ora segue
+  `self._sources_order` invece di iterazione fissa
+
+Migration: il vecchio `sources_prefs.json` continua a funzionare; al
+prossimo avvio il loader aggiunge `_order` con il default ordine.
+
+### 🧪 Test logici (smoke)
+Verificato in subprocess Python:
+- Default order: produce ['musicbrainz', 'deezer', 'itunes', 'lastfm']
+- Deezer in cima dopo riordino: produce ['deezer', 'musicbrainz', ...]
+- Discogs in cima con token: produce ['discogs', 'musicbrainz', ...]
+- Master OFF: produce lista vuota → --no-external
+- Mix arbitrario: rispetta sempre l'ordine in self._sources_order
+
+---
+
+## v1086.1 — Round 3 (2026-05-06): fix regressione cascata BPM
+
+### 🐛 BUG-07 · Cascata BPM ignorava UI quando tutto disabilitato
+**Files:** `run_cataloger.py`, `services/external_apis.py`,
+          `services/bpm_services.py`, `gui/main_window.py`
+
+Pedro feedback dal log catalogazione test 1 (solo Discogs+AcoustID
+abilitati): `BPMServices: cascata abilitata = ['getsong', 'beatport']`
+nonostante UI mostrasse Beatport e GetSong DESELEZIONATI.
+
+Root cause: catena di tre buchi:
+1. `argparse --bpm-sources nargs="+"` non accetta lista vuota
+2. GUI quando lista vuota OMETTEVA il flag (perche' "+", non "*")
+3. Cataloger riceveva `args.bpm_sources = None` (= "non passato"),
+   trattato come "usa default"
+
+Risultato: utente non aveva modo di disabilitare TUTTI i BPM.
+Stessa logica era latente per metadata, ma mascherata da
+`--no-external` come fallback alternativo.
+
+Fix sequenziale:
+- argparse: `nargs="+"` → `nargs="*"` per `--metadata-sources` e
+  `--bpm-sources` (accettano lista esplicitamente vuota)
+- GUI build_cmd: passa SEMPRE entrambi i flag, anche se vuoti
+- ExternalAPIs e BPMServices: `enabled_sources=None` → default,
+  `enabled_sources=[]` → cascata vuota (NESSUN fallback)
+- Rimosso il fallback `--no-external` quando metadata vuoti
+  (non distingueva piu' meta-only off vs entrambi off)
+
+Ora `BPMServices: cascata abilitata = []` e' uno stato valido che
+significa "solo TuneBat/SongBPM/librosa fallback automatico".
+
+### 🐛 BUG-08 · Discogs senza token: nessun warning
+**File:** `services/external_apis.py`
+
+Pedro test: Discogs viene chiamato ma non ritorna nulla. Causa:
+`DISCOGS_TOKEN` mancante in `secrets.py`. Prima: silently None.
+
+Fix: warning all'init di `ExternalAPIs` se Discogs e' in
+`enabled_sources` ma il token manca. Stesso warning per AcoustID
+(ACOUSTID_API_KEY) con nota aggiuntiva che non e' ancora integrato
+nella cascata.
+
+### 🎨 UI-09 · Label AcoustID piu' onesta
+**File:** `gui/main_window.py`
+
+AcoustID era etichettata "fingerprinting (richiede fpcalc.exe)" ma
+la cascata `search_all()` non la chiama (e' un metodo file-based,
+non query-based). Pedro l'ha selezionata aspettandosi che funzionasse.
+
+Fix: label ora "fingerprint (non ancora integrato — pilot 2)".
+Il toggle resta funzionale (stato persiste) ma e' chiaro all'utente
+che oggi NON viene chiamata.
+
+### 📝 TODO per branch dev/unify-local-db (rimandati)
+1. **App non si riavvia dopo l'update**: il batch e' nascosto con
+   STARTUPINFO+SW_HIDE, ma `start "" /D ... <new_exe>` interno al
+   batch eredita il "show flag" del cmd.exe nascosto e l'EXE PyInstaller
+   non appare. Possibili approcci: usare `cmd /c start "" ...` esplicito
+   o sostituire `start` con una chiamata Python finale che faccia
+   `subprocess.Popen([new_exe])` con startupinfo normale. Da indagare.
+2. **`LocalMusicDB.upsert() got an unexpected keyword argument 'cataloged_at'`**:
+   regressione dell'API DB locale. Visibile nei log delle sezioni
+   "Correggi Metadati Cartelle Esistenti". Probabilmente firma
+   `upsert()` cambiata senza aggiornare i call site.
+3. **AcoustID integrazione fingerprint reale**: aggiungere
+   `process_audio_fingerprint()` come fallback dopo che `search_all()`
+   esaurisce le sorgenti query-based.
+4. **DB merge**: unificare `metadata_cache.json` + `music_library.json`
+   in `local_db.json` con sezioni `cache/library` + migration al primo boot.

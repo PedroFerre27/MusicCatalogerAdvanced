@@ -218,7 +218,8 @@ echo [%DATE% %TIME%] Avvio updater v1085p >> %LOG%
 echo   current_exe = {current_exe} >> %LOG%
 echo   new_exe     = {new_exe} >> %LOG%
 
-echo Music Cataloger - aggiornamento in corso...
+REM v1086.1: niente piu' echo verso stdout (la console e' nascosta con
+REM CREATE_NO_WINDOW lato Python; tutto quel che serve va nel %LOG%).
 REM Aspetto 2 sec che il vecchio processo abbia chiuso tutti i handle
 timeout /t 2 /nobreak >nul
 
@@ -248,7 +249,6 @@ set "_PYIBOOT_USER_PYTHONPATH="
 set "_PYI_SPLASH_IPC="
 echo [%DATE% %TIME%] env vars PyInstaller cleared >> %LOG%
 
-echo Aggiornamento completato. Riavvio in corso...
 REM /D forza la cwd nella cartella dell'EXE (no eredita %TEMP% del batch)
 start "" /D "{current_exe.parent}" "{current_exe}"
 echo [%DATE% %TIME%] start emesso, errorlevel=%errorlevel% >> %LOG%
@@ -257,9 +257,9 @@ exit /b 0
 
 :FAIL
 echo [%DATE% %TIME%] FAIL - copy non riuscita dopo 30 tentativi >> %LOG%
-echo ERRORE: impossibile aggiornare l'eseguibile.
-echo Log dettagliato in %LOG%
-pause
+REM v1086.1: niente piu' pause — la console e' nascosta, l'utente non
+REM vedrebbe il prompt e il batch resterebbe in stallo per sempre.
+REM L'errore e' loggato in %LOG% per debug.
 exit /b 1
 """
     # cp1252 funziona perche' ho rimosso tutti i caratteri non-ASCII
@@ -461,12 +461,31 @@ def _show_update_dialog(api_client, parent_window, info: dict, local_ver: str):
 
                 script = _make_windows_updater_script(current_exe, new_exe)
 
-                # Lancia il batch in background detached, poi chiudi l'app
+                # v1086.1 (revisione): la combo CREATE_NO_WINDOW |
+                # DETACHED_PROCESS NON nasconde affidabilmente la console
+                # di un .bat (DETACHED stacca dal padre, ma il batch crea
+                # comunque la propria console). Su Windows il modo corretto
+                # per nascondere completamente la finestra di un processo
+                # figlio e' usare STARTUPINFO con wShowWindow=SW_HIDE.
                 import subprocess
+                CREATE_NO_WINDOW = 0x08000000
+                startupinfo = subprocess.STARTUPINFO()
+                # STARTF_USESHOWWINDOW = 0x00000001
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = subprocess.SW_HIDE
                 subprocess.Popen(
-                    ["cmd.exe", "/c", "start", "", "/MIN", str(script)],
-                    creationflags=0x00000008,  # DETACHED_PROCESS
+                    [str(script)],
+                    creationflags=CREATE_NO_WINDOW,
+                    startupinfo=startupinfo,
                     close_fds=True,
+                    shell=False,
+                    # Reindirizzo I/O standard a NUL per evitare che il
+                    # batch erediti handle del processo padre (che si sta
+                    # chiudendo). Senza questo, su alcune configurazioni
+                    # Windows il batch puo' fallire silenziosamente.
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
                 )
                 win.after(0, lambda: (
                     status_var.set("✓ Aggiornamento avviato. L'app si riavvierà..."),

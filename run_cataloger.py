@@ -123,6 +123,21 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--cover-sources", nargs="+",
                         choices=["spotify", "musicbrainz", "lastfm", "deezer", "itunes"],
                         default=["musicbrainz", "lastfm", "deezer", "itunes"])
+    # v1086.1 (revisione 3): priorita' sorgenti METADATA (cascata search_all).
+    # Ordine = priorita'. Solo le sorgenti elencate vengono usate.
+    # nargs="*" ammette lista esplicitamente vuota (= cascata disattivata),
+    # mentre default=None significa "argomento non passato" (= usa default).
+    # Distinguere None da [] e' fondamentale: con nargs="+" la lista vuota
+    # non era esprimibile e finiva sempre nel fallback default.
+    parser.add_argument("--metadata-sources", nargs="*",
+                        default=None,
+                        help="Sorgenti metadata in ordine priorita' "
+                             "(es. musicbrainz deezer itunes lastfm discogs). "
+                             "Lista vuota = nessuna sorgente metadata.")
+    parser.add_argument("--bpm-sources", nargs="*",
+                        default=None,
+                        help="Sorgenti BPM abilitate UI: getsong beatport. "
+                             "Lista vuota = solo TuneBat/SongBPM/librosa fallback.")
     parser.add_argument("--excluded-genres", nargs="*", default=[])
     parser.add_argument("--update-local-db", action="store_true", default=False)
     parser.add_argument("--rename-pattern", type=str, default=None,
@@ -167,6 +182,9 @@ def main():
         update_local_db=args.update_local_db,
         excluded_genres=args.excluded_genres,
         rename_pattern=args.rename_pattern,
+        # v1086.1: priorita' sorgenti UI
+        metadata_sources=args.metadata_sources,
+        bpm_sources=args.bpm_sources,
     )
 
     try:

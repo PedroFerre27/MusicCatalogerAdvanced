@@ -25,18 +25,62 @@ class ExternalAPIs:
     Classe per gestire tutte le chiamate alle API esterne
     """
     
-    def __init__(self, api_keys, settings, logger=None):
+    # v1086.1: lista canonical delle sorgenti METADATA (no BPM-only).
+    # Ordine = priorita' di default cascata. La GUI puo' override
+    # passando una lista propria.
+    DEFAULT_METADATA_SOURCES = ['musicbrainz', 'deezer', 'itunes', 'lastfm']
+    # Sorgenti che richiedono token (devono essere esplicitamente abilitate)
+    TOKEN_METADATA_SOURCES = ['discogs', 'acoustid']
+
+    def __init__(self, api_keys, settings, logger=None,
+                  enabled_sources=None):
         """
         Inizializza il gestore API
-        
+
         Args:
             api_keys: Oggetto con le API keys (da config.secrets)
             settings: Oggetto con le configurazioni (da config.settings)
             logger: Logger per output (opzionale)
+            enabled_sources: Lista ordinata delle sorgenti metadata abilitate
+                (es. ['musicbrainz', 'deezer', 'discogs']). La cascata
+                rispetta questo ordine. Se None → DEFAULT_METADATA_SOURCES.
+                Sorgenti non in questa lista sono SKIPPATE.
+                v1086.1: aggiunto per fix priorita' sorgenti UI.
         """
         self.api_keys = api_keys
         self.settings = settings
         self.logger = logger or logging.getLogger(__name__)
+
+        # v1086.1 (revisione 3): distinguere None (non passato → default)
+        # da [] (esplicitamente vuoto → cascata disattivata).
+        if enabled_sources is None:
+            self.enabled_sources = list(self.DEFAULT_METADATA_SOURCES)
+        else:
+            # Filtra solo sorgenti note per evitare typo/casing issues
+            valid = set(self.DEFAULT_METADATA_SOURCES) | set(self.TOKEN_METADATA_SOURCES)
+            self.enabled_sources = [s.lower() for s in enabled_sources
+                                     if s.lower() in valid]
+            # NON fare fallback a default se la lista era esplicitamente
+            # vuota o conteneva solo typo: l'utente ha disabilitato tutto.
+        self.logger.debug(f"ExternalAPIs: cascata abilitata = {self.enabled_sources}")
+
+        # v1086.1 (revisione 3): warning se sorgenti token-based sono
+        # abilitate ma il token manca in secrets.py. Senza questo l'utente
+        # vede la sorgente "abilitata" nei log ma in realta' search_*
+        # ritorna sempre None silenziosamente.
+        if 'discogs' in self.enabled_sources:
+            if not getattr(self.api_keys, 'DISCOGS_TOKEN', None):
+                self.logger.warning(
+                    "Discogs abilitato in UI ma DISCOGS_TOKEN mancante in "
+                    "secrets.py — la sorgente verra' saltata. Genera token su "
+                    "https://www.discogs.com/settings/developers")
+        if 'acoustid' in self.enabled_sources:
+            if not getattr(self.api_keys, 'ACOUSTID_API_KEY', None):
+                self.logger.warning(
+                    "AcoustID abilitato in UI ma ACOUSTID_API_KEY mancante "
+                    "in secrets.py. Inoltre AcoustID e' fingerprint-only "
+                    "(richiede fpcalc.exe) e attualmente NON e' integrato "
+                    "nella cascata search_all — sara' aggiunto in pilot 2.")
         
         # Cache per ridurre chiamate API
         self.metadata_cache = {}
@@ -85,37 +129,64 @@ class ExternalAPIs:
 
     def search_all(self, artist: str, title: str, album: str = None) -> Optional[Dict]:
         """
-        Cascata metadati — v1049 (ordine ottimizzato per genere):
-          1. MusicBrainz  — massima precisione per generi, jazz, classica, soundtrack
-          2. Deezer        — ottimo per pop/latin (Salsa, Reggaeton), film, generi italiani
-          3. iTunes        — generi Apple Music precisi (Anime, TV Soundtrack, Classical)
-          4. Last.fm       — tag community (electronic, alternative, indie); debole su latin
-          5. Discogs       — jazz, vinili, world (richiede token)
-        Spotify rimosso (v1040). AcoustID/AudD solo via fingerprinting.
-        La cascata continua finché trova un genere utile (non generico).
+        Cascata metadati — v1086.1 (rispetta self.enabled_sources):
+
+        L'ordine della cascata e' determinato da self.enabled_sources, che
+        viene popolato dall'argomento `--metadata-sources` della CLI o dal
+        default del costruttore. La cascata SKIPPA le sorgenti non
+        presenti in enabled_sources.
+
+        Sorgenti supportate (riconosciute):
+          - musicbrainz   - massima precisione, jazz, classica, soundtrack
+          - deezer        - pop/latin, film, generi italiani (free)
+          - itunes        - Anime, TV, Classical (free)
+          - lastfm        - electronic, alternative, indie (free)
+          - discogs       - jazz, vinili, world (richiede token)
+          - acoustid      - fingerprinting (richiede fpcalc + token)
+
+        La cascata si ferma alla prima sorgente che restituisce un genere
+        utile (non vuoto / non in {'other','unknown','musique du monde'}).
+        Se nessuna sorgente trova un genere valido, ritorna il primo
+        candidato non-vuoto (che almeno ha BPM/album).
         """
         if not artist or not title:
             return None
 
+        # Mappa sorgente → metodo (chiamato lazy)
+        source_methods = {
+            'musicbrainz': lambda: self.search_musicbrainz(artist, title, album),
+            'deezer':      lambda: self.search_deezer(artist, title),
+            'itunes':      lambda: self.search_itunes(artist, title),
+            'lastfm':      lambda: self.search_lastfm(artist, title),
+            'discogs':     lambda: self.search_discogs(artist, title),
+            # acoustid e' file-based, non query-based — gestito separatamente
+        }
+        source_display_names = {
+            'musicbrainz': 'MusicBrainz', 'deezer': 'Deezer',
+            'itunes': 'iTunes', 'lastfm': 'Last.fm', 'discogs': 'Discogs',
+        }
+
         candidates = []
-        for method, name in [
-            (lambda: self.search_musicbrainz(artist, title, album), 'MusicBrainz'),
-            (lambda: self.search_deezer(artist, title),             'Deezer'),
-            (lambda: self.search_itunes(artist, title),             'iTunes'),
-            (lambda: self.search_lastfm(artist, title),             'Last.fm'),
-            (lambda: self.search_discogs(artist, title),            'Discogs'),
-        ]:
+        for source_id in self.enabled_sources:
+            method = source_methods.get(source_id)
+            if method is None:
+                # AcoustID e altre sorgenti non query-based — skippa qui,
+                # vengono provate altrove (search_acoustid via file)
+                continue
+            display_name = source_display_names.get(source_id, source_id)
             try:
                 result = method()
                 if result:
-                    result['source'] = name
+                    result['source'] = display_name
                     genre = (result.get('genre') or '').lower()
-                    if genre and genre not in ('', 'other', 'unknown', 'musique du monde'):
-                        self.logger.debug(f"search_all: genere trovato da {name} → '{genre}'")
+                    if genre and genre not in ('', 'other', 'unknown',
+                                                'musique du monde'):
+                        self.logger.debug(
+                            f"search_all: genere trovato da {display_name} → '{genre}'")
                         return result
                     candidates.append(result)
             except Exception as e:
-                self.logger.debug(f"search_all {name} exc: {e}")
+                self.logger.debug(f"search_all {display_name} exc: {e}")
 
         return candidates[0] if candidates else None
 

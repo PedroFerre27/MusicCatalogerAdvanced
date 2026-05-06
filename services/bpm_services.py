@@ -26,20 +26,44 @@ class BPMServices:
     """
     Classe per gestire il recupero BPM da varie fonti
     Priorità: metadati esistenti > GetSong > TuneBat > SongBPM > Beatport > librosa
+
+    v1086.1: aggiunto enabled_sources per rispettare la selezione UI.
     """
-    
-    def __init__(self, api_keys, settings, logger=None):
+
+    # Sorgenti BPM esposte all'utente nella UI (TuneBat e SongBPM
+    # sono fallback automatici, non scelti dall'utente).
+    DEFAULT_BPM_SOURCES = ['getsong', 'beatport']
+
+    def __init__(self, api_keys, settings, logger=None,
+                  enabled_sources=None):
         """
         Inizializza il gestore BPM
-        
+
         Args:
             api_keys: Oggetto con le API keys (da config.secrets)
             settings: Oggetto con le configurazioni (da config.settings)
             logger: Logger per output (opzionale)
+            enabled_sources: Lista delle sorgenti BPM abilitate dalla UI
+                (subset di DEFAULT_BPM_SOURCES). Se None → tutte abilitate.
+                v1086.1: TuneBat e SongBPM sono SEMPRE abilitate come
+                fallback automatici (non sono in UI). Solo GetSong e
+                Beatport vengono filtrati.
         """
         self.api_keys = api_keys
         self.settings = settings
         self.logger = logger or logging.getLogger(__name__)
+
+        # v1086.1 (revisione 3): distinguere None (non passato → default)
+        # da [] (esplicitamente vuoto → cascata disattivata).
+        # PRIMA: enabled_sources=None default da fallback "tutto attivo",
+        # ma la GUI passava None anche quando l'utente aveva disabilitato
+        # tutto in UI → cascata BPM girava lo stesso (BUG). Ora None != [].
+        if enabled_sources is None:
+            self.enabled_sources = list(self.DEFAULT_BPM_SOURCES)
+        else:
+            self.enabled_sources = [s.lower() for s in enabled_sources
+                                     if s.lower() in self.DEFAULT_BPM_SOURCES]
+        self.logger.debug(f"BPMServices: cascata abilitata = {self.enabled_sources}")
         
         # Cache per BPM
         self.bpm_cache = {}
@@ -95,35 +119,36 @@ class BPMServices:
         
         # 4. Prova servizi esterni in ordine
         bpm = None
-        
-        # GetSong
-        if self.api_keys.GETSONG_API_KEY:
+
+        # v1086.1: GetSong solo se l'utente l'ha abilitato in UI
+        if 'getsong' in self.enabled_sources and self.api_keys.GETSONG_API_KEY:
             bpm = self._get_bpm_from_getsongbpm(artist, title)
             if bpm:
                 self.logger.info(f">-- BPM: {bpm} (GetSong)")
                 self._cache_bpm(artist, title, file_path, bpm)
                 return bpm
-        
-        # TuneBat
+
+        # TuneBat — sempre attivo, fallback automatico (non in UI)
         bpm = self._get_bpm_from_tunebat(artist, title)
         if bpm:
             self.logger.info(f">-- BPM: {bpm} (TuneBat)")
             self._cache_bpm(artist, title, file_path, bpm)
             return bpm
-        
-        # SongBPM.com
+
+        # SongBPM.com — sempre attivo, fallback automatico (non in UI)
         bpm = self._get_bpm_from_songbpm_com(artist, title)
         if bpm:
             self.logger.info(f">-- BPM: {bpm} (SongBPM)")
             self._cache_bpm(artist, title, file_path, bpm)
             return bpm
-        
-        # Beatport
-        bpm = self._get_bpm_from_beatport(artist, title)
-        if bpm:
-            self.logger.info(f">-- BPM: {bpm} (Beatport)")
-            self._cache_bpm(artist, title, file_path, bpm)
-            return bpm
+
+        # v1086.1: Beatport solo se abilitato in UI
+        if 'beatport' in self.enabled_sources:
+            bpm = self._get_bpm_from_beatport(artist, title)
+            if bpm:
+                self.logger.info(f">-- BPM: {bpm} (Beatport)")
+                self._cache_bpm(artist, title, file_path, bpm)
+                return bpm
         
         # 5. Fallback librosa
         bpm = self._estimate_bpm_librosa(file_path)

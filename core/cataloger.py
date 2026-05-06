@@ -118,6 +118,9 @@ class MusicCataloger:
         # v1057: generi esclusi dalle preferenze GUI
         excluded_genres: Optional[List[str]] = None,
         rename_pattern: Optional[str] = None,
+        # v1086.1: priorita' sorgenti esterne (selezione UI)
+        metadata_sources: Optional[List[str]] = None,
+        bpm_sources: Optional[List[str]] = None,
         # Callback
         progress_callback: Optional[Callable[[CatalogProgress], None]] = None,
         log_callback: Optional[Callable[[str, str], None]] = None,
@@ -130,6 +133,10 @@ class MusicCataloger:
         self.update_local_db = update_local_db
         self.excluded_genres: set = set(excluded_genres or [])  # v1057
         self.rename_pattern: Optional[str] = rename_pattern  # v1069
+        # v1086.1: tengo refs come attributi cosi' init di ExternalAPIs/BPMServices
+        # piu' avanti nello stesso __init__ puo' leggerle.
+        self.metadata_sources = metadata_sources
+        self.bpm_sources = bpm_sources
         self.progress_callback = progress_callback
         self.log_callback = log_callback
 
@@ -285,11 +292,19 @@ class MusicCataloger:
 
     def _init_services(self):
         if SERVICES_AVAILABLE and CONFIG_AVAILABLE:
-            self.external_apis = ExternalAPIs(api_keys, settings, self.logger)
+            # v1086.1: passo metadata_sources e bpm_sources cosi' la
+            # cascata rispetta la priorita' UI.
+            self.external_apis = ExternalAPIs(
+                api_keys, settings, self.logger,
+                enabled_sources=self.metadata_sources,
+            )
             # v1056: propaga cache già caricata (se load_cache è stata chiamata prima)
             if self.metadata_cache:
                 self.external_apis.metadata_cache = self.metadata_cache
-            self.bpm_services = BPMServices(api_keys, settings, self.logger)
+            self.bpm_services = BPMServices(
+                api_keys, settings, self.logger,
+                enabled_sources=self.bpm_sources,
+            )
             self.cover_service = CoverService(api_keys, settings, self.logger) if self.cover_enabled else None
         else:
             self.external_apis = None

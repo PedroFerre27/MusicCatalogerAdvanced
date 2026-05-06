@@ -375,17 +375,52 @@ class MusicCatalogerGUI:
         self._opt_use_ext_db = ctk.BooleanVar(value=True)
 
         # v1036/v1047: Sorgenti metadati selezionabili
-        self._meta_sources = {
-            'musicbrainz':    ctk.BooleanVar(value=True),
-            'lastfm':         ctk.BooleanVar(value=True),
-            'beatport':       ctk.BooleanVar(value=True),
-            'getsong':        ctk.BooleanVar(value=True),
-            'deezer':         ctk.BooleanVar(value=True),
-            'itunes':         ctk.BooleanVar(value=True),
-            'discogs_enabled': ctk.BooleanVar(value=False),
-            'audd_enabled':    ctk.BooleanVar(value=False),
-            'acoustid_enabled': ctk.BooleanVar(value=False),
+        # v1086.1: caricato da data/sources_prefs.json se esiste, salvato
+        # automaticamente al cambio (trace su BooleanVar)
+        _sources_defaults = {
+            'musicbrainz': True,  'lastfm': True,
+            'beatport': True,     'getsong': True,
+            'deezer': True,       'itunes': True,
+            'discogs_enabled': False,
+            'audd_enabled': False,
+            'acoustid_enabled': False,
         }
+        # v1086.1 (revisione): ordine di default = visivamente equivalente
+        # a quello hardcoded di prima. La GUI lo permette ora di riordinare
+        # con frecce ↑↓. Persistito in sources_prefs.json sotto chiave "_order".
+        _default_order = [
+            'musicbrainz', 'deezer', 'itunes', 'lastfm',
+            'beatport', 'getsong',
+            'discogs_enabled', 'acoustid_enabled',
+            # audd_enabled rimosso (API trial scaduta)
+        ]
+        _sources_saved = self._load_sources_prefs()
+        self._meta_sources = {}
+        for key, default_val in _sources_defaults.items():
+            saved_val = _sources_saved.get(key, default_val)
+            var = ctk.BooleanVar(value=saved_val)
+            # Trace per autosave al cambio + sync master checkbox
+            var.trace_add("write",
+                          lambda *a, k=key, v=var: self._on_source_changed(k))
+            self._meta_sources[key] = var
+
+        # v1086.1: ordine sorgenti (lista persistita). Validate vs _sources_defaults
+        # cosi' non si accumulano chiavi sconosciute o spariscono nuove sorgenti.
+        saved_order = _sources_saved.get("_order", [])
+        valid_keys = set(_sources_defaults.keys())
+        # Tieni l'ordine salvato, filtrando chiavi non piu' valide
+        order = [k for k in saved_order if k in valid_keys]
+        # Aggiungi in coda eventuali nuove sorgenti non presenti nel saved_order
+        for k in _default_order:
+            if k not in order and k in valid_keys:
+                order.append(k)
+        self._sources_order = order
+
+        # Flag di guard per evitare loop di trace quando la master sincronizza le children
+        self._syncing_master = False
+        # Ricordo lo "stato precedente" delle checkbox quando la master viene
+        # disabilitata (per ripristinarlo al riattivamento)
+        self._sources_pre_disable_state = None
 
         # Opzioni duplicati
         self._dup_action = ctk.StringVar(value='keep_both')
@@ -5381,39 +5416,27 @@ class MusicCatalogerGUI:
         ctk.CTkFrame(frm, height=4, fg_color="transparent").pack()
 
         # Sorgenti Metadati in ordine di priorità
+        # v1086.1 (revisione): la sezione e' ora un widget riordinabile.
+        # Ogni riga ha [↑] [↓] [☑] N. Nome — descrizione. Le frecce muovono
+        # la sorgente nella lista self._sources_order, ridisegnando il blocco.
+        # I metadati per le label sono in self._SOURCE_META (sotto).
         frm2 = section("  Sorgenti Metadati  (ordine = priorità)", icon_name="adv_sources")
         self._sources_adv_frame = frm2  # v1057: riferimento per enable/disable
         ctk.CTkLabel(frm2,
-                     text="  L'ordine qui sotto rispecchia la priorità della cascata.\n"
-                          "  La prima fonte con genere utile viene usata e le successive saltate.",
+                     text="  Trascina con ↑↓ per cambiare la priorità della cascata.\n"
+                          "  La prima fonte con genere utile viene usata; le successive saltate.\n"
+                          "  Le sorgenti con token API (verdi) richiedono configurazione in secrets.py.",
                      font=(FONT_SMALL[0], FONT_SMALL[1] - 1),
                      text_color=PALETTE["text_dim"], justify="left",
                      ).pack(anchor="w", padx=16, pady=(6, 4))
-        for key, label in [
-            ('musicbrainz', "1.  MusicBrainz  — generi precisi, jazz, classica, soundtrack"),
-            ('deezer',      "2.  Deezer  — pop/latin, film, generi italiani (free)"),
-            ('itunes',      "3.  iTunes Search  — Anime, TV, Classical (free)"),
-            ('lastfm',      "4.  Last.fm  — electronic, alternative, indie"),
-            ('beatport',    "5.  Beatport  — BPM, genere elettronica"),
-            ('getsong',     "6.  GetSong  — BPM alternativo"),
-        ]:
-            chk(frm2, self._meta_sources[key], label)
-        ctk.CTkFrame(frm2, height=1, fg_color=PALETTE["border"]).pack(fill="x", padx=12, pady=(4, 4))
-        ctk.CTkLabel(frm2, text="  Con token API (configura in secrets.py):",
-                     font=(FONT_SMALL[0], FONT_SMALL[1] - 1), text_color=PALETTE["text_dim"]
-                     ).pack(anchor="w", padx=16, pady=(2, 2))
-        for key, lbl in [
-            ("discogs_enabled",  "7.  Discogs  — jazz/classica/vinili (token gratuito)"),
-            # AudD disabilitato — API trial scaduta
-            # ("audd_enabled",     "8.  AudD  — fingerprinting audio, 100 req/giorno"),
-            ("acoustid_enabled", "9.  AcoustID  — fingerprinting (richiede fpcalc.exe)"),
-        ]:
-            var = self._meta_sources.setdefault(key, ctk.BooleanVar(value=False))
-            chk(frm2, var, lbl, PALETTE["success"])
+
+        # Container ridisegnato dinamicamente da _redraw_sources_list
+        self._sources_list_container = ctk.CTkFrame(frm2, fg_color="transparent")
+        self._sources_list_container.pack(fill="x", padx=8, pady=(2, 4))
+        self._redraw_sources_list()
+
         ctk.CTkLabel(frm2,
-                     text="  discogs.com/settings/developers → Generate token\n"
-                          "  audd.io → Sign Up → Dashboard (API disabilitata)\n"
-                          "  acoustid.org/api-key  (login MusicBrainz)",
+                     text="  Token API:  discogs.com/settings/developers  •  acoustid.org/api-key",
                      font=(FONT_SMALL[0], FONT_SMALL[1] - 1),
                      text_color=PALETTE["text_dim"], justify="left",
                      ).pack(anchor="w", padx=16, pady=(0, 8))
@@ -5838,6 +5861,38 @@ class MusicCatalogerGUI:
         # DB locale
         if self._opt_local_db.get():
             cmd.append("--update-local-db")
+
+        # v1086.1 (revisione 3): priorita' sorgenti METADATA (UI tab Avanzate).
+        # L'ordine viene da self._sources_order (riordinato con frecce ↑/↓).
+        # IMPORTANTE: passiamo SEMPRE --metadata-sources e --bpm-sources,
+        # anche se vuoti. Nargs="*" lato argparse li distingue da None
+        # (= non passato, fallback a default). Senza questo, l'utente che
+        # disabilita tutto in UI vedeva girare la cascata default lo stesso.
+        ui_to_src_id = {
+            'musicbrainz':       'musicbrainz',
+            'deezer':            'deezer',
+            'itunes':            'itunes',
+            'lastfm':            'lastfm',
+            'discogs_enabled':   'discogs',
+            # acoustid_enabled e' fingerprint-only (non passa search_all)
+        }
+        bpm_keys = {'getsong', 'beatport'}
+
+        metadata_sources = []
+        bpm_sources = []
+        for ui_key in self._sources_order:
+            var = self._meta_sources.get(ui_key)
+            if var is None or not var.get():
+                continue
+            if ui_key in bpm_keys:
+                bpm_sources.append(ui_key)
+            elif ui_key in ui_to_src_id:
+                metadata_sources.append(ui_to_src_id[ui_key])
+            # acoustid_enabled e altre future fingerprint-only: skip qui
+
+        # Sempre presenti, anche vuoti — vedi commento sopra
+        cmd += ["--metadata-sources"] + metadata_sources
+        cmd += ["--bpm-sources"] + bpm_sources
 
         return cmd
 
@@ -6439,9 +6494,138 @@ class MusicCatalogerGUI:
 
     # ─── METODI MANUTENZIONE e BINDING ───────────────────────────────────────
 
+    # ─── v1086.1 (revisione): widget riordinabile sources ─────────────
+    # Metadata per ogni sorgente: descrizione + flag "richiede_token".
+    # L'ordine in _sources_order determina la priorita' cascata.
+    _SOURCE_META = {
+        'musicbrainz':     ("MusicBrainz",  "generi precisi, jazz, classica, soundtrack", False),
+        'deezer':          ("Deezer",       "pop/latin, film, generi italiani (free)",     False),
+        'itunes':          ("iTunes Search", "Anime, TV, Classical (free)",                False),
+        'lastfm':          ("Last.fm",      "electronic, alternative, indie",              False),
+        'beatport':        ("Beatport",     "BPM, genere elettronica",                     False),
+        'getsong':         ("GetSong",      "BPM alternativo",                             False),
+        'discogs_enabled': ("Discogs",      "jazz/classica/vinili (token gratuito)",       True),
+        # v1086.1 rev3: AcoustID non e' ancora integrato nella cascata
+        # search_all (fingerprint-only, richiede fpcalc.exe + token + chiamata
+        # per file invece che per query). Il toggle resta visibile per UX
+        # consistency ma la label avvisa che e' inattivo.
+        'acoustid_enabled': ("AcoustID",    "fingerprint (non ancora integrato — pilot 2)", True),
+    }
+
+    def _redraw_sources_list(self):
+        """v1086.1: ridisegna la lista sorgenti in self._sources_list_container.
+        Chiamato all'init e dopo ogni move ↑/↓."""
+        if not hasattr(self, "_sources_list_container"):
+            return
+        # Pulisco i widget vecchi
+        for w in self._sources_list_container.winfo_children():
+            w.destroy()
+
+        # Ridisegno ogni sorgente in ordine
+        for idx, key in enumerate(self._sources_order):
+            meta = self._SOURCE_META.get(key)
+            if meta is None:
+                continue
+            name, desc, requires_token = meta
+            var = self._meta_sources.get(key)
+            if var is None:
+                continue
+
+            row = ctk.CTkFrame(self._sources_list_container, fg_color="transparent")
+            row.pack(fill="x", padx=4, pady=1)
+
+            # Bottone ↑ (disabilitato per il primo)
+            btn_up = ctk.CTkButton(
+                row, text="▲", width=28, height=24,
+                font=(FONT_SMALL[0], FONT_SMALL[1] - 1),
+                fg_color=PALETTE["surface"], hover_color=PALETTE["primary_hover"],
+                text_color=PALETTE["text"],
+                command=lambda k=key: self._move_source(k, -1),
+                state="normal" if idx > 0 else "disabled",
+            )
+            btn_up.pack(side="left", padx=(8, 1))
+
+            # Bottone ↓ (disabilitato per l'ultimo)
+            btn_down = ctk.CTkButton(
+                row, text="▼", width=28, height=24,
+                font=(FONT_SMALL[0], FONT_SMALL[1] - 1),
+                fg_color=PALETTE["surface"], hover_color=PALETTE["primary_hover"],
+                text_color=PALETTE["text"],
+                command=lambda k=key: self._move_source(k, +1),
+                state="normal" if idx < len(self._sources_order) - 1 else "disabled",
+            )
+            btn_down.pack(side="left", padx=(1, 6))
+
+            # Checkbox + label numerata "N. Nome — desc"
+            label = f"{idx + 1}.  {name}  —  {desc}"
+            color = PALETTE["success"] if requires_token else PALETTE["text"]
+            cb = ctk.CTkCheckBox(
+                row, variable=var, text=label, font=FONT_SMALL,
+                text_color=color,
+                fg_color=PALETTE["primary"], hover_color=PALETTE["primary_hover"],
+                checkmark_color=PALETTE["bg"],
+            )
+            cb.pack(side="left", anchor="w", padx=4)
+
+    def _move_source(self, key: str, direction: int):
+        """v1086.1: muove la sorgente `key` di `direction` posizioni
+        (-1 = su, +1 = giu) nella lista _sources_order, poi ridisegna e salva."""
+        try:
+            idx = self._sources_order.index(key)
+        except ValueError:
+            return
+        new_idx = idx + direction
+        if new_idx < 0 or new_idx >= len(self._sources_order):
+            return
+        # Swap
+        self._sources_order[idx], self._sources_order[new_idx] = (
+            self._sources_order[new_idx], self._sources_order[idx]
+        )
+        self._save_sources_prefs()
+        self._redraw_sources_list()
+
     def _on_ext_db_toggle(self):
-        """v1057: abilita/disabilita la sezione Sorgenti Metadati in tab Avanzate."""
+        """v1057+v1086.1: master 'Abilita Sorgenti DB Online'.
+        - Quando deselezionata: salva stato corrente, spegne TUTTE le sorgenti
+          in Avanzate, e disabilita visivamente la sezione.
+        - Quando riselezionata: ripristina lo stato salvato (o tutte ON al
+          primo uso), riabilita visivamente.
+        """
+        # Se la chiamata viene da una sync programmatica children→master,
+        # non rifare il giro al contrario.
+        if getattr(self, "_syncing_master", False):
+            return
+
         enabled = self._opt_use_ext_db.get()
+
+        # 1) Sincronizza i valori delle BooleanVar (con guard per evitare loop)
+        if hasattr(self, "_meta_sources"):
+            self._syncing_master = True
+            try:
+                if not enabled:
+                    # Salvo lo stato corrente per poterlo ripristinare
+                    self._sources_pre_disable_state = {
+                        k: v.get() for k, v in self._meta_sources.items()
+                    }
+                    for v in self._meta_sources.values():
+                        v.set(False)
+                else:
+                    # Ripristino lo stato salvato; se non esiste, riaccendo
+                    # solo le free-tier (token rimangono off di default)
+                    saved = self._sources_pre_disable_state
+                    if saved:
+                        for k, v in self._meta_sources.items():
+                            v.set(saved.get(k, False))
+                    else:
+                        # Default: free-tier ON, token-tier OFF
+                        for k, v in self._meta_sources.items():
+                            v.set(not k.endswith("_enabled"))
+            finally:
+                self._syncing_master = False
+            # Salvataggio singolo a fine sync (i trace erano in guard)
+            self._save_sources_prefs()
+
+        # 2) Greyout / riabilita visivamente la sezione Avanzate
         state = "normal" if enabled else "disabled"
         if not hasattr(self, '_sources_adv_frame'):
             return
@@ -6452,7 +6636,6 @@ class MusicCatalogerGUI:
                 pass
             for child in widget.winfo_children():
                 _set_state(child)
-        # Greyout di tutti i widget figli del frame sorgenti
         for child in self._sources_adv_frame.winfo_children():
             _set_state(child)
 
@@ -6679,6 +6862,72 @@ class MusicCatalogerGUI:
                           ).pack(side="right", padx=0, pady=10)
         except Exception as e:
             messagebox.showerror("Errore", str(e))
+
+    # ─── v1086.1: persistenza preferenze sorgenti ───────────────────
+    def _sources_prefs_path(self):
+        """Path persistente in data/ accanto all'EXE (vedi _get_data_dir)."""
+        return _get_data_dir() / "sources_prefs.json"
+
+    def _load_sources_prefs(self) -> dict:
+        """Carica preferenze sorgenti dal disco, vuoto se non esiste."""
+        try:
+            p = self._sources_prefs_path()
+            if p.exists():
+                import json
+                with open(p, "r", encoding="utf-8") as f:
+                    return json.load(f) or {}
+        except Exception as e:
+            print(f"[sources_prefs] load skip: {e}")
+        return {}
+
+    def _save_sources_prefs(self):
+        """Salva preferenze sorgenti su disco (chiamato da trace BooleanVar)."""
+        if not hasattr(self, "_meta_sources"):
+            return  # ancora in fase di init
+        try:
+            import json
+            data = {k: v.get() for k, v in self._meta_sources.items()}
+            # v1086.1: persiste anche l'ordine
+            if hasattr(self, "_sources_order"):
+                data["_order"] = list(self._sources_order)
+            p = self._sources_prefs_path()
+            p.parent.mkdir(parents=True, exist_ok=True)
+            with open(p, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            print(f"[sources_prefs] save skip: {e}")
+
+    # ─── v1086.1 (revisione): sincronizzazione master ↔ children ──────
+    def _on_source_changed(self, key: str):
+        """Trace handler richiamato quando una checkbox sorgente cambia.
+        Salva su disco e sincronizza la master 'Abilita Sorgenti DB Online'."""
+        # Salvataggio sempre
+        self._save_sources_prefs()
+        # Se siamo nel mezzo di una sync programmatica master→children,
+        # NON propagare al contrario (eviterebbe loop infinito).
+        if getattr(self, "_syncing_master", False):
+            return
+        # Sync inversa: se TUTTE le sorgenti sono off → master OFF
+        # Se almeno una e' ON e master e' OFF → master ON
+        if not hasattr(self, "_opt_use_ext_db"):
+            return
+        any_on = any(v.get() for v in self._meta_sources.values())
+        master_currently = bool(self._opt_use_ext_db.get())
+        if any_on and not master_currently:
+            # L'utente ha riattivato una sorgente in Avanzate → master torna ON
+            # (senza richiamare _on_ext_db_toggle, che farebbe altre azioni)
+            self._syncing_master = True
+            try:
+                self._opt_use_ext_db.set(True)
+            finally:
+                self._syncing_master = False
+        elif (not any_on) and master_currently:
+            # Tutte le sorgenti spente → la master si autospegne per coerenza
+            self._syncing_master = True
+            try:
+                self._opt_use_ext_db.set(False)
+            finally:
+                self._syncing_master = False
 
     def _log_apply_filter(self):
         """v1068: riapplica il filtro livello al log completo.
