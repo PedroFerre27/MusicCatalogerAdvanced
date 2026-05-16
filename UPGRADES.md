@@ -6987,3 +6987,850 @@ Round 4 (6 maggio): Discogs token caricato (bug pregresso _get_key), AcoustID na
 2. **`LocalMusicDB.upsert() cataloged_at`** (bug pregresso, log puliti)
 3. **Unificazione DB locali** metadata_cache + music_library
 4. ~~AcoustID integration~~ — rimandato finche' Pedro avra' il token attivo
+
+---
+
+## v1086.2 — dev/unify-local-db Task 1+2 (2026-05-06)
+
+### 🐛 BUG-13 · `LocalMusicDB.upsert() got an unexpected keyword argument 'cataloged_at'`
+**File:** `core/cataloger.py` (call site #2)
+
+Causa: il chiamante in "Correggi Metadati Cartelle Esistenti" passava
+`cataloged_at=_dt.now().strftime(...)` come kwarg, ma la firma di
+`LocalMusicDB.upsert()` lo calcola internamente con
+`datetime.now().isoformat()`. Errore loggato per OGNI file (rumore
+log enorme nei test Pedro recenti).
+
+Fix: rimosso il kwarg dal call site. `LocalMusicDB.upsert()` resta
+single source of truth per il timestamp.
+
+Note: c'erano 2 call site in cataloger.py — il primo (line 740) era
+gia' corretto, solo il secondo (line 1198) era buggy.
+
+### 🐛 BUG-14 · App non si riavvia post-update (window state hide propagato)
+**File:** `services/updater.py`
+
+Causa root: in v1086.1 round 2 ho introdotto `STARTUPINFO + SW_HIDE`
+per nascondere la finestra cmd dell'updater. Funziona, ma su Windows
+il flag SW_HIDE viene EREDITATO dai processi figli a meno di non
+override esplicito. Quindi quando il batch chiamava
+`start "" <new_exe>`, il nuovo EXE PyInstaller veniva avviato hidden
+e l'utente non vedeva nulla.
+
+Fix: nel batch sostituito `start ""` con `explorer.exe <exe>`. Il
+trick classico Windows: quando explorer.exe lancia un processo, lo
+fa nel contesto della shell utente (window state default = visible),
+"staccato" dal contesto del padre nascosto. Mantenuto `start ""` come
+fallback se explorer.exe non risponde (raro).
+
+Riferimento: https://stackoverflow.com/q/29903706
+
+### 🚧 TODO restanti per dev/unify-local-db
+3. **Unificazione DB locali** (task grosso, prossimo turno):
+   `metadata_cache.json` + `music_library.json` → `local_db.json`
+   con sezioni `cache/library` + migration al primo boot.
+
+---
+
+## v1086.2 — Round 2 (2026-05-06): updater realmente fixato + UX critica
+
+### 🐛 BUG-15 · Updater fail "30 tentativi in 1 secondo" (regression v1086.1)
+**File:** `services/updater.py`
+
+Pedro test: 30 retry in 1.37 secondi invece di 30 secondi. Ogni copia
+falliva con "il file e' utilizzato da un altro processo".
+
+Causa: in v1086.1 round 2 ho introdotto `stdin=subprocess.DEVNULL` per
+nascondere la cmd. Effetto collaterale non previsto: il comando
+`timeout /t N /nobreak` di Windows **richiede una stdin valida** (anche
+se ridiretta a NUL non funziona) e fallisce immediatamente con errore
+"il reindirizzamento dell'input non e' supportato; uscita immediata".
+I 30 retry quindi non aspettavano il secondo previsto fra l'uno e
+l'altro: tutto si concentrava in ~1 secondo, durante il quale l'EXE
+vecchio non aveva tempo di rilasciare il lock sul file → copia rotta.
+
+Fix: sostituito `timeout /t 1 /nobreak >nul` con `ping -n 2 127.0.0.1 >nul`.
+`ping` non ha il problema con stdin ridiretto. E' il workaround standard
+Windows per "sleep N secondi in batch script con stdin chiusa".
+- `ping -n 3` → ~2 secondi (warmup iniziale)
+- `ping -n 2` → ~1 secondo (fra retry)
+
+### 🐛 BUG-16 · `bpm` come stringa rompe `LocalMusicDB.upsert()`
+**File:** `services/local_db.py`
+
+Pedro feedback: ancora `DEBUG - DB update err: type str doesn't define
+__round__ method` per ogni file. Diverso dal bug round 1 (cataloged_at):
+ora il problema e' che alcuni file hanno BPM nel tag ID3 come stringa
+("128") invece che numero, e `round("128", 1)` rompe.
+
+Fix: coercion difensiva all'inizio di upsert. `float(bpm)` con
+try/except, e stessa cosa per `quality_kbps`. Test smoke verificato:
+str/None/float/typo tutti producono il valore atteso.
+
+### ✨ FEAT-17 · Single instance lock (Pedro UX request)
+**Files:** `services/singleton.py` (nuovo), `run_gui.py`
+
+Pedro: "se apro l'EXE una seconda volta, il programma si apre
+tranquillamente. Non ci dovrebbe essere un controllo per impedire di
+riaprire il programma o per lo meno portare in primo piano quello gia'
+aperto?".
+
+Implementazione:
+- `services/singleton.py`: lock TCP socket su 127.0.0.1:47286.
+  Vantaggio rispetto a lock file con PID: il SO rilascia
+  automaticamente la porta quando il processo muore (anche su crash),
+  no PID stale.
+- All'avvio (PRIMA degli import pesanti come ctk), `acquire()` prova
+  a bind. Se fallisce → un'altra istanza e' attiva.
+- `bring_existing_to_front()`: scansiona tutte le finestre Windows
+  via `EnumWindows`, cerca quella che inizia con "Music Cataloger",
+  fa `ShowWindow(SW_RESTORE) + SetForegroundWindow`.
+- `show_already_running_dialog()`: MessageBox nativo Windows
+  (no Tk import per essere veloce).
+
+Edge case: il lock va PRIMA del check `--cataloger-mode` per
+permettere ai subprocess cataloger figli di aprirsi (sono "seconde
+invocazioni legittime" dell'EXE durante la catalogazione).
+
+[CORREZIONE]: in realta' il lock va DOPO `--cataloger-mode` perche'
+il subprocess parte con `sys.executable` cioe' lo stesso EXE; senza
+escluderlo, il subprocess non riuscirebbe ad acquisire il lock e
+fallirebbe la catalogazione. Fix in run_gui.py: `_singleton_acquire`
+e' chiamato solo se `--cataloger-mode` NON e' nei sys.argv.
+
+### ✨ FEAT-18 · Modal dialog (blocco interazione main mentre dialog aperto)
+**File:** `gui/main_window.py`
+
+Pedro: "se c'e' una finestra attiva il programma principale rimanga
+bloccato e non ti faccia aprire altre finestre o lavorare sulla
+principale, cosi' non avviene".
+
+Fix: `_setup_standalone_dialog()` ora supporta `modal=True` (default).
+Applica `transient(root) + grab_set()` ritardato di 50ms (per evitare
+fallimento se chiamato prima che la finestra sia mappata).
+
+Effetto: dialog "Cambia password", "Crea utente", "Upgrade Plan",
+"About" bloccano la main finche' non chiusi. L'utente non puo' piu'
+premere "Avvia" mentre ha un dialog aperto.
+
+### 🐛 BUG-19 · Generi esclusi nelle prefs non rispettati (diagnostico)
+**File:** `gui/main_window.py`
+
+Pedro: "ho escluso Alternative e World ma li cataloga". Verificato
+con simulazione: la logica `_genre_prefs[macro::sub]` e' corretta
+e produce la lista exclude attesa.
+
+Il problema piu' probabile: o le prefs sono state salvate DOPO
+l'avvio della catalogazione, oppure il path `_get_data_dir()` punta
+a una location diversa fra dev e EXE (OneDrive sync, working dir).
+
+Aggiunto log debug `[build_cmd] excluded_genres dalla UI: N user +
+M always = K totali` con dettaglio della lista user-excluded. Al
+prossimo run Pedro vedra' chiaramente cosa il client passa.
+
+### ✨ FEAT-20 · Riepilogo distribuzione completo (no top-10)
+**File:** `core/cataloger.py`
+
+Pedro: "se ci sono generi con meno di 5 canzoni non lo segnala. Deve
+essere una funzionalita' attiva per tutta la catalogazione".
+
+Causa: `[:10]` slicing dopo sorted in `_print_summary`. Conferma del
+report JSON: 17 generi totali, di cui solo i top 10 nel log.
+
+Fix: rimosso `[:10]`. Tutti i generi rilevati ora sono mostrati,
+ordinati per count desc. Cambiato titolo da "TOP GENERI" a
+"DISTRIBUZIONE GENERI (N)" per chiarezza.
+
+### 🚧 TODO restanti per dev/unify-local-db
+3. **Unificazione DB locali** (task grosso, prossimo turno):
+   `metadata_cache.json` + `music_library.json` → `local_db.json`
+   con sezioni `cache/library` + migration al primo boot.
+
+---
+
+## v1086.3 — dev/unify-local-db (TASK 3 PRINCIPALE)
+
+### 🎯 BIG-CHANGE-21 · DB locali UNIFICATI in `local_db.json` (Option B)
+**Files:** `services/local_db.py` (riscritto), `services/cache_manager.py`
+(eliminato), `core/cataloger.py`, `gui/main_window.py`, `config/settings.py`
+
+Pedro: "L'opzione B mi sembra quella più pulita anche se più grossa,
+inoltre fare questo refactoring dovrebbe sistemare alcuni metadati che
+nel tab cache risultano vuoti perché sono nell'altro file. Avere un dato
+unico per file aiuterà in futuro la logica di merging per community".
+
+#### Schema v2
+```json
+{
+  "version": 2,
+  "last_updated": "...",
+  "files": {
+    "<rel_path>": {
+      "artist": "...", "title": "...", "album": "...",
+      "genre": "...", "subgenre": "...",
+      "bpm": float | null, "quality_kbps": int | null,
+      "external_lookup": {
+        "source": "MusicBrainz" | "iTunes" | ...,
+        "raw_genre": "...", "raw_bpm": float, "cached_at": "..."
+      },
+      "cataloged_at": "..."
+    },
+    "__orphan__:<artist>|||<title>": { ... }   # cache entries senza file reale
+  },
+  "lookup_by_query": {
+    "<artist>|||<title>": "<rel_path>"   # indice inverso per cache lookup
+  }
+}
+```
+
+Un solo record per brano, con metadati di catalogazione + cache API
+attaccata. L'indice `lookup_by_query` e' inverso (artist|title → path)
+e permette alla cascata API di cercare "ho gia' visto questo (artist,
+title)?" senza scansionare tutti i files.
+
+#### Migration v1 → v2 (automatica al primo boot)
+- Eseguita da `migrate_legacy_to_v2(data_dir)`
+- Idempotente: no-op se `local_db.json` gia' esiste
+- Inferenza euristica artist/title dal filename (pattern
+  "Artist - Title.mp3") per collegare cache → record file
+- Cache entries senza match diventano "record orfani"
+  (`__orphan__:artist|||title`) — preservate ma escluse dalle
+  viste library
+- I file legacy `metadata_cache.json` e `music_library.json`
+  vengono rinominati `.migrated_v2` (no perdita dati)
+
+Testato con smoke test: 9 scenari coperti (upsert con coercion str→num,
+cache attaccata a file esistente, cache orfana, promozione orfano →
+file reale, save/load atomico, backcompat LocalMusicDB.upsert(),
+migration con inferenza, idempotenza, scrittura .tmp+rename).
+
+#### Eliminazione `services/cache_manager.py`
+Era orfano (nessun import nel codebase). Le sue responsabilita' sono
+ora dentro `LocalDB.cache_external_lookup()` /
+`LocalDB.get_cached_metadata()`.
+
+#### Aggiornamento call site
+1. `core/cataloger.py`:
+   - init: chiama `migrate_legacy_to_v2()` + apre `LocalDB(local_db.json)`
+   - `load_cache()`: legge external_lookup dai records → popola
+     `ExternalAPIs.metadata_cache` in-RAM
+   - `save_cache()`: scrive `metadata_cache` in-RAM → external_lookup
+     dei records via `cache_external_lookup()`
+   - `backup_cache()`: copia `local_db.json` (era metadata_cache.json)
+   - `upsert_file()` con artist/title/album passati dal `final_metadata`
+     così l'indice lookup_by_query si popola correttamente
+
+2. `gui/main_window.py`:
+   - **Library tab** (`_db_reload`): legge `local_db.json`,
+     filtra orfani (escludi keys `__orphan__:...`)
+   - **Cache tab** (`_cache_reload`): RICOSTRUITA da zero. Scorri
+     records → builda dict[query_key]→{source, genre, raw_genre, bpm,
+     raw_bpm, artist, title, album, _path}. Pedro lamentava metadati
+     vuoti nel tab cache: con questo schema unificato, il record file
+     ha tutti i metadati ricchi (artist/album/genre/bpm)
+   - **CSV export**: semplificato — niente piu' lookup ridondante in
+     metadata_cache (era doppio file). Aggiunta colonna "Sorgente cache"
+   - **Find duplicates / Quality scan**: filtrano orfani
+   - **Clear cache**: ora svuota SOLO `external_lookup` + `lookup_by_query`,
+     non tocca i record library (genere/bpm assegnati dal cataloger)
+
+3. `config/settings.py`:
+   - `cache_filename` aggiornato a `local_db.json` (era dead config
+     non letto da nessuno, ma lo aggiorno per coerenza)
+
+#### Backward compatibility
+La classe `LocalMusicDB` resta come shim. Codice che chiama
+`LocalMusicDB.upsert(path, genre, ...)` continua a funzionare,
+internamente delega a `LocalDB.upsert_file()`.
+
+#### Migration scenario per Pedro
+Al primo avvio della v1086.3, l'EXE trovera':
+- `data/metadata_cache.json` (~5 MB, cache esterna)
+- `data/music_library.json` (1202 file dalla scorsa catalogazione)
+
+Eseguira' la migration automatica:
+- Crea `data/local_db.json` con tutti e due uniti
+- I 1202 file della library + cache attaccata dove l'inferenza
+  artist/title matcha
+- Le entries cache senza match → orfani (preservati ma non visibili
+  in library)
+- Rinomina `metadata_cache.json` → `metadata_cache.json.migrated_v2`
+  e idem per `music_library.json` (backup di sicurezza)
+
+Log atteso:
+```
+DB legacy migrato → local_db.json: 1202 file, N cache entries (M orfani)
+DB locale attivo: local_db.json (1202 file, N cache entries)
+```
+
+### 🚧 TODO post-task 3
+1. **Test Pedro**: verifica migration + uso normale tab Library/Cache
+2. **Merge in main + tag v1086.3-stable**
+3. **Branch dev/security-audit** (priorita' 1: plan check server-side)
+4. **Branch dev/community-db** (futuro: usa local_db.json come schema
+   per il merge community)
+
+---
+
+## v1086.4 — dev/unify-local-db Round 4 (2026-05-11): cache roundtrip + UI fixes
+
+### 🐛 BUG-22 · Tab Cache mostra record cancellati (Clear Cache "non funzionava")
+**File:** `gui/main_window.py` (`_cache_reload`)
+
+Pedro test 5: dopo Clear Cache, il tab cache mostrava ancora le righe.
+Allegando i file `local_db.json` pre/post, ho visto che la cache ERA
+stata svuotata correttamente (`lookup_by_query` da 12 → 0), ma il
+`_cache_reload` mostrava tutti i record file che avessero artist+title,
+indipendentemente dalla presenza di `external_lookup`.
+
+Fix: `_cache_reload` ora skippa i record SENZA external_lookup.
+La cache view rappresenta solo i record effettivamente cached, come
+dovrebbe essere.
+
+### 🐛 BUG-23 · Cache roundtrip povero (cover_url e altri campi persi)
+**Files:** `core/cataloger.py` (`load_cache`, `save_cache`),
+          `services/local_db.py` (migration cache)
+
+Pedro test 3: "i metadati non sono tutti popolati e le cover album non
+sono più visibili nè per i vecchi dati nè per i dati di nuova
+catalogazione". Diagnosi: il roundtrip cache era impoverito.
+
+- La cache in-RAM di `external_apis.py` contiene blob RICCHI con
+  artist, title, album, genre, bpm, cover_url, year, source
+- Ma `save_cache` v1086.3 round 1 estraeva SOLO `source/raw_genre/raw_bpm`
+- E `load_cache` ricostruiva solo `{source, genre, bpm}` in-RAM
+- E la migration legacy → v2 perdeva idem tutti gli extra campi
+
+Risultato: ogni roundtrip cache (load → use → save) impoveriva
+sistematicamente i metadati. Le cover URL, gli anni, gli album extra
+venivano persi al primo restart.
+
+Fix RICCO:
+- `external_lookup` ora contiene il PAYLOAD COMPLETO della risposta API
+- `save_cache` copia integralmente `metadata_cache[qk]` come
+  `external_lookup`, aggiungendo solo `cached_at` timestamp
+- `load_cache` ritorna il blob external_lookup intero in-RAM (con
+  artist/title/album come fallback dal record file)
+- Migration legacy preserva ALL i campi della cache vecchia
+  (cover_url, year, etc.) invece di filtrare solo 3 campi
+
+NOTA per Pedro: l'attuale `local_db.json` (post-migration con bug
+round 1) ha gia' perso i cover_url ai miei dati cache. Per
+recuperarli:
+1. Chiudi l'app
+2. Apri `data/`
+3. Rinomina `local_db.json` → `local_db.json.bak`
+4. Rinomina `metadata_cache.json.migrated_v2` → `metadata_cache.json`
+5. Rinomina `music_library.json.migrated_v2` → `music_library.json`
+6. Riavvia l'app — la migration v1086.4 partira' di nuovo, questa volta
+   preservando TUTTO
+
+### 🐛 BUG-24 · Statistiche dialog limitate a Top 8
+**File:** `gui/main_window.py` (dialog "Catalogazione Completata")
+
+Pedro test: il riepilogo nel log gia' mostrava tutti i generi (fix
+v1086.2 round 2), ma il **dialog GUI** finale era ancora limitato a
+`[:8]`. Lo stesso bug in un altro punto del codice.
+
+Fix: rimosso `[:8]`. Dialog ora mostra TUTTI i generi rilevati con il
+titolo aggiornato a "Distribuzione Generi (N)" per coerenza col log.
+Il dialog e' gia' scrollable quindi nessun rischio di overflow.
+
+### 🎨 UI-25 · Login email case-insensitive
+**File:** `gui/login_window.py`
+
+Pedro: "controlleresti anche la login, mi sembra che sia sensitive cap
+la mail e non è necessario il campo sensitive per email/utente".
+
+Fix duplice:
+- `_do_login` normalizza email a lowercase prima di inviarla al server
+- Entry email ha trace_add("write") che forza lowercase in tempo reale
+  mentre l'utente digita (con preservazione cursor position).
+  Se l'utente scrive "Mario@Gmail.com", vedra' "mario@gmail.com" man
+  mano. Niente piu' confusione "ho scritto bene ma il server dice
+  utente non trovato".
+- Password resta case-sensitive (giusta).
+
+### 🚧 Aperti
+- Restano da identificare possibili altri punti che soffrono dello
+  stesso pattern `Top N`/`[:N]` in altre viste GUI (audit futuro).
+- Pedro chiedeva qualcosa su "permanenza delle impostazioni" ma il
+  messaggio si era troncato. Da chiarire nel prossimo turno.
+
+---
+
+## v1086.5 — dev/unify-local-db Round 5 (2026-05-11): cache roundtrip FIX CRITICO
+
+### 🐛 BUG-26 · Cache key format mismatch (causa root di tutto)
+**Files:** `core/cataloger.py` (load/save_cache),
+          `services/local_db.py` (migration)
+
+**Bug critico scoperto** dal log di Pedro:
+```
+Cache caricata: 0 metadati
+[...10 file processati con risposte iTunes valide...]
+Cache salvata: 0 voci → local_db.json
+```
+
+Cause root: `external_apis.py` usa chiavi cache in formato
+`"<provider>_<artist>_<title>"` (es. `"itunes_Akon_Lonely"`,
+`"mb_Beatles_Yesterday_Help!"`). Da v1086.3, il refactor unificato
+si aspettava chiavi `"artist|||title"` e splittava su `"|||"` →
+TUTTE le entries scartate silenziosamente.
+
+Sintomi visibili a Pedro:
+1. Cache caricata 0 metadati ad ogni boot (ogni catalogazione rifa le
+   query API → lente, sprecano rate limit)
+2. Tab cache vuoto
+3. Cover album mai visibili (cover_url nelle entries scartate)
+4. CSV "Sorgente cache" vuota
+5. Migration log: "421 errori non fatali" = le 421 entries cache che
+   non riusciva a parsare con `_parse_legacy_query_key`
+
+### Schema v1086.5 (aggregato per provider)
+Il nuovo `external_lookup` aggrega le risposte di provider diversi
+per stesso (artist, title):
+```json
+"external_lookup": {
+  "primary": "itunes",
+  "providers": {
+    "itunes": { artist, title, genre, bpm, cover_url, year, ... },
+    "musicbrainz": { artist, title, genre, ... }
+  },
+  "cached_at": "...",
+  "source": "itunes",      // backcompat
+  "raw_genre": "R&B/Soul", // backcompat (= primary.genre)
+  "raw_bpm": 89            // backcompat (= primary.bpm)
+}
+```
+
+**save_cache**: scorre `external_apis.metadata_cache` (chiavi
+per-provider), estrae artist/title dai dati del payload (NON dalla
+chiave, che e' ambigua), aggrega per stesso (artist, title), crea
+external_lookup con sotto-sezione `providers`. Da n entries
+per-provider → m records aggregati (con m ≤ n).
+
+**load_cache**: per ogni record con external_lookup, ricostruisce le
+chiavi per-provider che external_apis.py si aspetta:
+`"itunes_Akon_Lonely"`, `"mb_Akon_Lonely"`, ecc. Cosi' al prossimo
+boot la cache HIT funziona davvero.
+
+**Migration**: stessa logica del save. Parsing del prefisso provider
+dalla chiave legacy, aggregazione per (artist, title) preso dal payload.
+
+### 🐛 BUG-27 · Orfani-candidati: Indie/Blues/Ambient inclusi
+**File:** `gui/main_window.py`
+
+Pedro: "vedi che non consiglia a sottogeneri con pochi file di spostarli
+in macrogenere? (in questo caso Indie e Blues)". 
+
+Causa: `_MACRO_GENRES` set conteneva `blues`, `indie`, `ambient` →
+venivano esclusi dal filtro orfani anche se avevano 1 file ciascuno.
+
+Fix: rimossi dai macrogeneri. Ora Indie con 1 file viene suggerito
+come spostabile sotto Alternative, Blues sotto Jazz, Ambient sotto
+Electronic (mapping gia' presente in `_SUB_TO_MACRO`).
+
+### 🚧 Aperti (Pedro test)
+- Permanenza impostazioni menu sinistra → rinviato al prossimo branch
+- Recovery cache: Pedro deve rifare la procedura ren/restore con
+  v1086.5 (la migration ora funziona correttamente)
+
+---
+
+## v1086.6 — dev/unify-local-db Round 6 (2026-05-11): tab Cache enrichment
+
+### 🎨 UI-28 · Layout dettaglio cache a 2 colonne con metadati estesi
+**File:** `gui/main_window.py`
+
+Pedro request:
+1. "voci 'Titolo' e 'Artisti Partecipanti' invece di stampare solo
+    titolo e artista" → header del record con titolo + artisti come riga
+    separata
+2. "indentare la colonna dei titoli metadati a sinistra e la colonna
+    dei metadati a destra" → grid 2 colonne con label sx, valori dx
+3. "aggiungere altri metadati nelle cache: dimensione file, bitrate,
+    altri campi utili" → carta bianca
+
+Implementazione:
+- `_cache_detail_var` (singolo StringVar testuale) → SOSTITUITO da
+  un layout strutturato:
+  - Header in alto: `_cache_detail_title_var` (bold) + `_cache_detail_artist_var`
+  - Grid 2 colonne in `CTkScrollableFrame` per i metadati
+  - I widget label+valore vengono creati al primo select e RIUTILIZZATI
+    ai successivi (StringVar) — niente ricostruzione, niente flicker
+- Campi dettaglio:
+  - Album, Anno, Genere, BPM, Durata (mm:ss formattato)
+  - **Qualità** (kbps) — dal record file
+  - **Sample rate** (Hz) — best-effort via mutagen
+  - **Dimensione** (MB/KB/B leggibile) — `stat().st_size` se file esiste
+  - **Sorgente** con annotazione `+N` se piu' provider hanno risposto
+    (es. `"itunes (+1)"` = iTunes + MusicBrainz)
+
+Note tecniche:
+- L'accesso al disco per leggere size/bitrate/sample_rate e' best-effort:
+  se il file e' un orfano (`_path = None`) o e' su path non risolvibile
+  rispetto a `_db_base_path_var`, i campi mostrano "—" senza errori
+- Mutagen e' gia' una dipendenza del progetto, riuso esistente
+
+### 📝 Sul "campi non popolati" di Pedro (analisi)
+Pedro test 3: "i metadati non sono tutti popolati... Alberto Indio ha
+trovato corrispondenza su iTunes ma da tab cache non vedo genere/BPM".
+
+Investigato: il record "Alberto Indio - Quero-te Dizer" e' un ORFANO
+(`__orphan__:alberto indio|||quero-te dizer`) perche' il cataloger l'ha
+processato MA non l'ha spostato (log: "Errore spostamento o SKIP
+duplicato"). Quando upsert_file non viene chiamato, save_cache non
+trova un file corrispondente nell'indice `lookup_by_query` e crea un
+orfano. Comportamento corretto, non bug: i metadati iTunes sono
+preservati nel record orfano (visibile nel tab cache), e quando il
+file verra' davvero spostato in una catalogazione futura,
+upsert_file fara' la promozione automatica orfano → record file
+(logica gia' presente).
+
+Altri "campi vuoti" in cache di Pedro: record di catalogazioni
+PASSATE (pre-v1086.5) che non hanno mai avuto external_lookup
+perche' la cache era rotta allora. Si sistemano solo con una
+ricatalogazione (la cache da Quero-te Dizer e altre risposte API
+sono adesso in `external_apis.metadata_cache` e verranno persistite
+al prossimo save_cache).
+
+### 🚧 Permanenza impostazioni menu sinistra
+Pedro chiedeva di rendere persistenti anche le impostazioni del menu
+di sinistra (come quelle del tab Avanzate). Rinviato al prossimo
+branch dedicato (`dev/persistent-settings` o nel `dev/security-audit`,
+da decidere). Aggiunto alla todo list.
+
+---
+
+## v1086.7-wip — dev/security-audit (Fase 1 client, work in progress)
+
+⚠️ Questa è una versione **DI LAVORO** — non distribuibile in produzione finché
+gli endpoint server proxy non sono implementati. I cambiamenti di seguito
+sono PARTE del refactoring security, non lo stato finale.
+
+### Cosa è cambiato
+
+**`config/secrets.py`** — rimossi i 5 token sensibili (Discogs, Last.fm,
+GetSong, AcoustID, AudD). Spotify CLIENT_SECRET messo a None. Solo
+CLIENT_ID (pubblico) e identificativi MusicBrainz (user-agent, contact)
+restano. Le chiavi sensibili viaggeranno via server proxy.
+
+**`config/user_plans.py`** — `_DEFAULT_PLAN = "base"` (era "advanced").
+`has_feature()` default = False per feature sconosciute (era True). Nuovo
+helper `set_plan_from_server()` per impostare il piano post-login senza
+manipolare il file locale come fonte di verità.
+
+**`gui/main_window.py`** — sostituiti i `features.get("...", True)`
+permissivi con `features.get("...", False)`. Da ora un piano sconosciuto
+o features mancanti DISABILITANO la feature invece di darla per scontata.
+
+**`services/api_client.py`** — `get_stored_user_info()` ritorna SEMPRE
+`is_admin=False` per la modalità offline. Le tab admin si vedono solo
+dopo `me()` riuscito (server autoritativo). Niente più rischio di
+modificare `session.json` con `is_admin=True` per vedere le tab.
+
+**`services/external_apis.py`** — Spotify ora controlla anche None per
+client_secret (prima solo "YOUR_SPOTIFY_CLIENT_ID"). Tutti i path
+gestiscono graceful "no chiave → skip provider".
+
+### Cosa NON è ancora cambiato (TODO Fase 2-4)
+
+- [ ] Endpoint server proxy per Discogs/Last.fm/Spotify/GetSong
+- [ ] Client che chiama il server invece delle API esterne dirette
+- [ ] `@require_feature` decorator server-side su endpoint plan-gated
+- [ ] Job quota tracker server-side (`max_runs_per_day`)
+- [ ] Firma EXE digitale (Ed25519)
+- [ ] Storage cifrato per `session.json` (Windows Credential Manager)
+- [ ] SECURITY.md finale + README.md
+
+### Test piano per v1086.7-wip
+
+NON deployare in produzione. Test interno:
+1. Login dovrebbe funzionare normalmente
+2. Le tab Pro/Advanced si vedono ancora dopo login con utente del piano corretto (perché `features` viene dal server)
+3. Le chiamate dirette a Discogs/Last.fm/Spotify/GetSong falliranno graceful con "no key, skip" nei log — i metadati useranno solo MusicBrainz/iTunes/Deezer
+4. Se cancelli `session.json` o lo modifichi a mano, NON dovresti vedere tab admin
+
+---
+
+## v1086.7-wip — Round 2 (2026-05-12): tab Cache UX fix prima di security
+
+⚠️ NB: questo round NON e' security audit. E' un fix UX rimandato dal
+v1086.6 per il quale Pedro aveva testato e segnalato regressioni
+visive prima di passare al server.
+
+### 🎨 UI-29 · Tab Cache layout corretto (Pedro feedback)
+**File:** `gui/main_window.py`
+
+Pedro feedback sull'iterazione precedente del tab Cache:
+
+1. "Voci 'Titolo' e 'Artisti Partecipanti' invece che stampare solo
+    titolo e artista"
+   → Aggiunte come PRIMI due elementi della grid 2 colonne, NON come
+   header separati. Cosi' tutto e' allineato nella stessa colonna.
+
+2. "Indentazione a sinistra completamente a sinistra"
+   → CTkScrollableFrame con `padx=0`, label con `padx=(0, 4)` (sinistra
+   0, gap 4px col valore). Prima c'era padx=(8, 6) — visualmente
+   "sembrava al centro".
+
+3. "Durata vuota nonostante iTunes la ritorni"
+   → `_cache_reload` non propagava `duration` dal primary provider al
+   cache_view. Aggiunto `"duration": primary_data.get("duration")`.
+
+4. "Sample rate e Dimensione mancanti"
+   → Il base path per risolvere il file fisico era `_db_base_path_var`,
+   variabile inesistente nel codice (bug pregresso v1086.6). Sostituito
+   con `self._selected_path` (StringVar del path entry GUI).
+   Ora se il file e' presente sul disco, dimensione + sample rate
+   vengono letti via `stat()` e `mutagen.MP3`.
+
+5. "Sorgente: iTunes (+1) mancante"
+   → `providers_count` non veniva propagato al cache_view per i record
+   migrati. Aggiunto.
+
+Layout finale (11 righe, allineate completamente a sinistra):
+- Titolo:                Quero-te Dizer
+- Artisti Partecipanti:  Alberto Indio
+- Album:                 Acústico
+- Anno:                  2013
+- Genere:                World
+- BPM:                   126.0
+- Durata:                4:10
+- Qualità:               256 kbps
+- Sample rate:           44100 Hz
+- Dimensione:            8.45 MB
+- Sorgente:              iTunes
+
+### 🔜 Prossimo: security audit FASE 2
+File server arrivati da Pedro:
+- `main.py` (FastAPI app, lifespan, CORS, seed admin)
+- `auth.py` (API endpoints login/refresh/me/change-password/register/admin)
+- `services/auth.py` (JWT bcrypt, get_current_user, require_admin)
+- `models/db.py` (User, UpgradeRequest, Job, JobLog, AdminAuditLog)
+- `requirements.txt` server
+- `.env` + `.env.example`
+
+Audit server-side parte nel prossimo turno.
+
+---
+
+## v1087.0 — dev/security-audit Round 3 (2026-05-12): tab Cache UX finale
+
+⚠️ Bump major: passaggio v1086 → v1087 perche' branch nuovo
+(dev/security-audit). Il fix UX tab cache resta marginale (Pedro ha
+testato il refactor di backend security in v1086.7-wip e funziona;
+questo round chiude la richiesta UX in sospeso prima di passare
+all'audit server vero e proprio).
+
+### 🎨 UI-30 · Tab Cache layout (Pedro feedback definitivo)
+**File:** `gui/main_window.py`
+
+Pedro screenshot test 1086.7-wip: "le label non sono tutte allineate
+a sinistra e in più continuo a non vedere Sample rate, Dimensione,
+Sorgente. Sospetto che dato lo spazio che hai introdotto tra le
+voci in verticale si nascondono sotto la UI, anzi confermo,
+espandendo in verticale i campi si vedono".
+
+#### Cause
+1. `pady=2` per ogni riga × 11 righe = 44px verticali di gap che
+   sommavano oltre l'altezza visibile del frame dettaglio →
+   gli ultimi 3 campi (Sample rate, Dimensione, Sorgente) finivano
+   sotto la zona visibile senza scroll
+2. `minsize=140` sulla colonna labels creava uno spazio fisso
+   "Album:          [          ] R&B", facendo sembrare i valori
+   centrati invece che subito dopo le label
+
+#### Fix
+- `pady=0` su tutte le righe — niente piu' gap inutile fra campi
+- Spacer dedicato (8px) inserito SOLO dopo "Artisti Partecipanti"
+  come richiesto da Pedro (separa header dai metadati dettaglio)
+- `minsize=0` + `weight=0` sulla colonna 0 → la colonna si adatta
+  al testo piu' lungo ("Artisti Partecipanti:") senza spazi inutilizzati
+- "Titolo:" e "Artisti Partecipanti:" in GRASSETTO + colore
+  `text` invece di `text_dim` per evidenziarli come header
+- Le altre label restano in `text_dim` per gerarchia visiva
+
+#### Campi aggiunti
+- **Cartella** — directory del file dentro la music dir (es. "R&B/")
+- **Catalogato il** — data ultima catalogazione formato "YYYY-MM-DD HH:MM"
+
+Layout finale (13 righe):
+```
+Titolo:                Lonely               (bold)
+Artisti Partecipanti:  Akon                 (bold)
+                                             (8px gap)
+Album:                 Trouble
+Anno:                  2004
+Genere:                R&B
+BPM:                   89.0
+Durata:                3:55
+Qualità:               320 kbps
+Sample rate:           44100 Hz
+Dimensione:            8.45 MB
+Cartella:              R&B
+Catalogato il:         2026-05-12 09:50
+Sorgente:              iTunes
+```
+
+### 🔢 Bump versione branch nuovo
+Pedro: "mi spieghi poi perché hai fatto la versione 1086.7 se siamo
+al branch nuovo? puoi progredire di versione".
+
+Hai ragione, scelta sbagliata mia. Branch nuovo = bump minor.
+- `dev/sources-priority` chiuso a v1086.1
+- `dev/unify-local-db` chiuso a v1086.6
+- `dev/security-audit` parte da **v1087.0** (era v1086.7-wip)
+
+Da ora in poi:
+- patch di fix dentro lo stesso branch: bump patch (v1087.0 → v1087.1)
+- branch nuovo: bump minor (v1087.x → v1088.0)
+- breaking changes: bump major (v1xxx → v2xxx)
+
+### 🔜 Prossimo turno
+Audit server completo sui file ricevuti (main.py, auth.py,
+services/auth.py, models/db.py, requirements.txt, .env, .env.example).
+Lista bug/lacune trovate + patch da applicare al server.
+
+---
+
+## v1087.1 — dev/security-audit Round 4 (2026-05-12): fix orfani + UI cache definitiva
+
+⚠️ Sono ancora fix UX/correttezza che hanno la precedenza sull'audit
+server vero. Il bug orfani impatta la qualità dei dati e va sistemato
+prima di continuare.
+
+### 🐛 BUG-31 · 13/16 file appena catalogati senza external_lookup
+**Files:** `services/external_apis.py`, `core/cataloger.py`, `services/local_db.py`
+
+Pedro test 17:19: 17 file catalogati, log dice "iTunes: Genere: X | BPM: Y"
+per ognuno. Ma dump del local_db: solo 3 hanno `external_lookup`,
+13 sono record file PURI senza cache e ci sono 71 ORFANI.
+
+#### Causa root
+Il cataloger fa `upsert_file()` usando `artist`/`title` dal **filename**
+(o tag mp3), che e' la versione "grezza" usata dall'utente per
+salvare i file. Esempio dal log:
+```
+*** Audiomachine - Kill 'Em All.mp3 ***
+>-- iTunes: Genere: Hip Hop | BPM: 92
+\-- Spostata in Hip Hop/
+```
+→ upsert_file: `artist="Audiomachine"`, `title="Kill 'Em All"`
+→ lookup_by_query["audiomachine|||kill 'em all"] = "Hip Hop/Audiomachine - Kill 'Em All.mp3"
+
+Poi a fine catalogazione `save_cache()` aggrega `external_apis.metadata_cache`:
+```python
+in_ram["itunes_Audiomachine_Kill 'Em All"] = {
+    "artist": "Big Rob Savage",                   # nome canonico iTunes !
+    "title":  "Kill Em' All (feat. Timothy)",     # nome canonico iTunes !
+    ...
+}
+```
+iTunes ha trovato una versione canonica DIVERSA del brano (succede
+sempre: feat. mancanti, "ft." vs "feat.", apostrofi curly vs ASCII,
+suffix tipo "(Radio Edit)", artisti aggiuntivi). `save_cache`
+costruiva la qk dai campi canonici → `"big rob savage|||kill em' all (feat. timothy)"`
+→ non match in `lookup_by_query` → ORFANO creato.
+
+#### Fix
+**Lato external_apis.py (search_all)**: il payload ritornato ora include
+`_query_artist` e `_query_title` con i parametri **originali** della
+ricerca (= quelli passati dal cataloger, = artist/title del filename,
+= chiave in `lookup_by_query`).
+
+**Lato cataloger.py (save_cache)**: usa `_query_artist`/`_query_title`
+quando presenti per costruire qk. Fallback ai canonici se manca
+(record migrati legacy).
+
+**Lato local_db.py (migration legacy)**: la cache vecchia v1086.x aveva
+chiavi `<prefix>_<query_artist>_<query_title>[_<album>]`. Il parser
+estrae query_artist/title dalla chiave invece di usare i canonici
+dal payload. Cosi' i record migrati dal vecchio `metadata_cache.json`
+si collegano correttamente alla library.
+
+#### Smoke test
+Scenario reale: file "Audiomachine - Kill 'Em All.mp3", iTunes ritorna
+"Big Rob Savage" come canonical artist.
+- Prima (v1086.6 e v1087.0): orfano `__orphan__:big rob savage|||...`
+- Dopo (v1087.1): external_lookup attaccato a "Hip Hop/Audiomachine - Kill 'Em All.mp3" (corretto)
+
+#### Impatto su DB esistenti
+Il `local_db.json` di Pedro attuale ha 71 orfani inutili. Saranno
+ripuliti automaticamente alle prossime catalogazioni (i record reali
+saranno popolati con external_lookup; gli orfani inutili non
+verranno piu' creati). Per pulizia immediata si puo' usare il
+bottone "Svuota Cache" — gli orfani si cancellano insieme alla
+cache, e al prossimo run vengono ricreati correttamente collegati
+ai file reali.
+
+### 🎨 UI-32 · Tab Cache: niente scrollbar, valori espansi a tutta larghezza
+**File:** `gui/main_window.py`
+
+Pedro feedback: "il valore non occupa tutto lo spazio disponibile in
+orizzontale risultando non realmente indentato a sinistra. Inoltre
+non è necessaria la scroolbar dovrebbe riuscire ad entrare tutto
+nella finestra."
+
+#### Cause
+- `CTkScrollableFrame` con 13 righe stretto mostrava scrollbar
+- Valori con `wraplength=160` → larghezza fissa, testo breve
+  ("Antonio José") sembrava centrato in spazio bianco
+
+#### Fix
+- `CTkScrollableFrame` → `CTkFrame` (niente scroll, niente scrollbar)
+- `columnconfigure(1, weight=1)` + `sticky="ew"` sui valori → la
+  colonna valori SI ESPANDE a riempire tutto lo spazio residuo
+- `wraplength=0` sui valori → niente wrap
+
+### 🚧 Prossimo turno
+Quando il fix orfani e' verificato OK, audit server completo.
+
+---
+
+## v1087.2 — dev/security-audit Round 5 (2026-05-16): ROLLBACK layout tab cache
+
+### ↩️ UI-33 · Rollback grid layout → testo semplice (Pedro)
+**File:** `gui/main_window.py`
+
+Pedro: "da quando ti ho chiesto di indentare le colonne nel tab cache
+hai creato questo spazio verticale tra le voci che prima non c'era e
+inoltre il campo non è comunque indentato a sinistra, quindi ti chiedo
+torna indietro alle modifiche sulla parte delle cache e aggiungi solo
+le voci in più che ti ho chiesto."
+
+Lezione appresa: ho preso una richiesta semplice ("aggiungi metadati,
+indenta il valore") e ho ricostruito tutto il layout con grid 2-colonne
+attraverso 4 round (v1086.6 → v1086.7 → v1087.0 → v1087.1), ognuno
+introducendo nuovi problemi (spazio verticale, scrollbar, valori che
+sembravano centrati). Era over-engineering.
+
+Fix v1087.2: ROLLBACK al singolo `CTkLabel` con `StringVar` di testo
+multi-riga (la struttura ORIGINALE pre-v1086.7). Niente grid, niente
+spazio verticale extra, niente scrollbar. Aggiunti SOLO i campi extra
+richiesti:
+- Titolo, Artisti Partecipanti (prime due righe)
+- Album, Anno, Genere, BPM, Durata
+- Qualità, Sample rate, Dimensione   ← extra concordati
+- Cartella, Catalogato il            ← extra concordati
+- Sorgente
+
+L'indentazione perfetta del valore a destra NON e' risolvibile con un
+singolo Label di testo. Pedro ha confermato: "Se non si trova una
+soluzione sull'indentazione a destra, per il momento lasciamola così".
+Accettato come limite noto.
+
+### ✅ BUG-31 (orfani) — CONFERMATO RISOLTO
+Pedro test 16/05: catalogazione 11 file. Dump local_db: i file
+appena catalogati hanno `external_lookup` correttamente collegato
+(32 record con external_lookup recenti; quelli senza sono di run
+PRE-fix). I 138 orfani residui sono legacy — si puliscono con
+"Svuota Cache" o restano innocui (non vengono piu' creati nuovi
+orfani nei run post-fix).
+
+Il fix `_query_artist`/`_query_title` in v1087.1 funziona.
+
+### 🔜 Prossimo turno (finalmente): AUDIT SERVER
+Tutti i blocchi UX/correttezza chiusi. Si parte con l'audit di
+sicurezza server-side sui file ricevuti da Pedro.

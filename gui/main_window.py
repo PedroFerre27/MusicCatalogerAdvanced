@@ -73,14 +73,20 @@ PALETTE = {
 
 
 def _setup_standalone_dialog(win, root, title: str,
-                              w: int, h: int, center_on_root: bool = True):
+                              w: int, h: int, center_on_root: bool = True,
+                              modal: bool = True):
     """v1085o: helper per configurare un CTkToplevel come finestra Windows
     STANDALONE (con propria entry in taskbar, propria icona, gestione
     z-order nativa). Usato per i dialog "modali importanti".
 
-    Sostituisce il pattern overrideredirect=True + transient che creava
-    finestre senza titlebar e legate alla main — le quali su Windows
-    tendevano a nascondersi sotto la main al re-focus dell'utente.
+    v1086.2: aggiunto parametro `modal` (default True). Se True, applica
+    `transient(root)` + `grab_set()` per bloccare l'interazione con la
+    main window finche' il dialog non viene chiuso. Pedro feedback:
+    "se c'e' una finestra attiva il programma principale rimanga
+    bloccato e non ti faccia aprire altre finestre o lavorare sulla
+    principale". Senza modal, l'utente puo' premere accidentalmente
+    "Avvia" mentre ha aperto un dialog "Cambia password" e finire in
+    stato inconsistente.
 
     Strategia:
     - title visibile in taskbar (entry separata in alt+tab)
@@ -91,6 +97,7 @@ def _setup_standalone_dialog(win, root, title: str,
       focus_force, dopo 100ms tolgo il topmost. Risultato: appare sopra
       tutte le app al primo show, poi z-order normale.
     - centratura sopra la main window
+    - modal: transient + grab_set
     """
     win.title(title)
     win.geometry(f"{w}x{h}")
@@ -126,6 +133,21 @@ def _setup_standalone_dialog(win, root, title: str,
             rw = root.winfo_width(); rh = root.winfo_height()
             win.geometry(f"{w}x{h}+{rx + (rw-w)//2}+{ry + (rh-h)//2}")
         except Exception: pass
+
+    # v1086.2: rendi il dialog modale (blocca input alla main).
+    # Ritardato con after(50) perche' grab_set su una finestra non ancora
+    # mappata su Windows puo' fallire silenziosamente o produrre warning.
+    if modal:
+        def _make_modal():
+            try:
+                win.transient(root)
+                win.grab_set()
+            except Exception:
+                pass
+        try:
+            win.after(50, _make_modal)
+        except Exception:
+            pass
 
 
 FONT_TITLE = ("Segoe UI", 20, "bold")
@@ -1716,10 +1738,13 @@ class MusicCatalogerGUI:
                 # Overlay "feature locked"
                 self._add_lock_overlay(tab_widget, feat_key, plan_name, plan_display)
 
-        # Disabilita check 'Abilita Sorgenti DB Online' se feature non concessa
+        # Disabilita check 'Abilita Sorgenti DB Online' se feature non concessa.
+        # v1086.7 security-audit: default False (era True). Se il server non
+        # ritorna `features` (raro, ma possibile in edge case), assumiamo
+        # che la feature NON sia disponibile invece di darla per scontata.
         try:
             ext_db_widget = getattr(self, "_chk_use_ext_db", None)
-            if not features.get("catalog_external_db", True):
+            if not features.get("catalog_external_db", False):
                 self._opt_use_ext_db.set(False)
                 if ext_db_widget is not None:
                     ext_db_widget.configure(state="disabled")
@@ -1729,9 +1754,9 @@ class MusicCatalogerGUI:
         except Exception:
             pass
 
-        # Feature cover
+        # Feature cover — stesso pattern
         try:
-            if not features.get("catalog_cover", True):
+            if not features.get("catalog_cover", False):
                 if hasattr(self, "_cover_enabled"):
                     self._cover_enabled.set(False)
         except Exception:
@@ -2472,7 +2497,7 @@ class MusicCatalogerGUI:
 
         ctk.CTkLabel(
             frm,
-            text="Salva la mappatura file→genere in music_library.json.\n"
+            text="Salva la mappatura file→genere nel DB locale unificato (local_db.json).\n"
                  "Permette di rilevare spostamenti manuali al prossimo avvio.",
             font=FONT_SMALL, text_color=PALETTE["text_dim"], justify="left",
         ).grid(row=2, column=0, padx=28, pady=(0, 10), sticky="w")
@@ -2728,18 +2753,24 @@ class MusicCatalogerGUI:
         self._db_reload()
 
     def _db_reload(self):
-        """Ricarica music_library.json e aggiorna la vista."""
+        """Ricarica local_db.json e aggiorna la vista (v1086.3)."""
         from pathlib import Path as _P
         if hasattr(sys, '_MEIPASS'):
             script_dir = _get_data_dir()
-        db_path = _get_data_dir() / "music_library.json"
+        db_path = _get_data_dir() / "local_db.json"
         self._db_data = {}
         if db_path.exists():
             try:
                 import json as _json
                 with open(db_path, encoding="utf-8") as f:
                     raw = _json.load(f)
-                self._db_data = raw.get("files", {})
+                # v1086.3: il nuovo local_db.json puo' contenere record orfani
+                # (chiavi __orphan__:...) che sono entry cache senza file
+                # corrispondente. Escludiamoli dalla library view.
+                self._db_data = {
+                    p: r for p, r in (raw.get("files", {}) or {}).items()
+                    if not p.startswith("__orphan__:")
+                }
             except Exception as e:
                 self._db_count_var.set(f"Errore lettura: {e}")
         self._db_filter()
@@ -3037,13 +3068,16 @@ class MusicCatalogerGUI:
         base = Path(base_path)
         results = []
 
-        # Fase 1: leggi dal DB locale (music_library.json)
+        # Fase 1: leggi dal DB locale (local_db.json v2 unificato)
         db_kbps: dict = {}
-        db_path = _get_data_dir() / "music_library.json"
+        db_path = _get_data_dir() / "local_db.json"
         if db_path.exists():
             try:
                 raw = _json.loads(db_path.read_text(encoding="utf-8"))
-                for rel_path, info in raw.get("files", {}).items():
+                for rel_path, info in (raw.get("files", {}) or {}).items():
+                    # v1086.3: skip orfani (entries cache senza file)
+                    if rel_path.startswith("__orphan__:"):
+                        continue
                     kbps = info.get("quality_kbps") or 0
                     if kbps:
                         fname_key = Path(rel_path).name.lower()
@@ -3399,33 +3433,88 @@ class MusicCatalogerGUI:
         )
         self._cache_cover_label.place(x=0, y=0, relwidth=1, relheight=1)
 
-        self._cache_detail_var = ctk.StringVar(value="Seleziona un brano dalla lista")
+        # v1087.2: ROLLBACK del layout grid 2-colonne (v1086.7→v1087.1).
+        # Pedro: "da quando ti ho chiesto di indentare le colonne hai
+        # creato questo spazio verticale tra le voci che prima non c'era".
+        # Torno al singolo Label multi-riga ORIGINALE (testo compatto,
+        # nessuno spazio verticale fra le righe) e aggiungo solo i campi
+        # extra richiesti (Sample rate, Dimensione, Cartella, Catalogato
+        # il, Sorgente). Il problema dell'indentazione a destra del valore
+        # NON e' risolvibile in modo pulito con un singolo Label di testo
+        # → come concordato con Pedro lo lasciamo cosi' per ora.
+        self._cache_detail_var = ctk.StringVar(
+            value="Seleziona un brano dalla lista")
         ctk.CTkLabel(detail, textvariable=self._cache_detail_var,
                      font=FONT_SMALL, text_color=PALETTE["text"],
-                     wraplength=200, justify="left",
+                     wraplength=220, justify="left",
                      ).pack(padx=16, pady=(0, 8), anchor="w")
 
         self._cache_built = False
         self._cache_reload()
 
     def _cache_reload(self):
-        """v1060b: Ricarica metadata_cache.json — robusto a dati malformati o di versioni precedenti."""
+        """v1086.4: ricostruisce la vista cache dal local_db.json. Il
+        nuovo schema external_lookup ha sotto-sezioni `providers`:
+            external_lookup: {
+                primary: "itunes",
+                providers: { itunes: {...}, musicbrainz: {...} },
+                ...
+            }
+        Per la vista cache mostriamo una riga per (artist, title) con i
+        dati del provider primary, ma il dettaglio puo' mostrare tutti
+        i provider disponibili.
+        """
         import json as _json
         self._cache_data = {}
-        cache_file = _get_data_dir() / "metadata_cache.json"
+        cache_file = _get_data_dir() / "local_db.json"
         if cache_file.exists():
             try:
                 raw = _json.loads(cache_file.read_text(encoding="utf-8"))
-                raw_cache = raw.get("metadata_cache", {})
-                # Filtra voci malformate senza cancellarle dal disco:
-                # accetta solo voci dove chiave è str e valore è dict o None
-                self._cache_data = {
-                    k: v for k, v in raw_cache.items()
-                    if isinstance(k, str) and (v is None or isinstance(v, dict))
-                }
-                n_skip = len(raw_cache) - len(self._cache_data)
-                if n_skip:
-                    self._cache_count_var.set(f"({n_skip} voci ignorate — formato non valido)")
+                cache_view = {}
+                for path, rec in (raw.get("files", {}) or {}).items():
+                    if not isinstance(rec, dict):
+                        continue
+                    ext = rec.get("external_lookup")
+                    if not ext:
+                        continue
+                    artist = (rec.get("artist") or "").strip()
+                    title = (rec.get("title") or "").strip()
+                    if not artist or not title:
+                        continue
+                    qk = f"{artist.lower()}|||{title.lower()}"
+
+                    # Estrai il provider primary (o legacy flat schema)
+                    providers = ext.get("providers") or {}
+                    if providers:
+                        primary = ext.get("primary") or next(iter(providers.keys()))
+                        primary_data = providers.get(primary, {})
+                    else:
+                        # Schema legacy round 3 (flat payload)
+                        primary = ext.get("source") or "unknown"
+                        primary_data = ext
+
+                    cache_view[qk] = {
+                        "source": primary,
+                        "genre": rec.get("genre"),
+                        "raw_genre": primary_data.get("genre") or ext.get("raw_genre"),
+                        "bpm": rec.get("bpm"),
+                        "raw_bpm": primary_data.get("bpm") or ext.get("raw_bpm"),
+                        "artist": artist,
+                        "title": title,
+                        "album": rec.get("album") or primary_data.get("album"),
+                        "quality_kbps": rec.get("quality_kbps"),
+                        "cover_url": primary_data.get("cover_url"),
+                        "year": primary_data.get("year"),
+                        # v1086.7: aggiunto duration dal primary provider
+                        # (iTunes la ritorna in `duration` secondi)
+                        "duration": primary_data.get("duration"),
+                        # v1086.7: numero provider per visualizzare "iTunes (+1)"
+                        "providers_count": len(providers) if providers else 1,
+                        # v1087.0: cataloged_at + path per nuovi campi UI
+                        "cataloged_at": rec.get("cataloged_at"),
+                        "_path": path if not path.startswith("__orphan__:") else None,
+                    }
+                self._cache_data = cache_view
             except Exception as e:
                 self._cache_count_var.set(f"Errore lettura cache: {e}")
         self._cache_search_var.set("")
@@ -3543,16 +3632,24 @@ class MusicCatalogerGUI:
         self._cache_built = True
 
     def _cache_select(self, key: str, meta: dict):
-        """Mostra il dettaglio e la cover del record selezionato."""
+        """v1087.2: dettaglio cache come testo multi-riga semplice
+        (ROLLBACK del layout grid che introduceva spazio verticale).
+        Campi: Titolo, Artisti Partecipanti, Album, Anno, Genere, BPM,
+        Durata, Qualità, Sample rate, Dimensione, Cartella, Catalogato
+        il, Sorgente.
+        """
         artist = meta.get("artist") or "—"
-        title  = meta.get("title") or key
+        title  = meta.get("title") or (key.split("|||")[-1] if "|||" in key else key)
         album  = meta.get("album") or "—"
         genre  = meta.get("genre") or "—"
         year   = meta.get("year") or "—"
         source = meta.get("source") or "—"
         bpm    = meta.get("bpm") or "—"
 
-        # Durata formattata
+        # v1086.7: niente piu' header separati — titolo+artisti sono ora
+        # le prime due entry della grid (vedi fields piu' sotto).
+
+        # Durata formattata "mm:ss"
         dur = meta.get("duration")
         if dur:
             try:
@@ -3563,25 +3660,117 @@ class MusicCatalogerGUI:
         else:
             dur_str = "—"
 
-        self._cache_detail_var.set(
-            f"{artist}\n{title}\n\n"
-            f"Album: {album}\n"
-            f"Genere: {genre}\n"
-            f"Anno: {year}\n"
-            f"Durata: {dur_str}\n"
-            f"BPM: {bpm}\n"
-            f"Sorgente: {source}"
-        )
+        # Qualità (kbps) dal record file (no dalla cache provider)
+        kbps = meta.get("quality_kbps")
+        kbps_str = f"{kbps} kbps" if kbps else "—"
+
+        # Dimensione file: prova a leggere dal disco se il path e' noto
+        # e il file esiste. v1086.7: il base path della catalogazione
+        # corrente e' in `self._selected_path` (StringVar), non in
+        # `_db_base_path_var` (inesistente — bug pregresso).
+        file_size_str = "—"
+        bitrate_kbps_str = kbps_str  # alias di qualità
+        sample_rate_str = "—"
+        path = meta.get("_path")
+        if path:
+            try:
+                from pathlib import Path as _P
+                base_str = ""
+                # Prima fonte: path selezionato attualmente nella UI
+                sel = getattr(self, "_selected_path", None)
+                if sel:
+                    try:
+                        base_str = sel.get()
+                    except Exception:
+                        base_str = ""
+                # Seconda fonte (fallback): dir corrente del processo
+                abs_path = _P(base_str) / path if base_str else _P(path)
+                if abs_path.exists():
+                    sz_b = abs_path.stat().st_size
+                    # Format leggibile (MB > KB)
+                    if sz_b >= 1024 * 1024:
+                        file_size_str = f"{sz_b / (1024 * 1024):.2f} MB"
+                    elif sz_b >= 1024:
+                        file_size_str = f"{sz_b / 1024:.1f} KB"
+                    else:
+                        file_size_str = f"{sz_b} B"
+                    # Bitrate effettivo + sample rate via mutagen (best effort)
+                    try:
+                        from mutagen.mp3 import MP3
+                        m = MP3(str(abs_path))
+                        if m.info:
+                            if hasattr(m.info, 'bitrate'):
+                                bitrate_kbps_str = f"{int(m.info.bitrate // 1000)} kbps"
+                            if hasattr(m.info, 'sample_rate'):
+                                sample_rate_str = f"{m.info.sample_rate} Hz"
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+        # Numero di provider che hanno dato risposta
+        providers_count = meta.get("providers_count")
+        source_str = source
+        if providers_count and providers_count > 1:
+            source_str = f"{source} (+{providers_count - 1})"
+
+        # v1087.0: campi extra utili (Pedro: "Se ti vengono altri campi
+        # in mente utili da inserire in cache fai pure")
+        # - Cartella: directory in cui sta il file (genere assegnato)
+        # - Catalogato il: data ultima catalogazione (record cataloged_at)
+        folder_str = "—"
+        if path:
+            try:
+                from pathlib import PurePosixPath
+                parent = str(PurePosixPath(path).parent)
+                if parent and parent != ".":
+                    folder_str = parent
+            except Exception:
+                pass
+
+        cat_at_raw = meta.get("cataloged_at")
+        cat_at_str = "—"
+        if cat_at_raw:
+            # Formato ISO "2026-05-12T09:50:41" → "2026-05-12 09:50"
+            try:
+                cat_at_str = str(cat_at_raw).replace("T", " ")[:16]
+            except Exception:
+                cat_at_str = str(cat_at_raw)
+
+        # v1087.2 ROLLBACK: testo multi-riga compatto (come ORIGINALE
+        # pre-v1086.7). Niente grid, niente spazio verticale extra fra le
+        # righe. Pedro ha confermato di accettare che il valore non sia
+        # perfettamente indentato a destra — il singolo Label di testo
+        # non lo permette in modo pulito.
+        #
+        # Campi (ordine richiesto da Pedro + extra concordati):
+        #   Titolo, Artisti Partecipanti  (header — primi due)
+        #   Album, Anno, Genere, BPM, Durata, Qualità,
+        #   Sample rate, Dimensione, Cartella, Catalogato il, Sorgente
+        lines = [
+            f"Titolo: {title}",
+            f"Artisti Partecipanti: {artist}",
+            "",
+            f"Album: {album}",
+            f"Anno: {year}",
+            f"Genere: {genre}",
+            f"BPM: {bpm}",
+            f"Durata: {dur_str}",
+            f"Qualità: {bitrate_kbps_str}",
+            f"Sample rate: {sample_rate_str}",
+            f"Dimensione: {file_size_str}",
+            f"Cartella: {folder_str}",
+            f"Catalogato il: {cat_at_str}",
+            f"Sorgente: {source_str}",
+        ]
+        self._cache_detail_var.set("\n".join(lines))
 
         # Carica cover se disponibile
         cover_url = meta.get("cover_url")
         if cover_url:
             self._cache_load_cover(cover_url)
         else:
-            # v1061: pulisce anche il widget tkinter nativo che _cache_load_cover
-            # aggiorna direttamente (PhotoImage su ._label) — senza reset esplicito
-            # la cover precedente rimaneva visibile in background
-            self._cover_token = getattr(self, "_cover_token", 0) + 1  # invalida download attivi
+            self._cover_token = getattr(self, "_cover_token", 0) + 1
             self._cover_image_ref = None
             try:
                 lbl = self._cache_cover_label._label
@@ -5495,7 +5684,7 @@ class MusicCatalogerGUI:
         frm4 = section("  Libreria Locale", icon_name="adv_library")
         chk(frm4, self._opt_local_db, "Aggiorna DB locale Generi dopo catalogazione")
         ctk.CTkLabel(frm4,
-                     text="  Salva mappatura file→genere in data/music_library.json.\n"
+                     text="  Salva mappatura file→genere in data/local_db.json.\n"
                           "  Permette di rilevare spostamenti manuali al prossimo avvio.",
                      font=(FONT_SMALL[0], FONT_SMALL[1] - 1),
                      text_color=PALETTE["text_dim"], justify="left",
@@ -5723,34 +5912,59 @@ class MusicCatalogerGUI:
         messagebox.showinfo("Verifica", "Analisi avviata in background... attendere.")
 
     def _refresh_cache_info(self):
-        """Aggiorna le info sulla dimensione della cache."""
+        """Aggiorna le info sulla dimensione della cache (v1086.3 schema)."""
         try:
             sd = _get_data_dir()
-            cache_file = sd / "metadata_cache.json"
+            cache_file = sd / "local_db.json"
             if cache_file.exists():
                 import json as _json
                 data = _json.loads(cache_file.read_text(encoding="utf-8"))
-                n = len(data.get("metadata_cache", {}))
+                # v1086.3: il numero di voci cache = numero di entry in
+                # lookup_by_query (artist|title → path). NON usiamo
+                # `len(files)` perche' quello include anche file senza
+                # external_lookup.
+                n = len(data.get("lookup_by_query", {}))
                 kb = cache_file.stat().st_size // 1024
-                self._cache_info_var.set(f"{n} voci  ({kb} KB)")
+                self._cache_info_var.set(f"{n} voci cache  ({kb} KB tot DB)")
             else:
                 self._cache_info_var.set("Cache vuota")
         except Exception:
             self._cache_info_var.set("")
 
     def _clear_cache(self):
-        """Svuota il file metadata_cache.json."""
-        if not messagebox.askyesno("Conferma", "Svuotare la cache API?\nLe prossime catalogazioni saranno più lente."):
+        """v1086.3: svuota SOLO la cache esterna (external_lookup di ogni
+        record + lookup_by_query). Non tocca i record file della library
+        (genere/bpm assegnati dal cataloger). Rimuove anche i record
+        orfani (entries cache senza file)."""
+        if not messagebox.askyesno("Conferma",
+                "Svuotare la cache API esterne?\n\n"
+                "I metadati grezzi recuperati da MusicBrainz/iTunes/ecc.\n"
+                "verranno rimossi. La library file→genere NON viene\n"
+                "modificata.\n\n"
+                "Le prossime catalogazioni saranno più lente."):
             return
         try:
             sd = _get_data_dir()
-            cache_file = sd / "metadata_cache.json"
+            cache_file = sd / "local_db.json"
             if cache_file.exists():
                 import json as _json
-                cache_file.write_text(
-                    _json.dumps({"metadata_cache": {}, "genre_cache": {}}, indent=2),
-                    encoding="utf-8"
-                )
+                data = _json.loads(cache_file.read_text(encoding="utf-8"))
+                # 1) Svuota lookup_by_query (indice cache)
+                data["lookup_by_query"] = {}
+                # 2) Per ogni file, rimuovi external_lookup
+                files = data.get("files", {}) or {}
+                # 3) Rimuovi record orfani (entries cache senza file)
+                files = {p: r for p, r in files.items()
+                          if not p.startswith("__orphan__:")}
+                for p, rec in files.items():
+                    if isinstance(rec, dict):
+                        rec.pop("external_lookup", None)
+                data["files"] = files
+                # Salva atomicamente
+                tmp = cache_file.with_suffix(cache_file.suffix + ".tmp")
+                tmp.write_text(_json.dumps(data, indent=2, ensure_ascii=False),
+                                encoding="utf-8")
+                tmp.replace(cache_file)
             if hasattr(self, "_cache_info_var"):
                 self._refresh_cache_info()
             self._cache_reload()
@@ -5871,6 +6085,21 @@ class MusicCatalogerGUI:
                 if not self._genre_prefs.get(pref_key, True):
                     if sub not in excluded:
                         excluded.append(sub)
+        # v1086.2: log esclusioni effettive per debugging.
+        # Pedro ha riportato "ho escluso Alternative e World ma li
+        # cataloga lo stesso". Causa probabile: prefs salvate DOPO
+        # aver lanciato la catalogazione, oppure path data dir
+        # diverso fra EXE e dev. Questo log permette di verificare
+        # cosa il client passa effettivamente al cataloger.
+        try:
+            user_excluded = [g for g in excluded if g not in _always_excluded]
+            print(f"[build_cmd] excluded_genres dalla UI: "
+                   f"{len(user_excluded)} user + {len(_always_excluded)} always = "
+                   f"{len(excluded)} totali")
+            if user_excluded:
+                print(f"[build_cmd]   user-excluded: {user_excluded}")
+        except Exception:
+            pass
         if excluded:
             cmd += ["--excluded-genres"] + excluded
 
@@ -6349,11 +6578,16 @@ class MusicCatalogerGUI:
             "country pop": "Country",
         }
 
-        # Set dei macrogeneri — NON vengono segnalati come orfani
+        # Set dei macrogeneri — NON vengono segnalati come orfani.
+        # v1086.4: rimossi "blues", "indie", "ambient" perche' Pedro li
+        # vuole suggeriti come orfani quando hanno pochi file (es. Indie
+        # con 1 file deve essere proposto come spostabile sotto Alternative,
+        # Blues come spostabile sotto Jazz). Mantenuti solo i macrogeneri
+        # _veri_ del GENRE_TREE.
         _MACRO_GENRES = {
-            "latin", "rock", "pop", "classical", "electronic", "r&b", "jazz",
-            "world", "soundtrack", "alternative", "metal", "hip hop", "country",
-            "vocal", "blues", "indie", "ambient",
+            "latin", "rock", "pop", "classical", "electronic", "r&b",
+            "jazz", "world", "soundtrack", "alternative", "metal",
+            "hip hop", "country", "vocal",
         }
 
         # Filtra: orfani = pochi file E non sono già un macrogenere
@@ -6486,14 +6720,19 @@ class MusicCatalogerGUI:
                 font=FONT_SMALL, text_color=PALETTE["success"]
             ).pack(anchor="w", padx=16, pady=20)
 
-        # Riepilogo top generi
+        # Riepilogo distribuzione generi.
+        # v1086.3 round 4: rimosso [:8] — Pedro lamentava che i generi con
+        # pochi file non venivano mostrati. Ora elenchiamo TUTTI i generi
+        # rilevati nella catalogazione, ordinati per count desc.
+        # Il dialog e' gia' scrollable quindi non c'e' rischio overflow.
         if stats:
             ctk.CTkFrame(body, height=1, fg_color=PALETTE["border"]).pack(
                 fill="x", padx=12, pady=(10, 6))
-            ctk.CTkLabel(body, text="📊  Top Generi", font=FONT_HEAD,
-                         text_color=PALETTE["text"]
+            ctk.CTkLabel(body,
+                         text=f"📊  Distribuzione Generi ({len(stats)})",
+                         font=FONT_HEAD, text_color=PALETTE["text"]
                          ).pack(anchor="w", padx=16, pady=(4, 6))
-            top = sorted(stats.items(), key=lambda x: x[1], reverse=True)[:8]
+            top = sorted(stats.items(), key=lambda x: x[1], reverse=True)
             max_count = top[0][1] if top else 1
             for g, c in top:
                 bar_row = ctk.CTkFrame(body, fg_color="transparent")
@@ -6685,10 +6924,13 @@ class MusicCatalogerGUI:
             _set_state(child)
 
     def _maint_export_csv(self):
-        """v1057: esporta music_library.json in CSV."""
+        """v1086.3: esporta local_db.json in CSV. Schema unificato: il
+        record file contiene gia' artist/title/album/genre/bpm. Non
+        serve piu' la lookup ridondante in metadata_cache (che non
+        esiste piu' come sezione separata)."""
         import json as _json, csv as _csv
         from tkinter import filedialog
-        db_path = _get_data_dir() / "music_library.json"
+        db_path = _get_data_dir() / "local_db.json"
         if not db_path.exists():
             messagebox.showwarning("Attenzione", "Il DB locale non esiste ancora.\nAvvia prima una catalogazione.")
             return
@@ -6701,50 +6943,39 @@ class MusicCatalogerGUI:
             return
         try:
             raw = _json.loads(db_path.read_text(encoding="utf-8"))
-            files = raw.get("files", {})
-            # Carica anche metadata_cache per arricchire i dati
-            meta_cache = {}
-            cache_file = _get_data_dir() / "metadata_cache.json"
-            if cache_file.exists():
-                try:
-                    craw = _json.loads(cache_file.read_text(encoding="utf-8"))
-                    meta_cache = craw.get("metadata_cache", {})
-                except Exception:
-                    pass
-
-            def _find_meta(fname_no_ext):
-                """Cerca nei metadati cached il record più ricco per quel file."""
-                fname_l = fname_no_ext.lower()
-                for key, val in meta_cache.items():
-                    if val and isinstance(val, dict):
-                        title  = (val.get("title") or "").lower()
-                        artist = (val.get("artist") or "").lower()
-                        if fname_l in title or fname_l in artist or                            (artist and title and f"{artist}" in fname_l):
-                            return val
-                return {}
+            # v1086.3: filtra orfani (entries cache senza file reale)
+            files = {p: r for p, r in (raw.get("files", {}) or {}).items()
+                      if not p.startswith("__orphan__:")}
 
             with open(out, "w", newline="", encoding="utf-8-sig") as f:
                 w = _csv.writer(f, delimiter=";")
-                w.writerow(["File", "Titolo", "Artista", "Album", "Anno",
-                            "Genere", "Sottogenere", "BPM", "Qualità (kbps)", "Catalogato il"])
+                w.writerow(["File", "Titolo", "Artista", "Album",
+                            "Genere", "Sottogenere", "BPM",
+                            "Qualità (kbps)", "Sorgente cache", "Catalogato il"])
                 for rel, info in sorted(files.items()):
                     from pathlib import Path as _P
                     fname = _P(rel).name
-                    fname_no_ext = _P(rel).stem
-                    meta = _find_meta(fname_no_ext)
                     genre = info.get("genre", "") or ""
                     subgenre = info.get("subgenre", "") or ""
                     subgenre_out = "-" if subgenre.lower() == genre.lower() or not subgenre else subgenre
+                    ext = info.get("external_lookup") or {}
+                    # v1086.4: schema aggregato — sorgente dal primary
+                    # o, per legacy flat, dal campo source
+                    providers = ext.get("providers") or {}
+                    if providers:
+                        source_label = ext.get("primary") or ",".join(providers.keys())
+                    else:
+                        source_label = ext.get("source", "")
                     w.writerow([
                         fname,
-                        meta.get("title", "") or "",
-                        meta.get("artist", "") or "",
-                        meta.get("album", "") or "",
-                        meta.get("year", "") or "",
+                        info.get("title", "") or "",
+                        info.get("artist", "") or "",
+                        info.get("album", "") or "",
                         genre,
                         subgenre_out,
                         info.get("bpm", "") or "",
                         info.get("quality_kbps", "") or "",
+                        source_label,
                         info.get("cataloged_at", ""),
                     ])
             messagebox.showinfo("Esportazione completata", f"Esportati {len(files)} file in:\n{out}")
@@ -6754,13 +6985,15 @@ class MusicCatalogerGUI:
     def _maint_find_duplicates(self):
         """v1057: trova file con nome identico in cartelle diverse."""
         import json as _json
-        db_path = _get_data_dir() / "music_library.json"
+        db_path = _get_data_dir() / "local_db.json"
         if not db_path.exists():
             messagebox.showwarning("Attenzione", "Il DB locale non esiste ancora.")
             return
         try:
             raw = _json.loads(db_path.read_text(encoding="utf-8"))
-            files = raw.get("files", {})
+            # v1086.3: filtra orfani (entries cache senza file reale)
+            files = {p: r for p, r in (raw.get("files", {}) or {}).items()
+                      if not p.startswith("__orphan__:")}
             # Raggruppa per nome file
             by_name: dict = {}
             for rel in files:

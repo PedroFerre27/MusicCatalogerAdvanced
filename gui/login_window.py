@@ -110,7 +110,27 @@ class LoginWindow:
                      font=("Segoe UI", 11, "bold"),
                      text_color=PALETTE["text"]
                      ).pack(fill="x", padx=18, pady=(14, 2))
-        self.email_var = ctk.StringVar(value=client_config.last_email)
+        # v1086.3 round 4: email come StringVar con trace che forza lowercase
+        # in tempo reale (mentre l'utente digita). Coerente con il fatto che
+        # il server normalizza email a lowercase: vedere "USER@..." nell'UI
+        # quando il server riconosce solo "user@..." e' confondente.
+        self.email_var = ctk.StringVar(value=(client_config.last_email or "").lower())
+        def _force_lower(*_args):
+            v = self.email_var.get()
+            low = v.lower()
+            if v != low:
+                # Mantieni la posizione del cursore mentre re-set
+                try:
+                    pos = self.email_entry.index("insert")
+                except Exception:
+                    pos = None
+                self.email_var.set(low)
+                if pos is not None:
+                    try:
+                        self.email_entry.icursor(pos)
+                    except Exception:
+                        pass
+        self.email_var.trace_add("write", _force_lower)
         self.email_entry = ctk.CTkEntry(
             form, textvariable=self.email_var,
             fg_color=PALETTE["surface2"], border_color=PALETTE["border"],
@@ -213,7 +233,14 @@ class LoginWindow:
             self.login_btn.configure(text="Accedi", state="normal")
 
     def _do_login(self):
-        email    = self.email_var.get().strip()
+        # v1086.3 round 4: email forzata a lowercase prima del confronto.
+        # Pedro feedback: "mi sembra che sia sensitive cap la mail".
+        # Lo standard RFC 5321 (SMTP) dice che la parte locale TEORICAMENTE
+        # puo' essere case-sensitive, ma in pratica nessun mail provider
+        # serio lo e' (Gmail, Outlook, Yahoo trattano "User@..." == "user@...").
+        # Quindi normalizziamo lowercase per evitare frustrazione utente.
+        # La password resta case-sensitive (giusta).
+        email    = self.email_var.get().strip().lower()
         password = self.password_var.get()
         server   = self.server_var.get().strip()
 

@@ -223,15 +223,33 @@ class MusicCataloger:
         self.logger.info(f"Directory musica: {self.base_path}")
         self.logger.info(f"Duplicati: {self.duplicate_action} | Cover: {'ON' if cover_enabled else 'OFF'}")
 
-        # v1046: init DB locale (dopo logger disponibile)
+        # v1086.3: DB locale UNIFICATO (local_db.json) — gestisce sia la
+        # mappatura file→genere (era music_library.json) sia la cache delle
+        # query API esterne (era metadata_cache.json). Migration automatica
+        # al primo boot dai file legacy.
         self._local_db = None
         if self.update_local_db:
             try:
-                from services.local_db import LocalMusicDB
-                db_path = self.data_dir / "music_library.json"
-                self._local_db = LocalMusicDB(db_path)
+                from services.local_db import LocalDB, migrate_legacy_to_v2
+                # Tenta migration legacy → v2 (no-op se già migrato o fresh)
+                stats = migrate_legacy_to_v2(self.data_dir)
+                if stats.get("did_migration"):
+                    self.logger.info(
+                        f"DB legacy migrato → local_db.json: "
+                        f"{stats['files_migrated']} file, "
+                        f"{stats['cache_migrated']} cache entries "
+                        f"({stats['cache_orphans']} orfani)")
+                    if stats.get("errors"):
+                        self.logger.warning(
+                            f"Migration: {len(stats['errors'])} errori non fatali")
+                # Carica il DB unificato
+                db_path = self.data_dir / "local_db.json"
+                self._local_db = LocalDB(db_path)
                 self._local_db.load()
-                self.logger.info(f"DB locale attivo: {db_path.name} ({self._local_db.count()} record)")
+                self.logger.info(
+                    f"DB locale attivo: {db_path.name} "
+                    f"({self._local_db.count_files()} file, "
+                    f"{self._local_db.cache_count()} cache entries)")
             except Exception as e:
                 self.logger.warning(f"DB locale non disponibile: {e}")
 
@@ -724,11 +742,14 @@ class MusicCataloger:
 
             self.logger.info(f"\\-- Spostata in {dest_folder_rel}/")
 
-            # v1046/v1056: salva nel DB locale con bitrate
+            # v1046/v1056: salva nel DB locale con bitrate.
+            # v1086.3: passa anche artist/title (se disponibili) cosi' il
+            # nuovo LocalDB v2 popola correttamente l'indice
+            # lookup_by_query, permettendo alla cache esterna di trovare
+            # questo file alla prossima query.
             if self._local_db is not None:
                 try:
                     rel = (dest_folder_rel / file_path.name).as_posix()
-                    # Leggi bitrate con mutagen
                     kbps = None
                     try:
                         from mutagen.mp3 import MP3 as _MP3
@@ -737,9 +758,21 @@ class MusicCataloger:
                             kbps = int(_audio.info.bitrate // 1000)
                     except Exception:
                         pass
-                    self._local_db.upsert(relative_path=rel, genre=genre,
-                                          subgenre=str(raw_genre or ""),
-                                          quality_kbps=kbps)
+                    # Estraggo artist/title dal final_metadata se presente
+                    fm_artist = (final_metadata or {}).get("artist")
+                    fm_title = (final_metadata or {}).get("title")
+                    fm_album = (final_metadata or {}).get("album")
+                    fm_bpm = (final_metadata or {}).get("bpm")
+                    self._local_db.upsert_file(
+                        relative_path=rel,
+                        artist=fm_artist,
+                        title=fm_title,
+                        album=fm_album,
+                        genre=genre,
+                        subgenre=str(raw_genre or "") or None,
+                        bpm=fm_bpm,
+                        quality_kbps=kbps,
+                    )
                 except Exception:
                     pass
 
@@ -1190,18 +1223,21 @@ class MusicCataloger:
                             )
 
                     # Aggiorna DB locale con la posizione attuale
+                    # v1086.3: usa upsert_file con artist/title cosi' la
+                    # cache esterna trova il file via lookup_by_query.
                     if self.update_local_db and self._local_db:
                         rel_str = str(rel).replace("\\", "/")
                         try:
-                            from datetime import datetime as _dt
                             quality_kbps = metadata.get('quality_kbps') or metadata.get('bitrate')
-                            self._local_db.upsert(
+                            self._local_db.upsert_file(
                                 relative_path=rel_str,
+                                artist=metadata.get('artist'),
+                                title=metadata.get('title'),
+                                album=metadata.get('album'),
                                 genre=expected_genre,
                                 subgenre=expected_subgenre or tag_genre,
                                 quality_kbps=int(quality_kbps) if quality_kbps else None,
                                 bpm=metadata.get('bpm'),
-                                cataloged_at=_dt.now().strftime('%Y-%m-%d'),
                             )
                             db_updates += 1
                         except Exception as dex:
@@ -1317,8 +1353,13 @@ class MusicCataloger:
         return self._parent_map_lower.get(genre.strip().lower(), genre)
 
     def load_cache(self):
-        cache_file = self.data_dir / "metadata_cache.json"
-        # Controlla se i parametri caraibici sono stati modificati dall'ultima cache
+        """v1086.3: la cache delle query API esterne ora vive nel
+        local_db.json unificato. Questo metodo trasferisce la cache
+        del LocalDB → memoria di ExternalAPIs (dict in-RAM)
+        per compatibilita' con il codice esistente di external_apis.py
+        che lavora con `self.metadata_cache[cache_key]`."""
+        # Caricamento dei flag caraibici (immutati dalla v1)
+        cache_file = self.data_dir / "local_db.json"
         dirty_file = self.data_dir / "caribbean_dirty.flag"
         self._caribbean_dirty = False
         if dirty_file.exists() and cache_file.exists():
@@ -1333,45 +1374,182 @@ class MusicCataloger:
                     )
             except Exception:
                 pass
-        if not cache_file.exists():
+
+        # Caricamento cache da LocalDB unificato.
+        # v1086.4: la cache in-RAM di external_apis.py usa chiavi
+        # "<provider>_<artist>_<title>" (es. "itunes_Akon_Lonely"). Il nuovo
+        # external_lookup ha la struttura aggregata { providers: {...} }.
+        # Ricostruiamo le entries per-provider in RAM cosi' external_apis.py
+        # puo' fare cache hit con le sue chiavi originali.
+        if self._local_db is None:
             return
-        try:
-            with open(cache_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            self.metadata_cache = data.get('metadata_cache', {})
-            self.genre_cache = data.get('genre_cache', {})
-            # v1056: propaga la cache caricata a ExternalAPIs (che ha la propria dict separata)
-            if self.external_apis is not None:
-                self.external_apis.metadata_cache = self.metadata_cache
-            self.logger.info(f"Cache caricata: {len(self.metadata_cache)} metadati")
-        except Exception as e:
-            self.logger.warning(f"Errore caricamento cache: {e}")
+        # Prefissi cache_key usati da external_apis.py
+        provider_prefixes = {
+            "musicbrainz": "mb",
+            "lastfm": "lfm",
+            "spotify": "sp",
+            "deezer": "deezer",
+            "itunes": "itunes",
+            "discogs": "discogs",
+        }
+        in_ram_cache = {}
+        for path, rec in self._local_db._data.get("files", {}).items():
+            ext = rec.get("external_lookup")
+            if not ext:
+                continue
+            providers = ext.get("providers") or {}
+            if not providers:
+                # Schema legacy round 3: flat payload, un solo provider
+                # implicito. Lo ricostruisco come single-provider.
+                src = ext.get("source") or ext.get("primary") or "unknown"
+                providers = {src: ext}
+            artist = (rec.get("artist") or "").strip()
+            title = (rec.get("title") or "").strip()
+            if not artist or not title:
+                continue
+            for provider, payload in providers.items():
+                if not isinstance(payload, dict):
+                    continue
+                prefix = provider_prefixes.get(provider)
+                if not prefix:
+                    continue
+                # Costruisco la chiave originale di external_apis.py
+                # NOTA: MusicBrainz usa "mb_<artist>_<title>_<album>";
+                # gli altri "<prefix>_<artist>_<title>". Per restare
+                # compatibile con entrambi, salvo la chiave senza
+                # album (matchera' la maggior parte delle query MB
+                # che non specificano album).
+                cache_key = f"{prefix}_{artist}_{title}"
+                in_ram_cache[cache_key] = payload
+                # Per MusicBrainz, salvo anche la variante con album
+                if provider == "musicbrainz" and payload.get("album"):
+                    in_ram_cache[f"{prefix}_{artist}_{title}_{payload['album']}"] = payload
+        self.metadata_cache = in_ram_cache
+        self.genre_cache = {}
+        if self.external_apis is not None:
+            self.external_apis.metadata_cache = self.metadata_cache
+        self.logger.info(f"Cache caricata: {len(self.metadata_cache)} metadati")
 
     def save_cache(self):
-        # v1056: legge la cache da ExternalAPIs (dove vengono scritti i dati reali)
-        if self.external_apis is not None:
-            self.metadata_cache = self.external_apis.metadata_cache
-        cache_file = self.data_dir / "metadata_cache.json"
-        try:
-            with open(cache_file, 'w', encoding='utf-8') as f:
-                json.dump({
-                    'metadata_cache': self.metadata_cache,
-                    'genre_cache': self.genre_cache,
-                    'last_updated': datetime.now().isoformat(),
-                    'base_path': str(self.base_path),
-                }, f, indent=2, ensure_ascii=False)
-            self.logger.info(f"Cache salvata: {len(self.metadata_cache)} voci")
-        except Exception as e:
-            self.logger.error(f"Errore salvataggio cache: {e}")
+        """v1086.4: salva la cache API → local_db.json. 
+
+        Background del bug v1086.3: `external_apis.metadata_cache` usa
+        chiavi nel formato "<provider>_<artist>_<title>" (es. "itunes_Akon_Lonely"),
+        NON "artist|||title". Il vecchio save_cache splittava sulla
+        stringa "|||" che non e' mai presente → 0 entries salvate, mai.
+
+        Strategia v1086.4: estraiamo da ogni chiave il provider e l'asse
+        (artist, title), poi AGGREGHIAMO le risposte di provider diversi
+        per lo stesso (artist, title) in un unico blob
+        `external_lookup` con sotto-sezioni per provider.
+
+        Schema risultante:
+            external_lookup: {
+                "primary": "itunes",
+                "providers": {
+                    "itunes": { artist, title, genre, bpm, cover_url, ... },
+                    "musicbrainz": { artist, title, genre, bpm, ... },
+                },
+                "cached_at": "..."
+            }
+        """
+        if self._local_db is None or self.external_apis is None:
+            return
+        import re
+        from datetime import datetime as _dt
+
+        in_ram = self.external_apis.metadata_cache or {}
+        # Mappatura prefisso → nome provider canonico
+        prefix_map = {
+            "mb": "musicbrainz", "lfm": "lastfm", "sp": "spotify",
+            "deezer": "deezer", "itunes": "itunes", "discogs": "discogs",
+        }
+
+        # Aggrega per (artist, title): provider → payload
+        aggregated: dict = {}  # qk_canonical → {provider: data, ...}
+        for cache_key, data in in_ram.items():
+            if not data or not isinstance(data, dict):
+                continue
+            # v1087.1: preferisci _query_artist/_query_title (i parametri
+            # originali con cui il cataloger ha cercato — corrispondono ai
+            # campi del filename/tag, e quindi al record file via
+            # lookup_by_query). Fallback ai canonici se la query non c'e'
+            # (es. record migrati dalla cache legacy senza _query_*).
+            q_artist = (data.get("_query_artist") or "").strip()
+            q_title  = (data.get("_query_title")  or "").strip()
+            artist = q_artist or (data.get("artist") or "").strip()
+            title  = q_title  or (data.get("title")  or "").strip()
+            if not artist or not title:
+                continue
+            # Prefisso provider
+            provider = "unknown"
+            m = re.match(r"^([a-z]+)_", cache_key)
+            if m:
+                provider = prefix_map.get(m.group(1), m.group(1))
+            qk = f"{artist.lower()}|||{title.lower()}"
+            aggregated.setdefault(qk, {})[provider] = data
+
+        promoted = 0
+        now = _dt.now().isoformat(timespec="seconds")
+        for qk, providers in aggregated.items():
+            try:
+                # Recupera artist/title originali (case preservato) dal
+                # primo provider disponibile
+                first = next(iter(providers.values()))
+                artist = first.get("artist", "")
+                title = first.get("title", "")
+                if not artist or not title:
+                    continue
+
+                target_path = self._local_db._data.get(
+                    "lookup_by_query", {}).get(qk)
+                if target_path is None:
+                    target_path = f"__orphan__:{qk}"
+                rec = self._local_db._data.setdefault(
+                    "files", {}).setdefault(target_path, {})
+                rec["artist"] = rec.get("artist") or artist
+                rec["title"] = rec.get("title") or title
+                # Album: preferisci dal record library (assegnato dal
+                # cataloger), fallback al primo provider che ce l'ha
+                if not rec.get("album"):
+                    for p_data in providers.values():
+                        if p_data.get("album"):
+                            rec["album"] = p_data["album"]
+                            break
+
+                # Costruisci external_lookup con tutti i provider
+                ext = {
+                    "primary": next(iter(providers.keys())),
+                    "providers": providers,
+                    "cached_at": now,
+                    # Campi top-level per backcompat (lettori vecchi)
+                    "source": next(iter(providers.keys())),
+                    "raw_genre": first.get("genre"),
+                    "raw_bpm": first.get("bpm"),
+                }
+                rec["external_lookup"] = ext
+                self._local_db._data.setdefault(
+                    "lookup_by_query", {})[qk] = target_path
+                promoted += 1
+            except Exception as e:
+                self.logger.debug(f"save_cache aggregation err: {e}")
+
+        if self._local_db.save():
+            self.logger.info(
+                f"Cache salvata: {promoted} voci aggregate → local_db.json "
+                f"(da {len(in_ram)} entries per-provider)")
+        else:
+            self.logger.warning("Errore salvataggio cache nel local_db.json")
 
     def backup_cache(self):
-        cache_file = self.data_dir / "metadata_cache.json"
+        """v1086.3: backup di local_db.json (era metadata_cache.json)."""
+        cache_file = self.data_dir / "local_db.json"
         if not cache_file.exists():
             return
         try:
             ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-            shutil.copy2(str(cache_file), str(self.data_dir / f"metadata_cache_backup_{ts}.json"))
-            backups = sorted(self.data_dir.glob("metadata_cache_backup_*.json"),
+            shutil.copy2(str(cache_file), str(self.data_dir / f"local_db_backup_{ts}.json"))
+            backups = sorted(self.data_dir.glob("local_db_backup_*.json"),
                              key=lambda x: x.stat().st_mtime, reverse=True)
             for old in backups[5:]:
                 old.unlink()
@@ -1436,8 +1614,13 @@ class MusicCataloger:
             self.logger.info(f"Cover aggiunte: {self.cover_added}")
         self.logger.info(f"Non catalogati: {len(self.uncatalogued_files)}")
         if genre_stats:
-            self.logger.info("=== TOP GENERI ===")
-            for g, c in sorted(genre_stats.items(), key=lambda x: x[1], reverse=True)[:10]:
+            # v1086.2: rimosso il limite [:10]. Pedro: "perche' se ci sono
+            # generi con meno di 5 canzoni non lo segnala? Deve essere una
+            # funzionalita' attiva per tutta la catalogazione". Mostro tutti
+            # i generi rilevati ordinati per count desc. Cambio anche il
+            # titolo da TOP GENERI a DISTRIBUZIONE GENERI per chiarezza.
+            self.logger.info(f"=== DISTRIBUZIONE GENERI ({len(genre_stats)}) ===")
+            for g, c in sorted(genre_stats.items(), key=lambda x: x[1], reverse=True):
                 self.logger.info(f"  {g}: {c} file")
             # v1048: token per il dialog generi orfani nella GUI
             import json as _json

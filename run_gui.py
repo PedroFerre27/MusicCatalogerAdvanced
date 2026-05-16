@@ -63,6 +63,26 @@ if "--cataloger-mode" in sys.argv:
     rc = cataloger_main()
     sys.exit(rc if isinstance(rc, int) else 0)
 
+# v1086.2: singleton lock — impedisci doppio avvio.
+# DEVE stare DOPO il check `--cataloger-mode` (perche' il subprocess
+# cataloger e' una seconda invocazione legittima dell'EXE) ma PRIMA
+# di tutti gli import pesanti (ctk, ApiClient, etc.) cosi' il check
+# di "gia' in esecuzione" sia istantaneo.
+from services.singleton import (
+    acquire as _singleton_acquire,
+    bring_existing_to_front as _singleton_focus,
+    show_already_running_dialog as _singleton_dialog,
+)
+if not _singleton_acquire():
+    # Un'altra istanza e' gia' attiva. Porto la sua finestra in primo
+    # piano. v1086.2 round 3 (Pedro feedback): se bring-to-front
+    # riesce, NIENTE dialog — il porting in foreground e' gia' chiaro
+    # all'utente. Mostro il dialog solo come fallback se la finestra
+    # esistente non viene trovata (es. crash zombie o errore Win32).
+    if not _singleton_focus():
+        _singleton_dialog()
+    sys.exit(0)
+
 import customtkinter as ctk
 
 from config.app_config import config as client_config

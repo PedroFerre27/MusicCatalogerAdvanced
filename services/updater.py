@@ -220,8 +220,17 @@ echo   new_exe     = {new_exe} >> %LOG%
 
 REM v1086.1: niente piu' echo verso stdout (la console e' nascosta con
 REM CREATE_NO_WINDOW lato Python; tutto quel che serve va nel %LOG%).
-REM Aspetto 2 sec che il vecchio processo abbia chiuso tutti i handle
-timeout /t 2 /nobreak >nul
+REM v1086.2 fix critico: sostituito `timeout /t N /nobreak` con
+REM `ping -n N+1 127.0.0.1`. Il comando `timeout` di Windows fallisce
+REM IMMEDIATAMENTE con "il reindirizzamento dell'input non e'
+REM supportato" quando stdin del batch e' ridiretto a NUL (cioe' nel
+REM nostro caso con subprocess.DEVNULL). Risultato: i 30 retry copy
+REM duravano in totale ~1 secondo invece che 30, e l'app non aveva
+REM tempo di chiudere → copia falliva sempre.
+REM `ping -n 3` fa 3 ping a 127.0.0.1 che durano ~2 secondi totali e
+REM non ha problemi con stdin ridiretto. E' il workaround standard.
+REM Aspetto ~2 sec che il vecchio processo abbia chiuso tutti i handle
+ping -n 3 127.0.0.1 >nul
 
 REM Retry copy fino a 30 sec (in caso di OneDrive/AV transient lock)
 set RETRIES=0
@@ -231,7 +240,8 @@ copy /Y "{new_exe}" "{current_exe}" >> %LOG% 2>&1
 if %errorlevel%==0 goto SUCCESS
 set /a RETRIES+=1
 if %RETRIES% GEQ 30 goto FAIL
-timeout /t 1 /nobreak >nul
+REM ping -n 2 = ~1 sec di attesa fra retry
+ping -n 2 127.0.0.1 >nul
 goto RETRY
 
 :SUCCESS
@@ -249,9 +259,22 @@ set "_PYIBOOT_USER_PYTHONPATH="
 set "_PYI_SPLASH_IPC="
 echo [%DATE% %TIME%] env vars PyInstaller cleared >> %LOG%
 
-REM /D forza la cwd nella cartella dell'EXE (no eredita %TEMP% del batch)
-start "" /D "{current_exe.parent}" "{current_exe}"
-echo [%DATE% %TIME%] start emesso, errorlevel=%errorlevel% >> %LOG%
+REM v1086.2 — Lancio del nuovo EXE in modo VISIBILE.
+REM Problema: il batch e' partito con STARTUPINFO+SW_HIDE da Python,
+REM quindi `start "" <exe>` eredita SW_HIDE → nuovo EXE invisibile.
+REM Soluzione classica Windows: lanciare via explorer.exe, che
+REM "stacca" il processo figlio dal contesto di hide del padre e
+REM lo lancia con il window state default (visibile).
+REM Vedi: https://stackoverflow.com/q/29903706
+REM Fallback: se explorer.exe fallisce per qualche motivo, prova
+REM start "" come backup (potrebbe non essere visibile, ma almeno
+REM l'EXE gira e l'utente puo' Alt-Tabbarci sopra).
+explorer.exe "{current_exe}"
+if %errorlevel% NEQ 0 (
+    echo [%DATE% %TIME%] explorer fallito errlvl=%errorlevel%, fallback start >> %LOG%
+    start "" /D "{current_exe.parent}" "{current_exe}"
+)
+echo [%DATE% %TIME%] launch emesso, errorlevel=%errorlevel% >> %LOG%
 echo [%DATE% %TIME%] Updater terminato OK >> %LOG%
 exit /b 0
 

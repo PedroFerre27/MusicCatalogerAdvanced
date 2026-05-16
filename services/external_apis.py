@@ -178,6 +178,14 @@ class ExternalAPIs:
                 result = method()
                 if result:
                     result['source'] = display_name
+                    # v1087.1: salva i parametri ORIGINALI della query come
+                    # hint per save_cache, cosi' puo' collegare l'esito al
+                    # record file giusto. Senza questi, save_cache usa
+                    # `result['artist']` (versione canonica dal provider,
+                    # es. "Big Rob Savage" invece del "Audiomachine" del
+                    # filename) e crea orfani.
+                    result.setdefault('_query_artist', artist)
+                    result.setdefault('_query_title', title)
                     genre = (result.get('genre') or '').lower()
                     if genre and genre not in ('', 'other', 'unknown',
                                                 'musique du monde'):
@@ -633,9 +641,13 @@ class ExternalAPIs:
             
             client_id = self.api_keys.SPOTIFY_CLIENT_ID
             client_secret = self.api_keys.SPOTIFY_CLIENT_SECRET
-            
-            if client_id == "YOUR_SPOTIFY_CLIENT_ID":
-                self.logger.debug("Credenziali Spotify non configurate")
+
+            # v1086.7 security-audit: client_secret puo' essere None
+            # (sposto server-side). Skip graceful con log.
+            if not client_id or not client_secret or                client_id == "YOUR_SPOTIFY_CLIENT_ID":
+                self.logger.debug(
+                    "Credenziali Spotify non configurate lato client "
+                    "(server proxy non ancora implementato)")
                 return None
             
             # Rate limiting

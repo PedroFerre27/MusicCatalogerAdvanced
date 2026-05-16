@@ -236,7 +236,7 @@ class GenreSettings:
 class CacheSettings:
     max_age_days: int = 30
     max_backup_files: int = 5
-    cache_filename: str = "metadata_cache.json"
+    cache_filename: str = "local_db.json"  # v1086.3: era metadata_cache.json
     backup_prefix: str = "metadata_cache_backup"
     enable_metadata_cache: bool = True
     enable_genre_cache: bool = True

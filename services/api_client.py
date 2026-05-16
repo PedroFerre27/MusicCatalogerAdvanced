@@ -374,7 +374,16 @@ class ApiClient:
 
     def get_stored_user_info(self) -> Optional[dict]:
         """Info utente dalla sessione salvata (per mostrare "DJ" nella GUI
-        anche prima di una chiamata `/auth/me`)."""
+        anche prima di una chiamata `/auth/me`).
+
+        v1086.7 security-audit: `is_admin` viene SEMPRE letto come False
+        in modalita' offline. Prima si fidava del JWT decodificato senza
+        verifica firma → un attaccante poteva editare `session.json` con
+        un token fake che dichiarava `is_admin=True` per vedere le tab
+        admin (anche se le chiamate sarebbero state respinte dal server).
+        Ora le tab admin si vedono SOLO con login online riuscito
+        (autoritativo via `/auth/me`).
+        """
         s = store.load()
         if not s:
             return None
@@ -383,5 +392,6 @@ class ApiClient:
             "email":    s.user_email,
             "plan":     s.user_plan,
             "username": payload.get("username", s.user_email.split("@")[0]),
-            "is_admin": payload.get("is_admin", False),
+            # v1086.7: SEMPRE False in stored info; only `me()` puo' set True
+            "is_admin": False,
         }
