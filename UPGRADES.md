@@ -7834,3 +7834,105 @@ Il fix `_query_artist`/`_query_title` in v1087.1 funziona.
 ### 🔜 Prossimo turno (finalmente): AUDIT SERVER
 Tutti i blocchi UX/correttezza chiusi. Si parte con l'audit di
 sicurezza server-side sui file ricevuti da Pedro.
+
+---
+
+## v1087.3 — dev/security-audit (Fase 2 Step 2/3): client usa proxy
+
+### 🔐 Client collegato al proxy server-side
+**Files:** `services/api_client.py`, `services/external_apis.py`,
+          `core/cataloger.py`
+
+Completa la Fase 2 lato client. I token Discogs/Last.fm/Spotify/
+GetSong NON sono piu' nel client (rimossi v1087.0); ora il client
+li usa attraverso il server.
+
+- `api_client.lookup(provider, artist, title)`: nuovo metodo che
+  chiama `GET /api/v1/lookup` sul server. Gestione errori robusta:
+  server offline / sessione scaduta / qualsiasi eccezione → ritorna
+  None senza propagare (la catalogazione non si ferma mai per il
+  proxy).
+- `external_apis._proxy_lookup()`: helper che inoltra al server.
+- `search_lastfm` / `search_discogs` / `get_spotify_metadata`:
+  proxy-first. Se il server risponde usa quello; altrimenti
+  fallback al codice diretto (che con token client rimossi
+  ritorna None → cascata passa al provider pubblico successivo:
+  iTunes/MusicBrainz/Deezer).
+- `ExternalAPIs.__init__`: nuovo param opzionale `api_client`
+  (retrocompatibile, default None).
+- `cataloger`: costruisce l'ApiClient da `app_config.server_url`
+  + jwt_store (run_cataloger gira come subprocess separato, ma i
+  token sono su disco dal login GUI). Se manca sessione → None →
+  provider pubblici.
+
+Server-side: v0.2.3 con `/api/v1/lookup` testato e funzionante
+(Last.fm ha restituito dati reali per "Daft Punk - Get Lucky").
+
+### Smoke test
+- proxy hit → usa dati server ✓
+- proxy miss → None graceful, cascata continua ✓
+- no api_client → None graceful, nessun crash ✓
+
+### 🔜 Prossimo: Step 3/3 — test end-to-end catalogazione reale
+
+---
+
+## v1088.0 — dev/security-audit CHIUSURA BRANCH (2026-05-18)
+
+Bump minor: chiusura del branch security-audit, pronto per merge in
+main + tag v1088.0-stable.
+
+### 📄 Documentazione finale
+**Files:** `README.md`, `SECURITY.md` (nuovi)
+
+- **SECURITY.md**: documento completo del modello di sicurezza.
+  Descrive cosa è protetto (auth bcrypt+JWT, rate limit, secrets
+  server-side, plan enforcement, HTTPS) e — con piena trasparenza —
+  cosa NON è protetto e perché (firma EXE e storage cifrato saltati
+  come rischio consapevolmente accettato per il pilot privato).
+  Include gestione incidenti e buone pratiche operative.
+- **README.md**: doppio scopo GitHub + utenti. Spiega cosa fa il
+  programma, perché, l'architettura client/server, la tabella piani,
+  requisiti, privacy, stato pilot.
+
+### Decisioni di scope (Pedro)
+- **Fase 3 (firma EXE Ed25519)**: SALTATA. Rischio accettato per
+  pilot fra amici (richiede compromissione preventiva del NAS).
+  Candidata a branch dedicato prima di distribuzione pubblica.
+- **Fase 4 (storage cifrato session.json)**: SALTATA. Classificata
+  security theater in fase di audit (chi ha accesso al PC vede
+  comunque tutto, come i cookie browser). Limite documentato in
+  SECURITY.md §3.2.
+
+### Riepilogo COMPLETO del branch dev/security-audit
+
+| Item | Esito |
+|------|-------|
+| Audit client completo | ✅ SECURITY_AUDIT.md |
+| Audit server completo | ✅ SECURITY_AUDIT_SERVER.md |
+| Fase 1: secrets rimossi dal client | ✅ v1087.0 |
+| Fase 1: plan defaults sicuri (no fallback permissivo) | ✅ v1087.0 |
+| Fase 1: is_admin offline = False | ✅ v1087.0 |
+| Server S1: rate limit login (slowapi) | ✅ v0.2.2 deploy |
+| Server S2: .env production (no dev/debug) | ✅ verificato NAS |
+| Server S3: require_plan dependency | ✅ v0.2.2 |
+| Server S4: token_version (invalida JWT) | ✅ v0.2.2 deploy |
+| Server S5: revoke-sessions endpoint | ✅ v0.2.2 |
+| Server S6: CORS ristretto | ✅ v0.2.2 |
+| Server S7: email normalizzata | ✅ v0.2.2 |
+| Server S8: require_admin dependency | ✅ v0.2.2 |
+| Fase 2: proxy lookup server-side | ✅ v0.2.3 + v1087.3 |
+| Fase 2: test end-to-end (Last.fm via proxy) | ✅ confermato 18/05 |
+| Fase 3: firma EXE | ⏭️ saltata (scelta) |
+| Fase 4: storage cifrato | ⏭️ saltata (scelta) |
+| README.md + SECURITY.md | ✅ v1088.0 |
+
+Versioni client del branch: v1086.6 → v1087.0 → v1087.1 → v1087.2 →
+v1087.3 → **v1088.0** (chiusura).
+Versioni server del branch: v0.2.1 → v0.2.2 → **v0.2.3** (in prod).
+
+### Bug risolti durante il branch (oltre alla security)
+- BUG-26: cache key format mismatch (roundtrip cache rotto)
+- BUG-31: orfani da nome canonico API ≠ nome filename
+- UI tab cache: rollback a layout semplice + campi extra
+- Macrogeneri: Indie/Blues/Ambient ora suggeribili come orfani

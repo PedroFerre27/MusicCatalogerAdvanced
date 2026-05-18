@@ -312,9 +312,30 @@ class MusicCataloger:
         if SERVICES_AVAILABLE and CONFIG_AVAILABLE:
             # v1086.1: passo metadata_sources e bpm_sources cosi' la
             # cascata rispetta la priorita' UI.
+            # v1087.3 (security Fase 2): costruisci un ApiClient per il
+            # proxy lookup server-side. run_cataloger.py gira come
+            # subprocess separato (non ha l'ApiClient della GUI in RAM),
+            # ma puo' ricostruirlo da app_config.server_url + jwt_store
+            # (token gia' salvati su disco dal login GUI). Se non c'e'
+            # sessione valida o il modulo non e' disponibile, api_client
+            # resta None → ExternalAPIs fa fallback ai provider pubblici.
+            _api_client = None
+            try:
+                from config.app_config import config as _client_config
+                from services.api_client import ApiClient
+                _api_client = ApiClient(_client_config.server_url)
+                self.logger.debug(
+                    f"Proxy lookup attivo → {_client_config.server_url}")
+            except Exception as _e:
+                self.logger.debug(
+                    f"Proxy lookup non disponibile ({_e}) — "
+                    f"uso solo provider pubblici")
+                _api_client = None
+
             self.external_apis = ExternalAPIs(
                 api_keys, settings, self.logger,
                 enabled_sources=self.metadata_sources,
+                api_client=_api_client,
             )
             # v1056: propaga cache già caricata (se load_cache è stata chiamata prima)
             if self.metadata_cache:

@@ -208,6 +208,39 @@ class ApiClient:
     def me(self) -> dict:
         return self._request("GET", "/auth/me")
 
+    def lookup(self, provider: str, artist: str, title: str) -> Optional[dict]:
+        """v1087.3 (security Fase 2): proxy lookup metadati via server.
+
+        Sostituisce le chiamate dirette del client a Discogs/Last.fm/
+        Spotify/GetSong (i cui token sono ora SOLO sul server).
+
+        Ritorna il dict metadati normalizzato (stesso formato di prima)
+        oppure None se: nessun risultato, provider non supportato,
+        server irraggiungibile, o utente non autenticato. In tutti i
+        casi None → il chiamante fa fallback ai provider pubblici
+        (iTunes/MusicBrainz/Deezer) senza interrompere la catalogazione.
+        """
+        try:
+            from urllib.parse import quote
+            path = (f"/api/v1/lookup?provider={quote(provider)}"
+                    f"&artist={quote(artist)}&title={quote(title)}")
+            resp = self._request("GET", path)
+            if resp and resp.get("found"):
+                return resp.get("data")
+            return None
+        except ServerUnreachableError:
+            # Server offline → fallback graceful (il client continua coi
+            # provider pubblici). Non rilanciare: la catalogazione non
+            # deve fermarsi se il proxy non risponde.
+            return None
+        except AuthError:
+            # Sessione non valida → il lookup proxy non e' disponibile,
+            # ma la catalogazione locale puo' proseguire coi provider
+            # pubblici. Logghiamo a debug, non interrompiamo.
+            return None
+        except Exception:
+            return None
+
     def list_plans(self) -> list:
         return self._request("GET", "/plans", require_auth=False)
 

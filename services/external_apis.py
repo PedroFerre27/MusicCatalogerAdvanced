@@ -33,7 +33,7 @@ class ExternalAPIs:
     TOKEN_METADATA_SOURCES = ['discogs', 'acoustid']
 
     def __init__(self, api_keys, settings, logger=None,
-                  enabled_sources=None):
+                  enabled_sources=None, api_client=None):
         """
         Inizializza il gestore API
 
@@ -46,10 +46,16 @@ class ExternalAPIs:
                 rispetta questo ordine. Se None → DEFAULT_METADATA_SOURCES.
                 Sorgenti non in questa lista sono SKIPPATE.
                 v1086.1: aggiunto per fix priorita' sorgenti UI.
+            api_client: v1087.3 (security Fase 2) — istanza ApiClient per
+                il proxy lookup server-side di Discogs/Last.fm/Spotify.
+                Se None, i provider che richiedono token (non piu'
+                disponibili client-side) vengono skippati gracefully.
         """
         self.api_keys = api_keys
         self.settings = settings
         self.logger = logger or logging.getLogger(__name__)
+        # v1087.3: client per proxy lookup (token server-side)
+        self.api_client = api_client
 
         # v1086.1 (revisione 3): distinguere None (non passato → default)
         # da [] (esplicitamente vuoto → cascata disattivata).
@@ -126,6 +132,29 @@ class ExternalAPIs:
         for logger_name in ['musicbrainzngs', 'xml']:
             logger = logging.getLogger(logger_name)
             logger.addFilter(MusicBrainzWarningFilter())
+
+    def _proxy_lookup(self, provider: str, artist: str, title: str):
+        """v1087.3 (security Fase 2): inoltra la ricerca al server proxy
+        (/api/v1/lookup) che possiede i token. Ritorna il dict metadati
+        normalizzato o None.
+
+        None significa "proxy non disponibile / nessun risultato" → il
+        chiamante fa fallback alla logica diretta (che con token client
+        rimossi ritornera' comunque None, quindi si passa al provider
+        pubblico successivo nella cascata). Nessuna eccezione propagata:
+        la catalogazione non deve mai fermarsi per il proxy.
+        """
+        if self.api_client is None:
+            return None
+        try:
+            result = self.api_client.lookup(provider, artist, title)
+            if result:
+                self.logger.debug(
+                    f">-- {provider} (proxy server): metadati trovati")
+            return result
+        except Exception as e:
+            self.logger.debug(f"_proxy_lookup {provider} exc: {e}")
+            return None
 
     def search_all(self, artist: str, title: str, album: str = None) -> Optional[Dict]:
         """
@@ -459,6 +488,17 @@ class ExternalAPIs:
         Returns:
             Dict con metadati o None
         """
+        # v1087.3 (security Fase 2): prova prima il proxy server-side.
+        # I token Last.fm/Discogs/Spotify NON sono piu' nel client →
+        # il server li tiene e fa la chiamata. Se il proxy risponde,
+        # usiamo quello. Altrimenti fallback al codice diretto sotto
+        # (che con api_key None ritornera' None graceful).
+        proxied = self._proxy_lookup("lastfm", artist, title)
+        if proxied is not None:
+            cache_key = f"lfm_{artist}_{title}"
+            self.metadata_cache[cache_key] = proxied
+            return proxied
+
         if not requests:
             return None
         
@@ -628,6 +668,15 @@ class ExternalAPIs:
         Returns:
             Dict con metadati o None
         """
+        # v1087.3 (security Fase 2): proxy-first. SPOTIFY_CLIENT_SECRET
+        # non e' piu' nel client → senza proxy questo metodo ritornava
+        # sempre None. Col proxy il server fa l'OAuth e la search.
+        proxied = self._proxy_lookup("spotify", artist, title)
+        if proxied is not None:
+            cache_key = f"sp_{artist}_{title}"
+            self.metadata_cache[cache_key] = proxied
+            return proxied
+
         if not requests:
             return None
         
@@ -881,7 +930,15 @@ class ExternalAPIs:
     # REST API gratuita. Richiede token personale (ottieni su discogs.com/settings/developers).
 
     def search_discogs(self, artist: str, title: str) -> Optional[Dict]:
-        """Cerca metadati su Discogs (richiede DISCOGS_TOKEN in secrets.py)."""
+        """Cerca metadati su Discogs. v1087.3: il token e' ora SOLO
+        sul server → prova prima il proxy. Fallback diretto solo se
+        un DISCOGS_TOKEN fosse settato via env (dev mode)."""
+        proxied = self._proxy_lookup("discogs", artist, title)
+        if proxied is not None:
+            cache_key = f"discogs_{artist}_{title}"
+            self.metadata_cache[cache_key] = proxied
+            return proxied
+
         if not requests:
             return None
         token = getattr(self.api_keys, 'DISCOGS_TOKEN', None)
