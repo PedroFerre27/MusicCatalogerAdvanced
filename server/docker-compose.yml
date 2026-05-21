@@ -1,0 +1,84 @@
+# docker-compose.yml — Music Cataloger Server
+#
+# USO LOCALE (test sul tuo PC prima del NAS):
+#   cd music-cataloger-server/
+#   cp .env.example .env
+#   # edita .env e metti una SECRET_KEY generata davvero
+#   docker compose up --build
+#   # apri http://localhost:8020/docs
+#
+# USO NAS (DS415+ DSM 7.1.1 via Container Manager / Portainer):
+#   Stack name: music-cataloger
+#   Portainer → Stacks → Add stack → incolla questo yaml
+#   Poi configura Reverse Proxy DSM per: api.choros27.synology.me → 8020
+#
+# Volume mapping da cambiare per il NAS:
+#   /volume1/docker/music-cataloger/data     → /srv/app/data
+#   /volume1/Multimedia/Musica                           → /music
+#   /volume1/docker/music-cataloger/output    → /output
+
+services:
+  server:
+    build: .
+    image: music-cataloger-server:latest
+    container_name: music-cataloger-server
+    restart: unless-stopped
+
+    # In LOCALE: pubblica sul PC
+    # Su NAS dietro reverse proxy DSM è meglio NON esporre la porta
+    # al mondo; usa invece la rete interna Docker e punta il proxy DSM
+    # alla porta 8020 del container. In tal caso rimuovi `ports:` qui.
+    ports:
+      - "8020:8020"
+
+    # v0.1.1: Portainer stack deploy friendly.
+    # Le variabili d'ambiente arrivano da:
+    #   - localmente: file .env caricato da docker-compose (se esiste)
+    #   - su NAS via Portainer: campi "Environment variables" dello stack
+    # Il blocco env_file è volutamente assente: non esiste in produzione
+    # NAS perché Portainer genera lo stack in /data/compose/<id>/ senza .env.
+    # Le env var sono passate direttamente come `environment` da Portainer.
+    environment:
+      # Valori con default — override da .env locale o Portainer env vars
+      ENV:                           ${ENV:-production}
+      DEBUG:                         ${DEBUG:-false}
+      SECRET_KEY:                    ${SECRET_KEY}
+      ACCESS_TOKEN_EXPIRE_MINUTES:   ${ACCESS_TOKEN_EXPIRE_MINUTES:-15}
+      REFRESH_TOKEN_EXPIRE_DAYS:     ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      DATABASE_URL:                  ${DATABASE_URL:-sqlite:////srv/app/data/app.db}
+      CORS_ORIGINS:                  ${CORS_ORIGINS:-["https://choros27.synology.me","https://api.choros27.synology.me"]}
+      ADMIN_EMAIL:                   ${ADMIN_EMAIL}
+      ADMIN_PASSWORD:                ${ADMIN_PASSWORD}
+
+    volumes:
+      # ── DATI (SQLite + config runtime) ─────────────────────────
+      # Sul NAS: /volume1/docker/music-cataloger/data
+      # In locale: ./data (cartella relativa al compose file)
+      - /volume1/docker/music-cataloger/data:/srv/app/data
+      # ── LIBRERIA MUSICALE — da adattare alla tua cartella reale
+      - /volume1/Multimedia/Musica:/music:rw
+      # ── OUTPUT (report, export CSV/M3U)
+      - /volume1/docker/music-cataloger/output:/output
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8020/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    # Limiti risorse — su Atom C2538 (4 core, 8GB RAM) lascia spazio
+    # per Portainer, Grafana, Jellyfin ecc. che hai già in esecuzione
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 512M
+        reservations:
+          cpus: "0.5"
+          memory: 128M
+
+# Network opzionale — se usi reverse proxy DSM con bridge dedicato
+# networks:
+#   mcs-net:
+#     driver: bridge

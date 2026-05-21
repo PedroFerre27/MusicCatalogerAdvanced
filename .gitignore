@@ -37,3 +37,22 @@ music_cataloger_updater.log
 
 # File di test
 test_output/
+
+# Client
+client/dist/
+client/build/
+client/data/
+client/__pycache__/
+client/**/__pycache__/
+client/*.pyc
+
+# Server  
+server/.env
+server/data/
+server/__pycache__/
+server/**/__pycache__/
+server/*.pyc
+
+# Globali
+*.log
+.venv/
