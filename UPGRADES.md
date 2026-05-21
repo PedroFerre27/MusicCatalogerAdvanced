@@ -7936,3 +7936,73 @@ Versioni server del branch: v0.2.1 → v0.2.2 → **v0.2.3** (in prod).
 - BUG-31: orfani da nome canonico API ≠ nome filename
 - UI tab cache: rollback a layout semplice + campi extra
 - Macrogeneri: Indie/Blues/Ambient ora suggeribili come orfani
+
+---
+
+## v1088.0 — bump version_info.txt + consolidamento documenti
+
+### 🔧 Fix versioning
+- `version_info.txt` era rimasto a `1.0.86.6` mentre `version.py`
+  era già a `v1088.0`. Bump a `(1, 0, 88, 0)` per allineamento.
+- Pedro ha segnalato che l'EXE buildato mostrava ancora versione
+  vecchia nelle Proprietà Windows perché PyInstaller legge la
+  versione da `version_info.txt`. D'ora in poi: bump SEMPRE in
+  sincrono version.py + version_info.txt + UPGRADES.md.
+
+### 📚 Consolidamento documentazione
+Da 13 file .md sparsi a 9 file vivi + archivio storico.
+
+**Nuovi documenti creati:**
+- `ROADMAP.md` — roadmap ufficiale versionata (P1/P2/P3)
+- `MANUALE_UTENTE.md` — manuale per utente finale, 10 sezioni:
+  cos'è, login, schermata, flusso catalogazione, 7 tab, strumenti
+  manutenzione, logica classificazione, piani, problemi comuni,
+  glossario. Sostituisce e amplia MANUALE_MANUTENZIONE.md (che è
+  ora la sezione 6).
+- `BUILD.md` — fusione di BUILD_INSTRUCTIONS / BUILD_CROSS_PLATFORM
+  / BUILD_LINUX in un unico documento con sezioni per OS.
+- `CONTEXT.md` — contesto tecnico rigenerato, aggiornato a
+  v1088.0/v0.2.3, architettura client+server. Sostituisce
+  CLAUDE_CONTEXT.md (v0.0.2.2) e STRUCTURE.md (monolite legacy).
+- `CLAUDE.md` — onboarding per Claude Code (memoria persistente).
+
+**Rimossi/archiviati:**
+- `BUILD_CROSS_PLATFORM.md`, `BUILD_LINUX.md`,
+  `BUILD_INSTRUCTIONS.md` → fusi in `BUILD.md`
+- `CLAUDE_CONTEXT.md`, `STRUCTURE.md` → fusi in `CONTEXT.md`
+- `MANUALE_MANUTENZIONE.md` → assorbito in `MANUALE_UTENTE.md`
+- `INDEX.md` → eliminato (vecchio package Docker desktop v0.0.2.0)
+- `SECURITY_AUDIT.md`, `SECURITY_AUDIT_SERVER.md` → spostati in
+  `docs/archive/` (storia del lavoro svolto)
+
+**Struttura finale documenti vivi:**
+README · ROADMAP · UPGRADES · SECURITY · VERSIONING · BUILD ·
+MANUALE_UTENTE · CONTEXT · CLAUDE
+
+---
+
+## v1088.1 — fix bug piano nella titlebar
+
+### 🐛 Fix: piano sempre "Base" anche per utenti Pro/Advanced
+**File:** `run_gui.py`
+
+Bug introdotto dall'audit security (v1086.7+): la funzione
+`set_plan_from_server` era stata creata in `config/user_plans.py`
+ma **nessuno la chiamava mai**. Effetto: il default `_DEFAULT_PLAN
+= "base"` non veniva mai sovrascritto coi dati del server al login,
+quindi:
+- La titlebar mostrava `Music Cataloger | 🆓 Base` per chiunque,
+  anche per l'admin con piano Advanced
+- Tutti gli `has_feature()` lato client tornavano i valori del
+  piano Base (le feature Pro/Advanced apparivano nascoste/disattive
+  nella UI)
+- La server-side validation funzionava comunque correttamente
+  (era già protetto dall'audit), ma l'UX era rotta
+
+Fix: in `run_gui.py::_start_main_window` aggiunta una chiamata a
+`set_plan_from_server(plan=user_info["plan"], ...)` PRIMA della
+creazione della MainWindow. Copre tutti i flussi: login fresco,
+sessione ripresa online, sessione ripresa offline.
+
+Pedro ha segnalato il bug ("Music Cataloger | Base" per utente
+admin) dopo la pubblicazione di v1088.0.

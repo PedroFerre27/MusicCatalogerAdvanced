@@ -147,6 +147,23 @@ def _start_main_window(api_client: ApiClient, user_info: dict, offline: bool):
     ctk.set_appearance_mode("dark")
     ctk.set_default_color_theme("blue")
 
+    # v1088.1 fix: aggiorna il piano locale con i dati ricevuti dal
+    # server PRIMA di costruire la GUI. Senza questo, la titlebar e
+    # tutti gli has_feature() leggevano il default "base" perché
+    # set_plan_from_server (introdotta nell'audit security) non era
+    # mai chiamata da nessuno. Effetto bug: utente Advanced vedeva
+    # "Music Cataloger | Base" e tutte le feature pro-only nascoste.
+    if user_info:
+        try:
+            from config.user_plans import set_plan_from_server
+            set_plan_from_server(
+                plan=user_info.get("plan", "base"),
+                username=user_info.get("username", "") or "",
+                email=user_info.get("email", "") or "",
+            )
+        except Exception as e:
+            print(f"[run_gui] set_plan_from_server skip: {e}")
+
     root = ctk.CTk()
     # Import lazy della main window (è grossa)
     from gui.main_window import MusicCatalogerGUI
