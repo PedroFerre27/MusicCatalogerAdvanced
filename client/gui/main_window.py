@@ -479,6 +479,7 @@ class MusicCatalogerGUI:
         self._build_layout()
         # Carica impostazioni caraibiche salvate
         self.root.after(200, self._load_caribbean_settings)
+        self.root.after(250, self._load_ui_prefs)               # R1: preferenze UI
         # v0.0.2.4: Applica restrizioni piano (overlay lock sui tab non concessi)
         # Eseguito DOPO la costruzione completa della GUI così tutti i tab esistono
         self.root.after(300, self._apply_plan_restrictions)
@@ -820,7 +821,7 @@ class MusicCatalogerGUI:
                 on_click=lambda: _toggle_sub("plans"),
                 has_submenu=True, sub_id="plans")
         _mk_row(list_frm, "help_ph", "Aiuto",
-                on_click=lambda: (self._close_profile_flyout(), self._show_about()))
+                on_click=lambda: (self._close_profile_flyout(), self._show_help()))
         _mk_row(list_frm, "logout", "Esci",
                 on_click=lambda: _handle_exit())
 
@@ -6185,6 +6186,8 @@ class MusicCatalogerGUI:
             messagebox.showerror("Errore", f"La directory non esiste:\n{path}")
             return
 
+        self._save_ui_prefs()   # R1: persiste le opzioni con cui si avvia
+
         # ── v0.0.2.4: Tracking server-side della catalogazione ──
         # Se siamo in modalità connessa al server, prima di partire
         # contiamo rapidamente i file MP3 per:
@@ -7207,6 +7210,131 @@ class MusicCatalogerGUI:
             finally:
                 self._syncing_master = False
 
+    # ─── R1: persistenza preferenze UI (ui_prefs.json) ──────────────────────
+
+    def _save_ui_prefs(self):
+        """R1: Salva le preferenze UI in data/ui_prefs.json.
+        Chiamata su close e all'inizio di ogni _run (ante crash-safe).
+        Ogni chiave è aggiunta individualmente: un errore su una variabile
+        non compromette il salvataggio delle altre."""
+        import json as _json
+        import datetime as _dt
+
+        data: dict = {"_saved_at": _dt.datetime.now().isoformat()}
+
+        # ── Menu sinistro ──────────────────────────────────────────────
+        try: data["opt_analyze"]    = bool(self._opt_analyze.get())
+        except Exception: pass
+        try: data["opt_cleanup"]    = bool(self._opt_cleanup.get())
+        except Exception: pass
+        try: data["opt_use_ext_db"] = bool(self._opt_use_ext_db.get())
+        except Exception: pass
+        try: data["cover_enabled"]  = bool(self._cover_enabled.get())
+        except Exception: pass
+        try: data["dup_action"]     = str(self._dup_action.get())
+        except Exception: pass
+        try: data["last_dir"]       = str(self._selected_path.get()).strip()
+        except Exception: pass
+
+        # ── Tab Avanzate — Classificazione ────────────────────────────
+        try: data["opt_dry_run"]    = bool(self._opt_dry_run.get())
+        except Exception: pass
+        try: data["opt_verbose"]    = bool(self._opt_verbose.get())
+        except Exception: pass
+        try: data["opt_classify"]   = bool(self._opt_classify.get())
+        except Exception: pass
+        try: data["opt_correct"]    = bool(self._opt_correct.get())
+        except Exception: pass
+
+        # ── Tab Avanzate — Cover ──────────────────────────────────────
+        try: data["cover_overwrite"]       = bool(self._cover_overwrite.get())
+        except Exception: pass
+        try: data["cover_strategy"]        = str(self._cover_strategy.get())
+        except Exception: pass
+        try: data["cover_src_musicbrainz"] = bool(self._cover_sources["musicbrainz"].get())
+        except Exception: pass
+        try: data["cover_src_lastfm"]      = bool(self._cover_sources["lastfm"].get())
+        except Exception: pass
+        try: data["cover_src_deezer"]      = bool(self._cover_sources["deezer"].get())
+        except Exception: pass
+        try: data["cover_src_itunes"]      = bool(self._cover_sources["itunes"].get())
+        except Exception: pass
+
+        # ── Tab Avanzate — Libreria e Rinomina ────────────────────────
+        try: data["opt_local_db"]   = bool(self._opt_local_db.get())
+        except Exception: pass
+        if hasattr(self, "_opt_rename"):
+            try: data["opt_rename"] = bool(self._opt_rename.get())
+            except Exception: pass
+        if hasattr(self, "_rename_pattern"):
+            try: data["rename_pattern"] = str(self._rename_pattern.get())
+            except Exception: pass
+
+        try:
+            prefs_file = _get_data_dir() / "ui_prefs.json"
+            prefs_file.write_text(
+                _json.dumps(data, indent=2, ensure_ascii=False),
+                encoding="utf-8"
+            )
+        except Exception:
+            pass  # mai interrompere per un errore di scrittura su disco
+
+    def _load_ui_prefs(self):
+        """R1: Carica le preferenze UI da data/ui_prefs.json.
+        Eseguita con root.after(250, ...) — dopo _build_advanced_tab, che
+        crea _opt_rename/_rename_pattern. Guard hasattr per sicurezza."""
+        import json as _json
+        prefs_file = _get_data_dir() / "ui_prefs.json"
+        if not prefs_file.exists():
+            return
+        try:
+            data = _json.loads(prefs_file.read_text(encoding="utf-8"))
+        except Exception:
+            return  # file corrotto → ignora silenziosamente
+
+        # ── Menu sinistro ──────────────────────────────────────────────
+        if "opt_analyze"    in data: self._opt_analyze.set(bool(data["opt_analyze"]))
+        if "opt_cleanup"    in data: self._opt_cleanup.set(bool(data["opt_cleanup"]))
+        if "opt_use_ext_db" in data: self._opt_use_ext_db.set(bool(data["opt_use_ext_db"]))
+        if "cover_enabled"  in data: self._cover_enabled.set(bool(data["cover_enabled"]))
+        if "dup_action" in data and data["dup_action"] in ("keep_both", "skip", "overwrite"):
+            self._dup_action.set(data["dup_action"])
+
+        # Ultima directory: .set() + breadcrumb direttamente, senza _select_path.
+        # _select_path chiamerebbe _add_recent_dir (path già in storico →
+        # write ridondante su disco). Il breadcrumb va aggiornato, lo status no.
+        last_dir = data.get("last_dir", "").strip()
+        if last_dir and Path(last_dir).is_dir():
+            self._selected_path.set(last_dir)
+            self._update_breadcrumb(last_dir)
+
+        # ── Tab Avanzate — Classificazione ────────────────────────────
+        if "opt_dry_run"  in data: self._opt_dry_run.set(bool(data["opt_dry_run"]))
+        if "opt_verbose"  in data: self._opt_verbose.set(bool(data["opt_verbose"]))
+        if "opt_classify" in data: self._opt_classify.set(bool(data["opt_classify"]))
+        if "opt_correct"  in data: self._opt_correct.set(bool(data["opt_correct"]))
+
+        # ── Tab Avanzate — Cover ──────────────────────────────────────
+        if "cover_overwrite" in data:
+            self._cover_overwrite.set(bool(data["cover_overwrite"]))
+        if "cover_strategy" in data and data["cover_strategy"] in ("largest", "first_available"):
+            self._cover_strategy.set(data["cover_strategy"])
+        for _src in ("musicbrainz", "lastfm", "deezer", "itunes"):
+            _key = f"cover_src_{_src}"
+            if _key in data:
+                self._cover_sources[_src].set(bool(data[_key]))
+
+        # ── Tab Avanzate — Libreria Locale ────────────────────────────
+        if "opt_local_db" in data: self._opt_local_db.set(bool(data["opt_local_db"]))
+
+        # ── Rinomina (guard: var create in _build_advanced_tab, non in __init__) ──
+        if "opt_rename" in data and hasattr(self, "_opt_rename"):
+            self._opt_rename.set(bool(data["opt_rename"]))
+        if "rename_pattern" in data and hasattr(self, "_rename_pattern"):
+            rp = data["rename_pattern"]
+            if rp in ("artista - titolo", "titolo - artista"):
+                self._rename_pattern.set(rp)
+
     def _log_apply_filter(self):
         """v1068: riapplica il filtro livello al log completo.
         v1085p: bypass del wrapper per non duplicare nel buffer."""
@@ -7276,69 +7404,151 @@ class MusicCatalogerGUI:
         except Exception as e:
             messagebox.showerror("Errore", str(e))
 
-    def _show_about(self):
-        """v1075: About ridisegnata — logo app reale (niente emoji) e testo
-        sintetico atemporale. Il dettaglio delle versioni vive in UPGRADES.md.
-        v1076: finestra centrata a schermo.
-        v1085o: finestra Windows standalone (entry in taskbar, icona top-left)."""
+    def _show_help(self):
+        """R2: finestra Help/About con 4 pulsanti contestuali (Changelog,
+        Email, Aggiornamenti, Documentazione). Sostituisce _show_about()."""
+        import webbrowser as _wb
         win = ctk.CTkToplevel(self.root)
-        # v1085o: helper standalone (era transient + grab_set + center custom)
-        _setup_standalone_dialog(win, self.root, "About", 460, 440)
-        win.grab_set()
+        _setup_standalone_dialog(win, self.root, "Help — Music Cataloger", 460, 440)
 
-        # ── Logo app (PNG 256) al posto dell'emoji ──────────────────────────
+        # ── Logo (stesso meccanismo MEIPASS-aware dell'ex _show_about) ──
         _logo_done = False
         try:
             from PIL import Image as _PilImg
-            # v1085p: MEIPASS-aware path (uguale logica di gui/icons.py)
             _meipass = getattr(sys, "_MEIPASS", None)
             if _meipass:
                 logo_path = Path(_meipass) / "icons" / "app" / "app_icon_256.png"
             else:
                 logo_path = Path(__file__).parent.parent / "icons" / "app" / "app_icon_256.png"
-            # Fallback a taskbar_active.png se app_icon_256 non c'è
-            # (Pedro ha quella icona, è quella vera)
             if not logo_path.exists():
-                if _meipass:
-                    logo_path = Path(_meipass) / "icons" / "app" / "taskbar_active.png"
-                else:
-                    logo_path = Path(__file__).parent.parent / "icons" / "app" / "taskbar_active.png"
+                logo_path = (Path(_meipass) if _meipass
+                             else Path(__file__).parent.parent
+                             ) / "icons" / "app" / "taskbar_active.png"
             if logo_path.exists():
                 _img = _PilImg.open(str(logo_path))
                 if _img.mode != "RGBA":
                     _img = _img.convert("RGBA")
-                _img = _img.resize((72, 72), _PilImg.LANCZOS)
-                _ctk_logo = ctk.CTkImage(light_image=_img, dark_image=_img, size=(72, 72))
-                _logo_lbl = ctk.CTkLabel(win, image=_ctk_logo, text="")
-                _logo_lbl.pack(pady=(24, 4))
-                # Mantieni reference per evitare GC dell'immagine
+                _img = _img.resize((64, 64), _PilImg.LANCZOS)
+                _ctk_logo = ctk.CTkImage(light_image=_img, dark_image=_img, size=(64, 64))
+                ctk.CTkLabel(win, image=_ctk_logo, text="").pack(pady=(20, 4))
                 win._logo_ref = _ctk_logo
                 _logo_done = True
         except Exception:
             pass
         if not _logo_done:
-            # Fallback: emoji se il PNG non c'è o PIL non disponibile
-            ctk.CTkLabel(win, text="🎵", font=("Segoe UI", 48)).pack(pady=(30, 4))
+            ctk.CTkLabel(win, text="🎵", font=("Segoe UI", 40)).pack(pady=(22, 4))
 
         ctk.CTkLabel(win, text="Music Cataloger", font=FONT_TITLE).pack()
-        ctk.CTkLabel(win, text=f"{APP_VERSION} — CustomTkinter",
-                     font=FONT_SMALL, text_color=PALETTE["text_dim"]).pack(pady=(4, 12))
-        ctk.CTkFrame(win, height=1, fg_color=PALETTE["border"]).pack(fill="x", padx=30)
+        ctk.CTkLabel(win, text=f"{APP_VERSION}  ·  Python / CustomTkinter",
+                     font=FONT_SMALL, text_color=PALETTE["text_dim"]).pack(pady=(2, 12))
+        ctk.CTkFrame(win, height=1, fg_color=PALETTE["border"]).pack(fill="x", padx=30, pady=(0, 16))
 
-        desc = (
-            "Catalogazione automatica di librerie MP3 con focus\n"
-            "sulla musica latina da ballo (Salsa e Bachata).\n\n"
-            "Classificazione multi-sorgente: filename → ID3 → BPM\n"
-            "→ DB online (MusicBrainz, Last.fm, Deezer, iTunes).\n\n"
-            "Suddivisione Salsa per velocità (Romantica / Lenta /\n"
-            "Media / Veloce / Crazy) e Bachata per stile\n"
-            "(Dominicana / Fusion / Sensual).\n\n"
-            "Per il changelog completo → UPGRADES.md"
+        # ── 4 pulsanti 2×2 ──────────────────────────────────────────
+        _btn_cfg = dict(
+            height=BTN_H, width=190, font=FONT_BODY,
+            fg_color=PALETTE["surface"], hover_color=PALETTE["primary"],
+            text_color=PALETTE["text"], anchor="w", corner_radius=6,
         )
-        ctk.CTkLabel(win, text=desc, font=FONT_BODY, justify="center").pack(pady=14)
+        _grid = ctk.CTkFrame(win, fg_color="transparent")
+        _grid.pack(padx=24, pady=(0, 16))
+
+        def _mk(row, col, label, cmd):
+            ctk.CTkButton(_grid, text=label, command=cmd, **_btn_cfg
+                          ).grid(row=row, column=col, padx=6, pady=5)
+
+        def _do_updates():
+            # Chiude Help (è modale) prima di aprire il dialog di update
+            win.destroy()
+            from services.updater import check_and_offer_update
+            check_and_offer_update(self.api_client, self.root, silent=False)
+
+        _mk(0, 0, "📋  Changelog",
+            lambda: self._show_help_changelog(win))
+        _mk(0, 1, "✉  Email supporto",
+            lambda: _wb.open("mailto:captainjoker27@gmail.com"
+                             "?subject=Music%20Cataloger%20Advanced%20-%20Supporto"))
+        _mk(1, 0, "🔄  Aggiornamenti", _do_updates)
+        _mk(1, 1, "📖  Documentazione",
+            lambda: _wb.open("https://github.com/PedroFerre27/MusicCatalogerAdvanced"))
+
+        # ── Footer ──────────────────────────────────────────────────
+        ctk.CTkFrame(win, height=1, fg_color=PALETTE["border"]).pack(fill="x", padx=30, pady=(0, 10))
         ctk.CTkLabel(win, text="© 2026 Pedro Marques — Uso personale ed educativo",
-                     font=FONT_SMALL, text_color=PALETTE["text_dim"]).pack(pady=(0, 14))
-        ctk.CTkButton(win, text="Chiudi", command=win.destroy, height=BTN_H, width=120).pack()
+                     font=FONT_SMALL, text_color=PALETTE["text_dim"]).pack(pady=(0, 8))
+        ctk.CTkButton(win, text="Chiudi", command=win.destroy,
+                      height=BTN_H, width=120,
+                      fg_color=PALETTE["surface"], hover_color=PALETTE["primary"],
+                      text_color=PALETTE["text"]).pack(pady=(0, 16))
+
+    def _show_help_changelog(self, help_win=None):
+        """R2: finestra Changelog — ultime 200 righe di UPGRADES.md.
+        In EXE: letto da _MEIPASS/UPGRADES.md (bundlato via spec, opzione A).
+        In sviluppo: letto da docs/UPGRADES.md (due livelli sopra gui/)."""
+        _meipass = getattr(sys, "_MEIPASS", None)
+        if _meipass:
+            upgrades_path = Path(_meipass) / "UPGRADES.md"
+        else:
+            upgrades_path = Path(__file__).parent.parent.parent / "docs" / "UPGRADES.md"
+
+        if upgrades_path.exists():
+            try:
+                lines = upgrades_path.read_text(encoding="utf-8",
+                                                errors="replace").splitlines()
+                content = "\n".join(lines[-200:] if len(lines) > 200 else lines)
+            except Exception as e:
+                content = f"[Errore lettura UPGRADES.md: {e}]"
+        else:
+            content = (
+                f"UPGRADES.md non trovato.\n"
+                f"Cercato in: {upgrades_path}\n\n"
+                "In modalità sviluppo il file è in docs/UPGRADES.md.\n"
+                "In modalità EXE viene bundlato automaticamente."
+            )
+
+        parent = help_win or self.root
+        clog = ctk.CTkToplevel(parent)
+        clog.title("Changelog")
+        clog.geometry("640x520")
+        clog.resizable(True, True)
+        clog.configure(fg_color=PALETTE["bg"])
+        clog.columnconfigure(0, weight=1)
+        clog.rowconfigure(0, weight=1)
+        try:
+            from gui.app_icon import set_window_icon
+            set_window_icon(clog)
+            clog.after(250, lambda: set_window_icon(clog))
+        except Exception:
+            pass
+        try:
+            clog.transient(parent)
+            clog.after(50, lambda: clog.grab_set())
+        except Exception:
+            pass
+        # Centra sopra la finestra Help (non sulla main window)
+        try:
+            parent.update_idletasks()
+            px, py = parent.winfo_x(), parent.winfo_y()
+            pw, ph = parent.winfo_width(), parent.winfo_height()
+            clog.geometry(f"640x520+{px + (pw - 640)//2}+{py + (ph - 520)//2}")
+        except Exception:
+            pass
+
+        txt = ctk.CTkTextbox(
+            clog, font=FONT_MONO,
+            fg_color=PALETTE["surface"], text_color=PALETTE["text"],
+            wrap="none", corner_radius=6,
+        )
+        txt.grid(row=0, column=0, padx=12, pady=(12, 4), sticky="nsew")
+        txt.insert("0.0", content)
+        txt.configure(state="disabled")
+        txt.see("end")   # posiziona sulle righe più recenti (= più nuove)
+
+        ctk.CTkButton(
+            clog, text="Chiudi", command=clog.destroy,
+            height=BTN_H, width=120,
+            fg_color=PALETTE["surface"], hover_color=PALETTE["primary"],
+            text_color=PALETTE["text"],
+        ).grid(row=1, column=0, pady=(4, 12))
 
     def _on_close(self):
         if self._is_running:
@@ -7350,6 +7560,7 @@ class MusicCatalogerGUI:
                     self._process.terminate()
                 except Exception:
                     pass
+        self._save_ui_prefs()   # R1: persiste le impostazioni UI
         self.root.destroy()
 
 

@@ -39,6 +39,7 @@ datas = [
     ('core',      'core'),
     ('gui',       'gui'),
     ('icons',     'icons'),
+    ('../docs/UPGRADES.md', '.'),   # R2: bundlato per Help → Changelog
 ]
 
 hiddenimports = [
