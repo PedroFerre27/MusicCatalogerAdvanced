@@ -821,7 +821,7 @@ class MusicCatalogerGUI:
                 on_click=lambda: _toggle_sub("plans"),
                 has_submenu=True, sub_id="plans")
         _mk_row(list_frm, "help_ph", "Aiuto",
-                on_click=lambda: (self._close_profile_flyout(), self._show_about()))
+                on_click=lambda: (self._close_profile_flyout(), self._show_help()))
         _mk_row(list_frm, "logout", "Esci",
                 on_click=lambda: _handle_exit())
 
@@ -7404,69 +7404,151 @@ class MusicCatalogerGUI:
         except Exception as e:
             messagebox.showerror("Errore", str(e))
 
-    def _show_about(self):
-        """v1075: About ridisegnata — logo app reale (niente emoji) e testo
-        sintetico atemporale. Il dettaglio delle versioni vive in UPGRADES.md.
-        v1076: finestra centrata a schermo.
-        v1085o: finestra Windows standalone (entry in taskbar, icona top-left)."""
+    def _show_help(self):
+        """R2: finestra Help/About con 4 pulsanti contestuali (Changelog,
+        Email, Aggiornamenti, Documentazione). Sostituisce _show_about()."""
+        import webbrowser as _wb
         win = ctk.CTkToplevel(self.root)
-        # v1085o: helper standalone (era transient + grab_set + center custom)
-        _setup_standalone_dialog(win, self.root, "About", 460, 440)
-        win.grab_set()
+        _setup_standalone_dialog(win, self.root, "Help — Music Cataloger", 460, 440)
 
-        # ── Logo app (PNG 256) al posto dell'emoji ──────────────────────────
+        # ── Logo (stesso meccanismo MEIPASS-aware dell'ex _show_about) ──
         _logo_done = False
         try:
             from PIL import Image as _PilImg
-            # v1085p: MEIPASS-aware path (uguale logica di gui/icons.py)
             _meipass = getattr(sys, "_MEIPASS", None)
             if _meipass:
                 logo_path = Path(_meipass) / "icons" / "app" / "app_icon_256.png"
             else:
                 logo_path = Path(__file__).parent.parent / "icons" / "app" / "app_icon_256.png"
-            # Fallback a taskbar_active.png se app_icon_256 non c'è
-            # (Pedro ha quella icona, è quella vera)
             if not logo_path.exists():
-                if _meipass:
-                    logo_path = Path(_meipass) / "icons" / "app" / "taskbar_active.png"
-                else:
-                    logo_path = Path(__file__).parent.parent / "icons" / "app" / "taskbar_active.png"
+                logo_path = (Path(_meipass) if _meipass
+                             else Path(__file__).parent.parent
+                             ) / "icons" / "app" / "taskbar_active.png"
             if logo_path.exists():
                 _img = _PilImg.open(str(logo_path))
                 if _img.mode != "RGBA":
                     _img = _img.convert("RGBA")
-                _img = _img.resize((72, 72), _PilImg.LANCZOS)
-                _ctk_logo = ctk.CTkImage(light_image=_img, dark_image=_img, size=(72, 72))
-                _logo_lbl = ctk.CTkLabel(win, image=_ctk_logo, text="")
-                _logo_lbl.pack(pady=(24, 4))
-                # Mantieni reference per evitare GC dell'immagine
+                _img = _img.resize((64, 64), _PilImg.LANCZOS)
+                _ctk_logo = ctk.CTkImage(light_image=_img, dark_image=_img, size=(64, 64))
+                ctk.CTkLabel(win, image=_ctk_logo, text="").pack(pady=(20, 4))
                 win._logo_ref = _ctk_logo
                 _logo_done = True
         except Exception:
             pass
         if not _logo_done:
-            # Fallback: emoji se il PNG non c'è o PIL non disponibile
-            ctk.CTkLabel(win, text="🎵", font=("Segoe UI", 48)).pack(pady=(30, 4))
+            ctk.CTkLabel(win, text="🎵", font=("Segoe UI", 40)).pack(pady=(22, 4))
 
         ctk.CTkLabel(win, text="Music Cataloger", font=FONT_TITLE).pack()
-        ctk.CTkLabel(win, text=f"{APP_VERSION} — CustomTkinter",
-                     font=FONT_SMALL, text_color=PALETTE["text_dim"]).pack(pady=(4, 12))
-        ctk.CTkFrame(win, height=1, fg_color=PALETTE["border"]).pack(fill="x", padx=30)
+        ctk.CTkLabel(win, text=f"{APP_VERSION}  ·  Python / CustomTkinter",
+                     font=FONT_SMALL, text_color=PALETTE["text_dim"]).pack(pady=(2, 12))
+        ctk.CTkFrame(win, height=1, fg_color=PALETTE["border"]).pack(fill="x", padx=30, pady=(0, 16))
 
-        desc = (
-            "Catalogazione automatica di librerie MP3 con focus\n"
-            "sulla musica latina da ballo (Salsa e Bachata).\n\n"
-            "Classificazione multi-sorgente: filename → ID3 → BPM\n"
-            "→ DB online (MusicBrainz, Last.fm, Deezer, iTunes).\n\n"
-            "Suddivisione Salsa per velocità (Romantica / Lenta /\n"
-            "Media / Veloce / Crazy) e Bachata per stile\n"
-            "(Dominicana / Fusion / Sensual).\n\n"
-            "Per il changelog completo → UPGRADES.md"
+        # ── 4 pulsanti 2×2 ──────────────────────────────────────────
+        _btn_cfg = dict(
+            height=BTN_H, width=190, font=FONT_BODY,
+            fg_color=PALETTE["surface"], hover_color=PALETTE["primary"],
+            text_color=PALETTE["text"], anchor="w", corner_radius=6,
         )
-        ctk.CTkLabel(win, text=desc, font=FONT_BODY, justify="center").pack(pady=14)
+        _grid = ctk.CTkFrame(win, fg_color="transparent")
+        _grid.pack(padx=24, pady=(0, 16))
+
+        def _mk(row, col, label, cmd):
+            ctk.CTkButton(_grid, text=label, command=cmd, **_btn_cfg
+                          ).grid(row=row, column=col, padx=6, pady=5)
+
+        def _do_updates():
+            # Chiude Help (è modale) prima di aprire il dialog di update
+            win.destroy()
+            from services.updater import check_and_offer_update
+            check_and_offer_update(self.api_client, self.root, silent=False)
+
+        _mk(0, 0, "📋  Changelog",
+            lambda: self._show_help_changelog(win))
+        _mk(0, 1, "✉  Email supporto",
+            lambda: _wb.open("mailto:captainjoker27@gmail.com"
+                             "?subject=Music%20Cataloger%20Advanced%20-%20Supporto"))
+        _mk(1, 0, "🔄  Aggiornamenti", _do_updates)
+        _mk(1, 1, "📖  Documentazione",
+            lambda: _wb.open("https://github.com/PedroFerre27/MusicCatalogerAdvanced"))
+
+        # ── Footer ──────────────────────────────────────────────────
+        ctk.CTkFrame(win, height=1, fg_color=PALETTE["border"]).pack(fill="x", padx=30, pady=(0, 10))
         ctk.CTkLabel(win, text="© 2026 Pedro Marques — Uso personale ed educativo",
-                     font=FONT_SMALL, text_color=PALETTE["text_dim"]).pack(pady=(0, 14))
-        ctk.CTkButton(win, text="Chiudi", command=win.destroy, height=BTN_H, width=120).pack()
+                     font=FONT_SMALL, text_color=PALETTE["text_dim"]).pack(pady=(0, 8))
+        ctk.CTkButton(win, text="Chiudi", command=win.destroy,
+                      height=BTN_H, width=120,
+                      fg_color=PALETTE["surface"], hover_color=PALETTE["primary"],
+                      text_color=PALETTE["text"]).pack(pady=(0, 16))
+
+    def _show_help_changelog(self, help_win=None):
+        """R2: finestra Changelog — ultime 200 righe di UPGRADES.md.
+        In EXE: letto da _MEIPASS/UPGRADES.md (bundlato via spec, opzione A).
+        In sviluppo: letto da docs/UPGRADES.md (due livelli sopra gui/)."""
+        _meipass = getattr(sys, "_MEIPASS", None)
+        if _meipass:
+            upgrades_path = Path(_meipass) / "UPGRADES.md"
+        else:
+            upgrades_path = Path(__file__).parent.parent.parent / "docs" / "UPGRADES.md"
+
+        if upgrades_path.exists():
+            try:
+                lines = upgrades_path.read_text(encoding="utf-8",
+                                                errors="replace").splitlines()
+                content = "\n".join(lines[-200:] if len(lines) > 200 else lines)
+            except Exception as e:
+                content = f"[Errore lettura UPGRADES.md: {e}]"
+        else:
+            content = (
+                f"UPGRADES.md non trovato.\n"
+                f"Cercato in: {upgrades_path}\n\n"
+                "In modalità sviluppo il file è in docs/UPGRADES.md.\n"
+                "In modalità EXE viene bundlato automaticamente."
+            )
+
+        parent = help_win or self.root
+        clog = ctk.CTkToplevel(parent)
+        clog.title("Changelog")
+        clog.geometry("640x520")
+        clog.resizable(True, True)
+        clog.configure(fg_color=PALETTE["bg"])
+        clog.columnconfigure(0, weight=1)
+        clog.rowconfigure(0, weight=1)
+        try:
+            from gui.app_icon import set_window_icon
+            set_window_icon(clog)
+            clog.after(250, lambda: set_window_icon(clog))
+        except Exception:
+            pass
+        try:
+            clog.transient(parent)
+            clog.after(50, lambda: clog.grab_set())
+        except Exception:
+            pass
+        # Centra sopra la finestra Help (non sulla main window)
+        try:
+            parent.update_idletasks()
+            px, py = parent.winfo_x(), parent.winfo_y()
+            pw, ph = parent.winfo_width(), parent.winfo_height()
+            clog.geometry(f"640x520+{px + (pw - 640)//2}+{py + (ph - 520)//2}")
+        except Exception:
+            pass
+
+        txt = ctk.CTkTextbox(
+            clog, font=FONT_MONO,
+            fg_color=PALETTE["surface"], text_color=PALETTE["text"],
+            wrap="none", corner_radius=6,
+        )
+        txt.grid(row=0, column=0, padx=12, pady=(12, 4), sticky="nsew")
+        txt.insert("0.0", content)
+        txt.configure(state="disabled")
+        txt.see("end")   # posiziona sulle righe più recenti (= più nuove)
+
+        ctk.CTkButton(
+            clog, text="Chiudi", command=clog.destroy,
+            height=BTN_H, width=120,
+            fg_color=PALETTE["surface"], hover_color=PALETTE["primary"],
+            text_color=PALETTE["text"],
+        ).grid(row=1, column=0, pady=(4, 12))
 
     def _on_close(self):
         if self._is_running:

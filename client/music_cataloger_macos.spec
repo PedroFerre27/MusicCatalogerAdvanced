@@ -39,6 +39,7 @@ a = Analysis(
         ('gui',                    'gui'),
         ('run_cataloger.py',       '.'),
         ('version.py',             '.'),
+        ('../docs/UPGRADES.md',    '.'),   # R2: bundlato per Help → Changelog
     ],
     hiddenimports=[
         'customtkinter',
