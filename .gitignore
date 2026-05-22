@@ -56,3 +56,12 @@ server/*.pyc
 # Globali
 *.log
 .venv/
+
+# Documentazione interna (non distribuita all'utente finale)
+docs/ROADMAP.md
+docs/UPGRADES.md
+docs/VERSIONING.md
+docs/CONTEXT.md
+docs/CLAUDE.md
+docs/archive/
+CLAUDE.md
