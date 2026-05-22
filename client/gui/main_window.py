@@ -479,6 +479,7 @@ class MusicCatalogerGUI:
         self._build_layout()
         # Carica impostazioni caraibiche salvate
         self.root.after(200, self._load_caribbean_settings)
+        self.root.after(250, self._load_ui_prefs)               # R1: preferenze UI
         # v0.0.2.4: Applica restrizioni piano (overlay lock sui tab non concessi)
         # Eseguito DOPO la costruzione completa della GUI così tutti i tab esistono
         self.root.after(300, self._apply_plan_restrictions)
@@ -6185,6 +6186,8 @@ class MusicCatalogerGUI:
             messagebox.showerror("Errore", f"La directory non esiste:\n{path}")
             return
 
+        self._save_ui_prefs()   # R1: persiste le opzioni con cui si avvia
+
         # ── v0.0.2.4: Tracking server-side della catalogazione ──
         # Se siamo in modalità connessa al server, prima di partire
         # contiamo rapidamente i file MP3 per:
@@ -7207,6 +7210,131 @@ class MusicCatalogerGUI:
             finally:
                 self._syncing_master = False
 
+    # ─── R1: persistenza preferenze UI (ui_prefs.json) ──────────────────────
+
+    def _save_ui_prefs(self):
+        """R1: Salva le preferenze UI in data/ui_prefs.json.
+        Chiamata su close e all'inizio di ogni _run (ante crash-safe).
+        Ogni chiave è aggiunta individualmente: un errore su una variabile
+        non compromette il salvataggio delle altre."""
+        import json as _json
+        import datetime as _dt
+
+        data: dict = {"_saved_at": _dt.datetime.now().isoformat()}
+
+        # ── Menu sinistro ──────────────────────────────────────────────
+        try: data["opt_analyze"]    = bool(self._opt_analyze.get())
+        except Exception: pass
+        try: data["opt_cleanup"]    = bool(self._opt_cleanup.get())
+        except Exception: pass
+        try: data["opt_use_ext_db"] = bool(self._opt_use_ext_db.get())
+        except Exception: pass
+        try: data["cover_enabled"]  = bool(self._cover_enabled.get())
+        except Exception: pass
+        try: data["dup_action"]     = str(self._dup_action.get())
+        except Exception: pass
+        try: data["last_dir"]       = str(self._selected_path.get()).strip()
+        except Exception: pass
+
+        # ── Tab Avanzate — Classificazione ────────────────────────────
+        try: data["opt_dry_run"]    = bool(self._opt_dry_run.get())
+        except Exception: pass
+        try: data["opt_verbose"]    = bool(self._opt_verbose.get())
+        except Exception: pass
+        try: data["opt_classify"]   = bool(self._opt_classify.get())
+        except Exception: pass
+        try: data["opt_correct"]    = bool(self._opt_correct.get())
+        except Exception: pass
+
+        # ── Tab Avanzate — Cover ──────────────────────────────────────
+        try: data["cover_overwrite"]       = bool(self._cover_overwrite.get())
+        except Exception: pass
+        try: data["cover_strategy"]        = str(self._cover_strategy.get())
+        except Exception: pass
+        try: data["cover_src_musicbrainz"] = bool(self._cover_sources["musicbrainz"].get())
+        except Exception: pass
+        try: data["cover_src_lastfm"]      = bool(self._cover_sources["lastfm"].get())
+        except Exception: pass
+        try: data["cover_src_deezer"]      = bool(self._cover_sources["deezer"].get())
+        except Exception: pass
+        try: data["cover_src_itunes"]      = bool(self._cover_sources["itunes"].get())
+        except Exception: pass
+
+        # ── Tab Avanzate — Libreria e Rinomina ────────────────────────
+        try: data["opt_local_db"]   = bool(self._opt_local_db.get())
+        except Exception: pass
+        if hasattr(self, "_opt_rename"):
+            try: data["opt_rename"] = bool(self._opt_rename.get())
+            except Exception: pass
+        if hasattr(self, "_rename_pattern"):
+            try: data["rename_pattern"] = str(self._rename_pattern.get())
+            except Exception: pass
+
+        try:
+            prefs_file = _get_data_dir() / "ui_prefs.json"
+            prefs_file.write_text(
+                _json.dumps(data, indent=2, ensure_ascii=False),
+                encoding="utf-8"
+            )
+        except Exception:
+            pass  # mai interrompere per un errore di scrittura su disco
+
+    def _load_ui_prefs(self):
+        """R1: Carica le preferenze UI da data/ui_prefs.json.
+        Eseguita con root.after(250, ...) — dopo _build_advanced_tab, che
+        crea _opt_rename/_rename_pattern. Guard hasattr per sicurezza."""
+        import json as _json
+        prefs_file = _get_data_dir() / "ui_prefs.json"
+        if not prefs_file.exists():
+            return
+        try:
+            data = _json.loads(prefs_file.read_text(encoding="utf-8"))
+        except Exception:
+            return  # file corrotto → ignora silenziosamente
+
+        # ── Menu sinistro ──────────────────────────────────────────────
+        if "opt_analyze"    in data: self._opt_analyze.set(bool(data["opt_analyze"]))
+        if "opt_cleanup"    in data: self._opt_cleanup.set(bool(data["opt_cleanup"]))
+        if "opt_use_ext_db" in data: self._opt_use_ext_db.set(bool(data["opt_use_ext_db"]))
+        if "cover_enabled"  in data: self._cover_enabled.set(bool(data["cover_enabled"]))
+        if "dup_action" in data and data["dup_action"] in ("keep_both", "skip", "overwrite"):
+            self._dup_action.set(data["dup_action"])
+
+        # Ultima directory: .set() + breadcrumb direttamente, senza _select_path.
+        # _select_path chiamerebbe _add_recent_dir (path già in storico →
+        # write ridondante su disco). Il breadcrumb va aggiornato, lo status no.
+        last_dir = data.get("last_dir", "").strip()
+        if last_dir and Path(last_dir).is_dir():
+            self._selected_path.set(last_dir)
+            self._update_breadcrumb(last_dir)
+
+        # ── Tab Avanzate — Classificazione ────────────────────────────
+        if "opt_dry_run"  in data: self._opt_dry_run.set(bool(data["opt_dry_run"]))
+        if "opt_verbose"  in data: self._opt_verbose.set(bool(data["opt_verbose"]))
+        if "opt_classify" in data: self._opt_classify.set(bool(data["opt_classify"]))
+        if "opt_correct"  in data: self._opt_correct.set(bool(data["opt_correct"]))
+
+        # ── Tab Avanzate — Cover ──────────────────────────────────────
+        if "cover_overwrite" in data:
+            self._cover_overwrite.set(bool(data["cover_overwrite"]))
+        if "cover_strategy" in data and data["cover_strategy"] in ("largest", "first_available"):
+            self._cover_strategy.set(data["cover_strategy"])
+        for _src in ("musicbrainz", "lastfm", "deezer", "itunes"):
+            _key = f"cover_src_{_src}"
+            if _key in data:
+                self._cover_sources[_src].set(bool(data[_key]))
+
+        # ── Tab Avanzate — Libreria Locale ────────────────────────────
+        if "opt_local_db" in data: self._opt_local_db.set(bool(data["opt_local_db"]))
+
+        # ── Rinomina (guard: var create in _build_advanced_tab, non in __init__) ──
+        if "opt_rename" in data and hasattr(self, "_opt_rename"):
+            self._opt_rename.set(bool(data["opt_rename"]))
+        if "rename_pattern" in data and hasattr(self, "_rename_pattern"):
+            rp = data["rename_pattern"]
+            if rp in ("artista - titolo", "titolo - artista"):
+                self._rename_pattern.set(rp)
+
     def _log_apply_filter(self):
         """v1068: riapplica il filtro livello al log completo.
         v1085p: bypass del wrapper per non duplicare nel buffer."""
@@ -7350,6 +7478,7 @@ class MusicCatalogerGUI:
                     self._process.terminate()
                 except Exception:
                     pass
+        self._save_ui_prefs()   # R1: persiste le impostazioni UI
         self.root.destroy()
 
 
