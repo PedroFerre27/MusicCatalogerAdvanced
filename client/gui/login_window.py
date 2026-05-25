@@ -371,10 +371,21 @@ class LoginWindow:
         """
         Dialog modale per la registrazione self-service.
 
-        v1085d:
-        - Titlebar custom (no barra Windows bianca standard)
-        - Pack order: titlebar TOP → btn_row BOTTOM → body (riempie resto)
-        - Pulsante "Registrati" sempre visibile in fondo
+        v1088.4:
+        - Finestra Windows STANDALONE (no overrideredirect, no titlebar
+          custom): titlebar nativa Windows con icona app, entry in
+          taskbar, gestione minimize/restore standard.
+        - transient(self.root) + grab_set(): modale figlia della login.
+          Windows mostra il blink/ding nativo se l'utente tenta di
+          cliccare la login mentre questa è aperta.
+        - DLG_H aumentato 540 → 600 per evitare che il campo "Conferma
+          password" venga compresso dal pack manager.
+
+        Storico (v1085d): aveva titlebar custom + overrideredirect=True,
+        ma quel pattern soffriva degli stessi problemi del dialog
+        "Crea utente" admin (BUG-04 in v1086.x): finestra senza bordo
+        che ereditava lo z-order della parent → si nascondeva sotto al
+        cambio focus.
         """
         from tkinter import messagebox
         import threading
@@ -385,19 +396,45 @@ class LoginWindow:
                                  "Configura prima l'URL del server nel campo in fondo.")
             return
 
-        DLG_W, DLG_H = 460, 540
+        # DLG_H 560: sweet spot empirico osservato sul rendering
+        # Windows (DPI scaling 125% rende CTkLabel/CTkEntry leggermente
+        # piu' alti dei pixel dichiarati). Sotto i 540 il pack comprime
+        # l'ultimo entry "Conferma password", sopra i 580 compare un
+        # buco vuoto sotto i bottoni. 560 = bilanciamento corretto.
+        DLG_W, DLG_H = 460, 560
 
         win = ctk.CTkToplevel(self.root)
+        win.title("Registrazione nuovo account")
         win.geometry(f"{DLG_W}x{DLG_H}")
         win.resizable(False, False)
+        win.configure(fg_color=PALETTE["bg"])
+
+        # Icona nativa con retry: iconbitmap() su CTkToplevel su Windows
+        # ha un timing problematico (la finestra non è ancora "realized"
+        # quando la chiamiamo subito dopo la creazione, e l'icona non
+        # si attacca alla titlebar). Stesso pattern usato in
+        # main_window._set_win_icon (v1076): chiamata immediata +
+        # secondo tentativo dopo 250ms quando la finestra è mappata.
+        def _apply_icon():
+            try:
+                if not win.winfo_exists():
+                    return
+                from gui.app_icon import set_window_icon
+                set_window_icon(win)
+            except Exception:
+                pass
+        _apply_icon()
+        try:
+            win.after(250, _apply_icon)
+        except Exception:
+            pass
+
+        # transient + grab_set = finestra figlia modale. Windows fa
+        # automaticamente il blink/ding sulla titlebar nativa se
+        # l'utente clicca la login mentre questa è aperta.
         win.transient(self.root)
         try:
             win.grab_set()
-        except Exception:
-            pass
-        win.configure(fg_color=PALETTE["bg"])
-        try:
-            win.overrideredirect(True)
         except Exception:
             pass
 
@@ -407,37 +444,13 @@ class LoginWindow:
         lw = self.root.winfo_width(); lh = self.root.winfo_height()
         win.geometry(f"{DLG_W}x{DLG_H}+{lx + (lw-DLG_W)//2}+{ly + (lh-DLG_H)//2}")
 
-        # ── 1. Titlebar (TOP) ────────────────────────────────────────
-        tb = ctk.CTkFrame(win, fg_color=PALETTE["surface"], height=42)
-        tb.pack(side="top", fill="x")
-        tb.pack_propagate(False)
-        ctk.CTkLabel(tb, text="Registrazione nuovo account",
-                     font=("Segoe UI", 12, "bold"),
-                     text_color=PALETTE["text"]).pack(side="left", padx=14, pady=10)
-        close_btn = ctk.CTkButton(tb, text="✕", width=32, height=26,
-                      fg_color="transparent", hover_color="#d84545",
-                      text_color=PALETTE["text_dim"],
-                      font=("Segoe UI", 12, "bold"),
-                      command=win.destroy)
-        close_btn.pack(side="right", padx=8, pady=8)
-
-        # Drag dalla titlebar
-        def _start_drag(e):
-            win._drag_x = e.x_root - win.winfo_x()
-            win._drag_y = e.y_root - win.winfo_y()
-        def _do_drag(e):
-            try:
-                win.geometry(f"+{e.x_root - win._drag_x}+{e.y_root - win._drag_y}")
-            except Exception:
-                pass
-        for w in tb.winfo_children():
-            if w is close_btn: continue
-            try:
-                w.bind("<Button-1>", _start_drag)
-                w.bind("<B1-Motion>", _do_drag)
-            except Exception: pass
-        tb.bind("<Button-1>", _start_drag)
-        tb.bind("<B1-Motion>", _do_drag)
+        # Porta la finestra in primo piano subito (evita che parta
+        # nascosta dietro altre app del desktop).
+        try:
+            win.lift()
+            win.focus_force()
+        except Exception:
+            pass
 
         # ── 2. Btn row (BOTTOM) — pinnato PRIMA del body ─────────────
         btn_row = ctk.CTkFrame(win, fg_color="transparent", height=70)
