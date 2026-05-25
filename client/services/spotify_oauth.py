@@ -154,19 +154,19 @@ class _CallbackHandler(http.server.BaseHTTPRequestHandler):
         self.result_holder.state = state
         self._respond_html(
             "Account Spotify collegato! Puoi chiudere questa scheda "
-            "e tornare a Music Cataloger.", ok=True)
+            "e tornare a TrackLab.", ok=True)
 
     def _respond_html(self, message: str, ok: bool):
         color = "#3b6fd4" if ok else "#d84545"
         html = f"""<!doctype html><html><head><meta charset="utf-8">
-<title>Music Cataloger - Spotify</title>
+<title>TrackLab - Spotify</title>
 <style>body{{font-family:Segoe UI,sans-serif;background:#0f1419;color:#e8edf2;
 display:flex;align-items:center;justify-content:center;height:100vh;margin:0;}}
 .card{{background:#1e2533;padding:32px 40px;border-radius:12px;
 border-left:4px solid {color};max-width:480px;text-align:center;}}
 h1{{color:{color};margin:0 0 12px;font-size:18px;}}
 p{{color:#7a8699;margin:0;line-height:1.5;}}</style></head>
-<body><div class="card"><h1>Music Cataloger Advanced</h1>
+<body><div class="card"><h1>TrackLab</h1>
 <p>{message}</p></div></body></html>"""
         body = html.encode("utf-8")
         self.send_response(200 if ok else 400)
@@ -319,7 +319,7 @@ def start_connect_flow() -> SpotifyToken:
     if port is None:
         raise SpotifyOAuthError(
             f"Nessuna porta libera tra {cfg.callback_ports}. "
-            "Chiudi eventuali altre istanze di Music Cataloger.")
+            "Chiudi eventuali altre istanze di TrackLab.")
 
     # 2. PKCE pair + state
     verifier, challenge = _generate_pkce_pair()

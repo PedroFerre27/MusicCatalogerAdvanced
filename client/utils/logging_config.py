@@ -1,7 +1,7 @@
 def setup_logging(self, level):
         """Configura logging con dual handler: file UTF-8 + console cp1252-safe"""
         import io
-        log_filename = f"MusicCatalogerAdvanced_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+        log_filename = f"TrackLab_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
         log_path = self.script_dir / log_filename
 
         # Rimuovi handler esistenti

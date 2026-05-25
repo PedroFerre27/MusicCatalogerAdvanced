@@ -1,5 +1,5 @@
 """
-config/user_plans.py — Music Cataloger Advanced (v1086.7 dev/security-audit)
+config/user_plans.py — TrackLab (v1086.7 dev/security-audit)
 
 Definizione dei piani utente con relative feature.
 

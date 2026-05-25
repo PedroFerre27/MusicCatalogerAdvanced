@@ -41,8 +41,8 @@ def find_icon_file() -> Optional[Path]:
     """
     root = _resource_root()
     candidates = [
-        root / "icons" / "music_cataloger.ico",
-        root / "icons" / "app" / "music_cataloger.ico",
+        root / "icons" / "tracklab.ico",
+        root / "icons" / "app" / "tracklab.ico",
         root / "icons" / "app" / "taskbar_active.png",
         root / "icons" / "app" / "app_icon_256.png",
     ]
@@ -121,14 +121,14 @@ def set_window_icon(window) -> bool:
 def get_title_icon_photo(size: int = 40):
     """
     Ritorna un CTkImage/PhotoImage da usare come 'logo' accanto al titolo
-    nella GUI (header Music Cataloger). Preferisce taskbar_active.png se
-    presente — altrimenti fallback a music_cataloger.ico via PIL.
+    nella GUI (header TrackLab). Preferisce taskbar_active.png se
+    presente — altrimenti fallback a tracklab.ico via PIL.
     """
     root = _resource_root()
     candidates = [
         root / "icons" / "app" / "taskbar_active.png",
         root / "icons" / "app" / "app_icon_256.png",
-        root / "icons" / "music_cataloger.ico",
+        root / "icons" / "tracklab.ico",
     ]
     icon_path = next((c for c in candidates if c.exists()), None)
     if icon_path is None:

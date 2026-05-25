@@ -17,8 +17,8 @@ class Settings(BaseSettings):
     )
 
     # ── Generale ──────────────────────────────────────────────────
-    APP_NAME: str = "Music Cataloger Server"
-    APP_VERSION: str = "0.2.4"
+    APP_NAME: str = "TrackLab Server"
+    APP_VERSION: str = "0.2.5"
     ENV: str = "production"    # development | production
     DEBUG: bool = False
 

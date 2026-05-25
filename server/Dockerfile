@@ -1,4 +1,4 @@
-# Dockerfile — Music Cataloger Server
+# Dockerfile — TrackLab Server
 #
 # Target: Synology DS415+ (Intel Atom C2538, amd64, DSM 7.1.1)
 # Container Manager di DSM è basato su Docker standard — nessuna
@@ -9,8 +9,8 @@
 FROM python:3.11-slim
 
 # ── Metadata OCI ──────────────────────────────────────────────────
-LABEL org.opencontainers.image.title="Music Cataloger Server"
-LABEL org.opencontainers.image.description="FastAPI backend per Music Cataloger Advanced"
+LABEL org.opencontainers.image.title="TrackLab Server"
+LABEL org.opencontainers.image.description="FastAPI backend per TrackLab"
 LABEL org.opencontainers.image.source="https://github.com/PedroFerre27"
 
 # ── System deps (bcrypt, psycopg2 se un domani si migra a postgres) ──
@@ -30,7 +30,7 @@ COPY app/ ./app/
 # ── Runtime config ────────────────────────────────────────────────
 # Non-root user per sicurezza (DSM spesso lo raccomanda).
 # UID/GID fissi a 1000 così chown sul NAS è prevedibile:
-#   sudo chown -R 1000:1000 /volume1/docker/music-cataloger/data
+#   sudo chown -R 1000:1000 /volume1/docker/tracklab/data
 RUN groupadd -r -g 1000 mcs \
     && useradd --create-home --shell /bin/bash -u 1000 -g 1000 mcs \
     && mkdir -p /srv/app/data /output \

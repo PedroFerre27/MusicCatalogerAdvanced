@@ -43,10 +43,10 @@ def test_main_class():
     """Test che la classe principale funzioni con config"""
     print("\nTest 3: Inizializzazione classe principale...")
     try:
-        from MusicCatalogerAdvanced_v0020 import MusicCatalogerAdvanced
+        from TrackLab_v0020 import TrackLab
         
         # Prova a creare istanza in dry-run mode
-        cataloger = MusicCatalogerAdvanced(
+        cataloger = TrackLab(
             base_path=".",  # Directory corrente
             dry_run=True,
             use_external_db=False  # Disabilita DB per test

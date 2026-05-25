@@ -1,4 +1,4 @@
-# Manuale Utente — Music Cataloger Advanced
+# Manuale Utente — TrackLab
 
 Benvenuto. Questo manuale è pensato per chi prende in mano il
 programma per la prima volta e non sa cosa fa. Le sezioni vanno
@@ -21,7 +21,7 @@ nell'ordine in cui le incontri all'uso.
 
 ## 1. Cos'è e cosa fa
 
-Music Cataloger Advanced organizza automaticamente librerie di file
+TrackLab organizza automaticamente librerie di file
 MP3. Lo fa in quattro modi che si combinano:
 
 - **Classifica i brani per genere** (es. Salsa, Bachata, Rock, Pop…)
@@ -67,7 +67,7 @@ misura di sicurezza.
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│  [logo]  Music Cataloger Advanced            [badge profilo]│
+│  [logo]  TrackLab            [badge profilo]│
 ├──────────────┬──────────────────────────────────────────────┤
 │              │                                              │
 │  MENU SX     │              AREA TAB (7 tab)                │

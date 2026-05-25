@@ -1,6 +1,6 @@
-# Security — Music Cataloger Advanced
+# Security — TrackLab
 
-Questo documento descrive il modello di sicurezza di Music Cataloger
+Questo documento descrive il modello di sicurezza di TrackLab
 Advanced: cosa è protetto, come, e — altrettanto importante — cosa
 **non** è protetto e perché. La trasparenza sui limiti fa parte della
 sicurezza: sapere cosa il sistema non garantisce evita falsi sensi di

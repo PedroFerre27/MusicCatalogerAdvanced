@@ -1,5 +1,5 @@
 """
-Test di integrazione completo per Music Cataloger Advanced
+Test di integrazione completo per TrackLab
 Verifica che tutti i moduli funzionino insieme
 """
 
@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 def setup_test_environment():
     """Crea ambiente di test temporaneo"""
-    temp_dir = Path(tempfile.mkdtemp(prefix='music_cataloger_test_'))
+    temp_dir = Path(tempfile.mkdtemp(prefix='tracklab_test_'))
     
     # Crea file MP3 di test fittizi (vuoti)
     test_files = [
@@ -50,7 +50,7 @@ def test_full_workflow():
         from core.metadata_extractor import MetadataExtractor
         from core.genre_classifier import GenreClassifier
         from core.file_manager import FileManager
-        from MusicCatalogerAdvanced_v0020 import MusicCatalogerAdvanced
+        from TrackLab_v0020 import TrackLab
         
         print("   ✓ Tutti i moduli importati correttamente")
         
@@ -62,7 +62,7 @@ def test_full_workflow():
         
         # Inizializza cataloger in dry-run mode
         print("\n4. Inizializzazione cataloger (dry-run)...")
-        cataloger = MusicCatalogerAdvanced(
+        cataloger = TrackLab(
             base_path=str(temp_dir),
             log_level=logging.WARNING,  # Riduce output
             dry_run=True,

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-run_cataloger.py — Entry point CLI per Music Cataloger Advanced
+run_cataloger.py — Entry point CLI per TrackLab
 v1057: fix unicode cp1252, aggiunto --excluded-genres
 """
 
@@ -19,13 +19,13 @@ if hasattr(sys.stdout, 'reconfigure'):
 project_root = Path(__file__).parent.absolute()
 sys.path.insert(0, str(project_root))
 
-from core.cataloger import MusicCataloger
+from core.cataloger import TrackLab
 
 
 def _load_caribbean_settings_from_json():
     """
     v1075: Carica `data/caribbean_settings.json` (se esiste) e applica le
-    preferenze utente ai settings runtime prima che MusicCataloger venga
+    preferenze utente ai settings runtime prima che TrackLab venga
     istanziato. Necessario perché il cataloger gira in subprocess separato
     dalla GUI e altrimenti userebbe solo i default hardcoded di settings.py.
 
@@ -100,7 +100,7 @@ def _load_caribbean_settings_from_json():
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="run_cataloger",
-        description="Music Cataloger Advanced — Catalogazione automatica MP3",
+        description="TrackLab — Catalogazione automatica MP3",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("path", help="Directory contenente i file MP3")
@@ -169,7 +169,7 @@ def main():
     elif args.cover:
         cover_enabled = True
 
-    cataloger = MusicCataloger(
+    cataloger = TrackLab(
         base_path=str(music_path),
         dry_run=args.dry_run,
         use_external_db=not args.no_external,

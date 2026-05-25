@@ -1,5 +1,5 @@
 """
-singleton.py — single-instance lock per Music Cataloger.
+singleton.py — single-instance lock per TrackLab.
 
 v1086.2: implementa il "lock di istanza singola". Se l'utente prova ad
 aprire l'EXE quando un'altra istanza e' gia' in esecuzione:
@@ -17,7 +17,7 @@ Strategia (multi-piattaforma):
 Il numero di porta e' deterministico ma alto e poco probabile collisione.
 Se la porta e' occupata da un altro programma (raro), `acquire()` ritorna
 False e l'utente vedra' un dialog "Already running" anche se non c'e'
-nessuna istanza Music Cataloger. E' un edge case accettabile.
+nessuna istanza TrackLab. E' un edge case accettabile.
 """
 from __future__ import annotations
 import socket
@@ -60,7 +60,7 @@ def acquire() -> bool:
 
 def bring_existing_to_front() -> bool:
     """
-    Porta in primo piano la finestra dell'istanza Music Cataloger gia'
+    Porta in primo piano la finestra dell'istanza TrackLab gia'
     in esecuzione. Solo Windows per ora — su Linux/macOS no-op.
 
     Returns:
@@ -98,7 +98,7 @@ def bring_existing_to_front() -> bool:
             buff = ctypes.create_unicode_buffer(length + 1)
             GetWindowTextW(hwnd, buff, length + 1)
             title = buff.value
-            if title.startswith("Music Cataloger"):
+            if title.startswith("TrackLab"):
                 target_hwnd[0] = hwnd
                 return False  # interrompo enum
             return True
@@ -117,7 +117,7 @@ def bring_existing_to_front() -> bool:
 
 def show_already_running_dialog():
     """
-    Mostra un dialog nativo "Music Cataloger e' gia' in esecuzione".
+    Mostra un dialog nativo "TrackLab e' gia' in esecuzione".
     Usa MessageBox di Windows per evitare di dover importare Tk (che e'
     pesante e rallenterebbe il check di doppia istanza).
     """
@@ -126,12 +126,12 @@ def show_already_running_dialog():
             import ctypes
             ctypes.windll.user32.MessageBoxW(
                 0,
-                "Music Cataloger e' gia' in esecuzione.\n\n"
+                "TrackLab e' gia' in esecuzione.\n\n"
                 "L'istanza esistente verra' portata in primo piano.",
-                "Music Cataloger",
+                "TrackLab",
                 0x40,  # MB_ICONINFORMATION
             )
         except Exception:
-            print("Music Cataloger e' gia' in esecuzione.")
+            print("TrackLab e' gia' in esecuzione.")
     else:
-        print("Music Cataloger e' gia' in esecuzione.")
+        print("TrackLab e' gia' in esecuzione.")

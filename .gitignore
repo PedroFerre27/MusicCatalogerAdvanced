@@ -29,11 +29,11 @@ env/
 Thumbs.db
 
 # Icona generata da build_ico.py (rigenerabile)
-/icons/music_cataloger.ico
+/icons/tracklab.ico
 
 # File temporanei updater
-music_cataloger_updater.bat
-music_cataloger_updater.log
+tracklab_updater.bat
+tracklab_updater.log
 
 # File di test
 test_output/

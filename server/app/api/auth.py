@@ -249,10 +249,10 @@ def register(body: RegisterRequest,
     from ..config import settings as _s
 
     # 1) Email di benvenuto all'utente
-    welcome_subject = "Benvenuto su Music Cataloger Advanced"
+    welcome_subject = "Benvenuto su TrackLab"
     welcome_body = (
         f"Ciao {new_user.username},\n\n"
-        f"Il tuo account su Music Cataloger Advanced e' stato creato "
+        f"Il tuo account su TrackLab e' stato creato "
         f"correttamente.\n\n"
         f"  Email: {new_user.email}\n"
         f"  Piano: Base\n\n"
@@ -260,7 +260,7 @@ def register(body: RegisterRequest,
         f"libreria musicale. Per richiedere l'upgrade a Pro o Advanced "
         f"usa il menu Account dentro l'app.\n\n"
         f"Buon ballo!\n"
-        f"— Music Cataloger Advanced"
+        f"— TrackLab"
     )
     background_tasks.add_task(
         send_email, new_user.email, welcome_subject, welcome_body)
@@ -269,7 +269,7 @@ def register(body: RegisterRequest,
     if _s.ADMIN_NOTIFY_EMAIL:
         admin_subject = f"Nuovo utente registrato: {new_user.email}"
         admin_body = (
-            f"Nuova registrazione self-service su Music Cataloger Server:\n\n"
+            f"Nuova registrazione self-service su TrackLab Server:\n\n"
             f"  Email:    {new_user.email}\n"
             f"  Username: {new_user.username}\n"
             f"  Piano:    {new_user.plan}\n"

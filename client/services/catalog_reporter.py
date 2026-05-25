@@ -1,7 +1,7 @@
 """
 services/catalog_reporter.py — Tracking server-side della catalogazione.
 
-Il client esegue la catalogazione localmente con MusicCataloger. Questo
+Il client esegue la catalogazione localmente con TrackLab. Questo
 modulo si occupa di notificare al server:
   - inizio job (con applicazione quote piano)
   - aggiornamenti periodici (files_done, progress_pct, log)

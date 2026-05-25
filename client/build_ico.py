@@ -1,7 +1,7 @@
 """
 build_ico.py — Genera un file .ico multi-resolution dal PNG sorgente.
 
-Da lanciare PRIMA di `pyinstaller music_cataloger.spec --clean` ogni
+Da lanciare PRIMA di `pyinstaller tracklab.spec --clean` ogni
 volta che si cambia il PNG sorgente o si vuole rigenerare l'icona.
 
 Windows usa dimensioni diverse a seconda del contesto:
@@ -21,7 +21,7 @@ USAGE:
     python build_ico.py
     # oppure con PNG custom:
     python build_ico.py --src icons/app/taskbar_active.png \
-                         --dst icons/music_cataloger.ico
+                         --dst icons/tracklab.ico
 """
 from pathlib import Path
 import argparse
@@ -91,7 +91,7 @@ def generate_ico(src_png: Path, dst_ico: Path) -> None:
     print(f"[build_ico] generato: {dst_ico} ({actual_size} byte)")
     print(f"[build_ico] dimensioni embedded: {sizes_in_image}")
     print(f"[build_ico] OK - ora rebuilda l'EXE con:")
-    print(f"             pyinstaller music_cataloger.spec --clean")
+    print(f"             pyinstaller tracklab.spec --clean")
 
 
 def main():
@@ -101,8 +101,8 @@ def main():
                         default=Path("icons/app/taskbar_active.png"),
                         help="PNG sorgente (default: icons/app/taskbar_active.png)")
     parser.add_argument("--dst", type=Path,
-                        default=Path("icons/music_cataloger.ico"),
-                        help="ICO di destinazione (default: icons/music_cataloger.ico)")
+                        default=Path("icons/tracklab.ico"),
+                        help="ICO di destinazione (default: icons/tracklab.ico)")
     args = parser.parse_args()
     generate_ico(args.src.resolve(), args.dst.resolve())
 

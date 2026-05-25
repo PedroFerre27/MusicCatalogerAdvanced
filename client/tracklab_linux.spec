@@ -1,9 +1,9 @@
-# music_cataloger_linux.spec — Build Linux (Ubuntu, Fedora, Arch, ...)
+# tracklab_linux.spec — Build Linux (Ubuntu, Fedora, Arch, ...)
 # v1085p: allineato allo spec Windows (onefile + niente UPX)
 #
 # USAGE su una macchina Linux:
 #   pip install pyinstaller customtkinter Pillow eyed3 mutagen mutagen[mp3] requests pyjwt
-#   pyinstaller music_cataloger_linux.spec --clean --noconfirm
+#   pyinstaller tracklab_linux.spec --clean --noconfirm
 #
 # IMPORTANTE: PyInstaller NON fa cross-compile. Devi buildare su una
 # macchina Linux per ottenere un binario Linux. Tre alternative:
@@ -11,7 +11,7 @@
 #   2. VM VirtualBox con Ubuntu 22.04
 #   3. La macchina Linux dell'amico (lui builda da source)
 #
-# Output: dist/music-cataloger-advanced (singolo binario, ~80-130MB)
+# Output: dist/tracklab-advanced (singolo binario, ~80-130MB)
 #
 # Per compatibilita' max-distro: build su Ubuntu 22.04 LTS
 # (glibc 2.35) → compatibile con Ubuntu 22.04+, Debian 12+, Fedora 36+
@@ -83,7 +83,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='music-cataloger-advanced',
+    name='tracklab-advanced',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -98,5 +98,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    # Linux: icona via .desktop file separato (vedi music-cataloger.desktop)
+    # Linux: icona via .desktop file separato (vedi tracklab.desktop)
 )

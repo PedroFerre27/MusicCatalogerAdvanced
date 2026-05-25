@@ -50,7 +50,7 @@ class LoginWindow:
         self.api_client: Optional[ApiClient] = None
 
         self.root = ctk.CTk()
-        self.root.title("Music Cataloger — Login")
+        self.root.title("TrackLab — Login")
         self.root.geometry("440x520")
         self.root.resizable(False, False)
         self.root.configure(fg_color=PALETTE["bg"])
@@ -94,7 +94,7 @@ class LoginWindow:
                          font=("Segoe UI", 44),
                          text_color=PALETTE["primary"]).pack()
 
-        ctk.CTkLabel(header, text="Music Cataloger",
+        ctk.CTkLabel(header, text="TrackLab",
                      font=("Segoe UI", 18, "bold"),
                      text_color=PALETTE["text"]).pack(pady=(6, 0))
         ctk.CTkLabel(header, text="Accedi per continuare",

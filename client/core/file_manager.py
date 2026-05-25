@@ -1,6 +1,6 @@
 """
 Gestione file system: spostamento, pulizia nomi, organizzazione
-Estratto da MusicCatalogerAdvanced_v0020.py
+Estratto da TrackLab_v0020.py
 """
 
 import logging
