@@ -34,12 +34,13 @@ if not ico_path.exists() and src_png.exists():
         print(f"[spec] WARNING: impossibile generare {ico_path}: {e}")
 
 datas = [
-    ('config',    'config'),
-    ('services',  'services'),
-    ('core',      'core'),
-    ('gui',       'gui'),
-    ('icons',     'icons'),
-    ('../docs/UPGRADES.md', '.'),   # R2: bundlato per Help → Changelog
+    ('config',       'config'),
+    ('services',     'services'),
+    ('core',         'core'),
+    ('gui',          'gui'),
+    ('icons',        'icons'),
+    ('translations', 'translations'),   # R6.0: bundle file IT/EN i18n
+    ('../docs/UPGRADES.md', '.'),       # R2: bundlato per Help → Changelog
 ]
 
 hiddenimports = [
@@ -49,6 +50,8 @@ hiddenimports = [
     'services.cover_service', 'services.local_db',
     'services.api_client', 'services.jwt_store',
     'services.catalog_reporter', 'services.updater',
+    'services.spotify_oauth', 'services.spotify_store',
+    'services.i18n',                    # R6.0
     'core.cataloger', 'core.genre_classifier',
     'core.file_manager', 'core.metadata_extractor',
     'gui.main_window', 'gui.login_window', 'gui.app_icon',

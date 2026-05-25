@@ -24,6 +24,7 @@ import os
 import sys
 from dataclasses import dataclass, asdict
 from pathlib import Path
+from typing import Optional
 
 
 def _resolve_data_dir() -> Path:
@@ -55,6 +56,11 @@ class ClientConfig:
     offline_ok:       bool = True    # consenti uso offline con last-known plan
     remember_email:   bool = True
     last_email:       str  = ""
+    # v1091.0 (R6.0): lingua UI scelta esplicitamente dall'utente.
+    # None = mai scelta → al boot si fa auto-detect dal locale OS
+    # (con fallback a "it"). Quando l'utente sceglie da Impostazioni →
+    # Lingua, qui viene salvato il codice ("it" / "en" / ...).
+    lang:             Optional[str] = None
 
 
 def _load_or_create() -> ClientConfig:

@@ -37,6 +37,7 @@ a = Analysis(
         ('services',               'services'),
         ('core',                   'core'),
         ('gui',                    'gui'),
+        ('translations',           'translations'),   # R6.0: bundle i18n
         ('run_cataloger.py',       '.'),
         ('version.py',             '.'),
         ('../docs/UPGRADES.md',    '.'),   # R2: bundlato per Help → Changelog
@@ -52,6 +53,9 @@ a = Analysis(
         'requests',
         'urllib3',
         'jwt',
+        'services.i18n',                    # R6.0
+        'services.spotify_oauth',
+        'services.spotify_store',
     ],
     hookspath=[],
     hooksconfig={},

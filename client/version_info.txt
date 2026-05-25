@@ -1,25 +1,25 @@
 # UTF-8
-# v1090.0: R5 rebrand completo "Music Cataloger Advanced" → "TrackLab".
+# v1091.0: R6.0 infrastruttura i18n IT/EN (JSON-based, restart-required).
 # IMPORTANTE: filevers/prodvers DEVONO essere tuple a 4 interi.
 # Windows mostra questa tupla in "Proprietà → Dettagli → Versione file".
-# Mapping: v1090.0 → (1, 0, 90, 0).
+# Mapping: v1091.0 → (1, 0, 91, 0).
 # In assenza di lettera (v1085) la quarta cifra è 0.
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 0, 90, 0),
-    prodvers=(1, 0, 90, 0),
+    filevers=(1, 0, 91, 0),
+    prodvers=(1, 0, 91, 0),
     mask=0x3f, flags=0x0, OS=0x40004, fileType=0x1, subtype=0x0, date=(0, 0)
   ),
   kids=[
     StringFileInfo([StringTable(u'040904B0', [
         StringStruct(u'CompanyName', u'Pedro Marques'),
         StringStruct(u'FileDescription', u'TrackLab'),
-        StringStruct(u'FileVersion', u'1.0.90.0'),
+        StringStruct(u'FileVersion', u'1.0.91.0'),
         StringStruct(u'InternalName', u'TrackLab'),
         StringStruct(u'LegalCopyright', u'\xa9 2026 Pedro Marques'),
         StringStruct(u'OriginalFilename', u'TrackLab.exe'),
         StringStruct(u'ProductName', u'TrackLab'),
-        StringStruct(u'ProductVersion', u'1.0.90.0')])
+        StringStruct(u'ProductVersion', u'1.0.91.0')])
     ]),
     VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
   ]

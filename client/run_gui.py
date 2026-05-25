@@ -91,6 +91,13 @@ from services.api_client import (
 )
 from services.jwt_store import store
 
+# v1091.0 (R6.0): inizializza i18n PRIMA che la GUI venga costruita.
+# Login window e tutti i widget useranno t("key") fin dall'avvio.
+# - client_config.lang = None  → autodetect da locale OS (fallback IT)
+# - client_config.lang = "it"/"en" → lingua scelta esplicitamente
+from services.i18n import init_i18n
+_active_lang = init_i18n(client_config.lang)
+
 
 APP_VERSION = "v0.0.2.2"
 
