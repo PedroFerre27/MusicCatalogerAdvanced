@@ -9,7 +9,7 @@ POST /auth/register           → {user}       (v0.1.3, self-service signup)
 """
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
@@ -20,6 +20,7 @@ from ..services.auth import (
     create_access_token, create_refresh_token,
     decode_token, get_current_user, require_admin,
 )
+from ..services.email_service import send_email
 from ..services.plans import get_features, PLAN_DISPLAY_NAMES
 from ..services.ratelimit import limiter
 
@@ -183,7 +184,9 @@ class RegisterRequest(BaseModel):
 
 @router.post("/register", response_model=UserPublic,
              status_code=status.HTTP_201_CREATED)
-def register(body: RegisterRequest, db: Session = Depends(get_db)):
+def register(body: RegisterRequest,
+             background_tasks: BackgroundTasks,
+             db: Session = Depends(get_db)):
     """
     Registrazione self-service. Il nuovo utente parte sempre con piano
     'base' e deve richiedere l'upgrade tramite il normale flusso
@@ -239,6 +242,42 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+
+    # v0.2.4 (R3): email transazionali asincrone via BackgroundTasks.
+    # send_email cattura gia' tutte le eccezioni SMTP: la registrazione
+    # NON fallisce mai se il server di posta e' giu' o malconfigurato.
+    from ..config import settings as _s
+
+    # 1) Email di benvenuto all'utente
+    welcome_subject = "Benvenuto su Music Cataloger Advanced"
+    welcome_body = (
+        f"Ciao {new_user.username},\n\n"
+        f"Il tuo account su Music Cataloger Advanced e' stato creato "
+        f"correttamente.\n\n"
+        f"  Email: {new_user.email}\n"
+        f"  Piano: Base\n\n"
+        f"Da ora puoi accedere all'app e iniziare a catalogare la tua "
+        f"libreria musicale. Per richiedere l'upgrade a Pro o Advanced "
+        f"usa il menu Account dentro l'app.\n\n"
+        f"Buon ballo!\n"
+        f"— Music Cataloger Advanced"
+    )
+    background_tasks.add_task(
+        send_email, new_user.email, welcome_subject, welcome_body)
+
+    # 2) Notifica admin (solo se ADMIN_NOTIFY_EMAIL e' configurata)
+    if _s.ADMIN_NOTIFY_EMAIL:
+        admin_subject = f"Nuovo utente registrato: {new_user.email}"
+        admin_body = (
+            f"Nuova registrazione self-service su Music Cataloger Server:\n\n"
+            f"  Email:    {new_user.email}\n"
+            f"  Username: {new_user.username}\n"
+            f"  Piano:    {new_user.plan}\n"
+            f"  ID:       {new_user.id}\n"
+        )
+        background_tasks.add_task(
+            send_email, _s.ADMIN_NOTIFY_EMAIL, admin_subject, admin_body)
+
     return _user_to_public(new_user)
 
 

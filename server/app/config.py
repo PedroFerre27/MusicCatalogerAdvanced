@@ -18,7 +18,7 @@ class Settings(BaseSettings):
 
     # ── Generale ──────────────────────────────────────────────────
     APP_NAME: str = "Music Cataloger Server"
-    APP_VERSION: str = "0.2.3"
+    APP_VERSION: str = "0.2.4"
     ENV: str = "production"    # development | production
     DEBUG: bool = False
 
@@ -61,6 +61,20 @@ class Settings(BaseSettings):
     SPOTIFY_CLIENT_SECRET: str = ""
     DISCOGS_TOKEN: str = ""
     GETSONG_API_KEY: str = ""
+
+    # ── SMTP (v0.2.4 — R3: email transazionali) ────────────────────
+    # Config per email di benvenuto + notifiche admin alla
+    # registrazione. Default: Gmail su 587 (STARTTLS). Per Gmail serve
+    # una App Password (https://myaccount.google.com/apppasswords),
+    # NON la password normale dell'account. Se SMTP_HOST o SMTP_USER
+    # sono vuoti, il server logga un warning e salta l'invio: la
+    # registrazione utente NON fallisce mai per problemi SMTP.
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = ""    # default: stesso valore di SMTP_USER
+    ADMIN_NOTIFY_EMAIL: str = ""    # destinatario notifica nuova registrazione
 
     # ── Storage ───────────────────────────────────────────────────
     # Cartelle dati del server (montate come volumi in Docker)
