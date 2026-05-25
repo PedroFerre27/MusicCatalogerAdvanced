@@ -905,11 +905,15 @@ class MusicCatalogerGUI:
         def _open_sub(sub_id):
             mx, my, mw, mh = self._profile_main_geom
             # v1080: dimensioni per-id calibrate sul contenuto di ciascun sub.
-            #   settings → solo 2 righe di testo placeholder → 280×160
+            #   settings → Account (Cambia password) + Servizi esterni
+            #              (Account collegati) + footer informativo → 320×300
+            #              (v1089.0 ha aggiunto "Servizi esterni"; v1089.1
+            #              ricalibra altezza che era rimasta a 280×160 del
+            #              vecchio placeholder "Altre preferenze in arrivo")
             #   lang     → 3 lingue + placeholder → 280×220
             #   plans    → 11 feature + 3 bottoni piano → 320×440 (scrollable)
             sub_sizes = {
-                "settings": (280, 160),
+                "settings": (320, 300),
                 "lang":     (280, 220),
                 "plans":    (320, 440),
             }
