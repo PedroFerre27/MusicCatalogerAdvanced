@@ -657,34 +657,151 @@ class ExternalAPIs:
         
         return genres
     
+    def _spotify_search_with_user_token(
+            self, artist: str, title: str) -> Optional[Dict]:
+        """
+        v1089.0 (R4 predisposizione): chiama la Spotify Search API col
+        token OAuth dell'utente (se esiste e valido).
+
+        Ritorna None se:
+          - l'utente non ha collegato il proprio account (caso comune
+            nella predisposizione: SPOTIFY_CLIENT_ID vuoto → nessuno
+            puo' essersi collegato)
+          - il refresh token e' scaduto/revocato
+          - errore di rete o risposta inattesa
+
+        In tutti i casi None, il chiamante `get_spotify_metadata`
+        cade sul fallback proxy server-side (comportamento attuale).
+        """
+        if not requests:
+            return None
+        try:
+            from services.spotify_oauth import get_valid_access_token
+        except Exception:
+            return None
+
+        access_token = get_valid_access_token()
+        if not access_token:
+            return None   # utente non collegato → silent skip, niente log
+
+        # Rate limit condiviso col path proxy/diretto
+        elapsed = time.time() - self.last_spotify_call
+        if elapsed < self.settings.api.spotify_rate_limit:
+            time.sleep(self.settings.api.spotify_rate_limit - elapsed)
+        self.last_spotify_call = time.time()
+        self.api_calls += 1
+
+        try:
+            resp = requests.get(
+                "https://api.spotify.com/v1/search",
+                headers={"Authorization": f"Bearer {access_token}"},
+                params={
+                    "q":     f'artist:"{artist}" track:"{title}"',
+                    "type":  "track",
+                    "limit": 1,
+                },
+                timeout=self.settings.api.timeout,
+            )
+        except Exception as e:
+            self.logger.debug(f"Spotify (user token) network error: {e}")
+            return None
+
+        if resp.status_code == 401:
+            # Token rifiutato nonostante il refresh: l'utente ha
+            # revocato il consenso dal pannello Spotify. Cancelliamo
+            # localmente cosi' la prossima volta /me dira' "non
+            # collegato" e l'UI puo' chiedere di ricollegare.
+            try:
+                from services.spotify_oauth import disconnect
+                disconnect()
+            except Exception:
+                pass
+            self.logger.info(
+                "Spotify (user token) 401 — token revocato lato utente, "
+                "scollegato localmente. Fallback al proxy server-side.")
+            return None
+        if resp.status_code != 200:
+            self.logger.debug(
+                f"Spotify (user token) HTTP {resp.status_code}")
+            return None
+
+        try:
+            tracks = resp.json().get("tracks", {}).get("items", [])
+        except Exception:
+            return None
+        if not tracks:
+            return None
+
+        track = tracks[0]
+        metadata = {
+            'title':  track.get('name'),
+            'artist': (track['artists'][0]['name']
+                      if track.get('artists') else None),
+            'album':  (track['album']['name']
+                      if track.get('album') else None),
+            'year':   (track['album']['release_date'][:4]
+                      if track.get('album', {}).get('release_date') else None),
+            'track_num':  (str(track.get('track_number'))
+                           if track.get('track_number') else None),
+            'duration':   (track.get('duration_ms', 0) / 1000.0
+                           if track.get('duration_ms') else None),
+            'popularity': track.get('popularity'),
+            'spotify_url': track.get('external_urls', {}).get('spotify'),
+        }
+        if track.get('album', {}).get('images'):
+            images = track['album']['images']
+            cover_url = images[0]['url'] if images else None
+            if cover_url:
+                metadata['cover_url'] = cover_url
+
+        self.logger.info(
+            ">-- Spotify (user OAuth): trovati metadati per "
+            f"'{artist} - {title}'")
+        return metadata
+
     def get_spotify_metadata(self, artist: str, title: str) -> Optional[Dict]:
         """
         Cerca metadati su Spotify
-        
+
         Args:
             artist: Nome artista
             title: Titolo traccia
-            
+
         Returns:
             Dict con metadati o None
         """
+        cache_key = f"sp_{artist}_{title}"
+        if cache_key in self.metadata_cache:
+            self.logger.debug("Spotify: Cache trovate")
+            return self.metadata_cache[cache_key]
+
+        # v1089.0 (R4): se l'utente ha collegato il proprio account
+        # Spotify, usiamo il SUO token (privacy-by-design: i suoi dati,
+        # il suo rate limit, il suo account). Predisposizione attuale:
+        # finche' SPOTIFY_CLIENT_ID non e' configurato (vedi
+        # config/settings.py::SpotifyOAuthSettings), nessuno puo' aver
+        # collegato l'account e questo blocco e' un no-op silenzioso.
+        user_result = self._spotify_search_with_user_token(artist, title)
+        if user_result is not None:
+            self.metadata_cache[cache_key] = user_result
+            return user_result
+
         # v1087.3 (security Fase 2): proxy-first. SPOTIFY_CLIENT_SECRET
         # non e' piu' nel client → senza proxy questo metodo ritornava
         # sempre None. Col proxy il server fa l'OAuth e la search.
         proxied = self._proxy_lookup("spotify", artist, title)
         if proxied is not None:
-            cache_key = f"sp_{artist}_{title}"
             self.metadata_cache[cache_key] = proxied
             return proxied
 
         if not requests:
             return None
-        
-        cache_key = f"sp_{artist}_{title}"
-        if cache_key in self.metadata_cache:
-            self.logger.debug("Spotify: Cache trovate")
-            return self.metadata_cache[cache_key]
-        
+
+        # v1089.0: cache_key + cache check spostati in cima al metodo
+        # nel refactor R4. Il blocco sottostante (Client Credentials
+        # diretto) e' codice morto dal v1087.3 — SPOTIFY_CLIENT_SECRET
+        # non e' piu' nel client. Lasciato come riferimento storico,
+        # rimuovibile in un cleanup futuro.
         try:
             import base64
             

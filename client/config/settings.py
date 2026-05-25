@@ -20,6 +20,52 @@ class APISettings:
 
 
 @dataclass
+class SpotifyOAuthSettings:
+    """
+    v1089.0 (R4 predisposizione): config per OAuth user-side Spotify.
+
+    Stato attuale: CLIENT_ID e' vuoto perche' Pedro non ha ancora
+    accesso al Spotify Developer Dashboard (richiede account
+    Premium nelle policy 2026). La UI "Collega Spotify" si
+    auto-disabilita finche' CLIENT_ID e' "" — l'utente vede il
+    pulsante grigio con tooltip "Funzione in preparazione".
+
+    Quando l'app Developer sara' creata:
+    1. Pedro mette il Client ID qui sotto (e' pubblicabile: con PKCE
+       non c'e' Client Secret da proteggere)
+    2. Pedro registra `redirect_uri` esatto sul dashboard Spotify
+    3. Rebuild client → la UI si attiva automaticamente
+
+    Scope R11-ready: gli scope chiesti coprono sia R4 (search) che
+    R11 (libreria utente). Un solo consent screen ora, R11 indolore
+    quando ci arriveremo.
+    """
+    # Spotify Web API Client ID — vuoto = feature disattivata
+    client_id: str = ""
+
+    # Redirect URI per il callback OAuth.
+    # 127.0.0.1 (loopback IP) e' raccomandato da Spotify dal 2025
+    # rispetto a 'localhost' (alcuni resolver DNS lo trattano
+    # diversamente). Il path '/callback' non e' obbligatorio ma
+    # documenta l'intento.
+    redirect_uri: str = "http://127.0.0.1:8765/callback"
+
+    # Lista di porte da provare per il loopback server (fallback
+    # se 8765 e' occupata). La porta scelta DEVE essere registrata
+    # sul dashboard Spotify nei "Redirect URIs" — quindi limitiamo
+    # le opzioni a un set fisso e piccolo.
+    callback_ports: List[int] = field(default_factory=lambda:
+                                       [8765, 8766, 8767])
+
+    # Scope R11-ready (vedi docstring sopra)
+    scope: str = "user-read-private user-read-email user-library-read playlist-read-private"
+
+    # Timeout (secondi) per attendere il callback dell'utente
+    # dopo l'apertura del browser. Oltre questo, si fa cleanup.
+    callback_timeout: int = 120
+
+
+@dataclass
 class BPMSettings:
     """Configurazioni per la ricerca BPM"""
     valid_range_min: int = 60
@@ -266,6 +312,7 @@ class FileSettings:
 class Settings:
     def __init__(self):
         self.api = APISettings()
+        self.spotify_oauth = SpotifyOAuthSettings()
         self.bpm = BPMSettings()
         self.bachata = BachataSettings()
         self.cover = CoverSettings()
