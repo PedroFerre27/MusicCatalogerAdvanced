@@ -1,0 +1,41 @@
+# .gitattributes — controllo line endings cross-platform.
+#
+# Senza questo file, Windows committa CRLF su file che DEVONO essere LF
+# (script bash su Linux/NAS), e l'interprete fallisce con "No such file
+# or directory" perche' legge "#!/bin/bash\r" e cerca un interprete
+# "/bin/bash\r" inesistente.
+#
+# Regole:
+# - .sh / Dockerfile / desktop entries  -> LF forzato (Unix tools)
+# - .bat / .cmd                         -> CRLF forzato (Windows cmd)
+# - tutto il resto                       -> normalizzazione automatica
+#   (CRLF nel working tree Windows, LF nel repo)
+
+* text=auto
+
+# Script shell e file Unix-only
+*.sh         text eol=lf
+*.bash       text eol=lf
+Dockerfile   text eol=lf
+*.desktop    text eol=lf
+
+# Script Windows-only
+*.bat        text eol=crlf
+*.cmd        text eol=crlf
+
+# Binari noti (no normalizzazione)
+*.png        binary
+*.jpg        binary
+*.jpeg       binary
+*.gif        binary
+*.ico        binary
+*.pdf        binary
+*.zip        binary
+*.gz         binary
+*.exe        binary
+*.dll        binary
+*.so         binary
+*.dylib      binary
+*.db         binary
+*.sqlite     binary
+*.sqlite3    binary
