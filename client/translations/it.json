@@ -1,0 +1,148 @@
+{
+  "_meta": {
+    "language": "Italiano",
+    "code": "it",
+    "version": "1091.0",
+    "_comment": "TrackLab — traduzioni IT. Le chiavi seguono lo schema 'sezione.sub_sezione.chiave'. Placeholders Python style: {variabile}. Vedi services/i18n.py per dettagli."
+  },
+
+  "app": {
+    "name": "TrackLab",
+    "title_with_plan": "TrackLab  |  {plan}"
+  },
+
+  "common": {
+    "btn_close": "Chiudi",
+    "btn_cancel": "Annulla",
+    "btn_confirm": "Conferma",
+    "btn_save": "Salva",
+    "btn_ok": "OK",
+    "btn_back": "← Indietro"
+  },
+
+  "profile_flyout": {
+    "menu_settings": "Impostazioni",
+    "menu_language": "Lingua",
+    "menu_plans": "Piani di abbonamento",
+    "menu_help": "Aiuto",
+    "menu_exit": "Esci"
+  },
+
+  "settings_sub": {
+    "title": "Impostazioni",
+    "section_account": "Account",
+    "btn_change_password": "🔒  Cambia password",
+    "section_services": "Servizi esterni",
+    "btn_linked_accounts": "🎵  Account collegati",
+    "footer_advanced_hint": "Le opzioni di catalogazione sono nel\ntab Avanzate della finestra principale."
+  },
+
+  "language_sub": {
+    "title": "Lingua",
+    "intro": "Scegli la lingua dell'interfaccia. Il cambio richiede il riavvio dell'app.",
+    "lang_it": "Italiano",
+    "lang_en": "English",
+    "lang_es_disabled": "Español  (in arrivo)",
+    "auto_detected_suffix": "  (auto)",
+    "current_suffix": "  (attiva)",
+    "restart_required_title": "Riavvia per applicare",
+    "restart_required_body": "La nuova lingua sarà attiva al prossimo avvio di TrackLab."
+  },
+
+  "linked_accounts": {
+    "title": "Account collegati",
+    "header_subtitle": "Collega i tuoi servizi esterni per usare il tuo account personale\ninvece del proxy di sistema (privacy + nessun rate-limit condiviso).",
+    "spotify": {
+      "name": "Spotify",
+      "status_not_configured": "In preparazione",
+      "detail_not_configured": "Verrà attivato in una release futura.\nRichiede setup dell'app Spotify Developer.",
+      "btn_not_configured": "Collega Spotify (non disponibile)",
+      "status_disconnected": "Non collegato",
+      "detail_disconnected": "Usa il tuo account Spotify per i lookup metadati.\nIl token resta solo sul tuo PC.",
+      "btn_disconnected": "🔗  Collega Spotify",
+      "status_connected": "Collegato",
+      "detail_connected": "Collegato come: {user}",
+      "btn_connected": "Scollega",
+      "confirm_disconnect_title": "Conferma",
+      "confirm_disconnect_msg": "Scollegare l'account Spotify?\nIl token locale verrà cancellato. Per revocare il consenso anche lato Spotify usa Account → Apps sul sito Spotify.",
+      "msg_connected_title": "Spotify collegato",
+      "msg_connected_body": "Account Spotify collegato con successo. Da ora i lookup useranno il tuo token.",
+      "msg_cancelled_title": "Autorizzazione annullata",
+      "msg_cancelled_body": "Hai annullato il collegamento Spotify.",
+      "msg_timeout_title": "Timeout",
+      "msg_timeout_body": "Tempo scaduto. Riprova il collegamento.",
+      "msg_error_title": "Errore Spotify",
+      "msg_waiting_btn": "Attendi: autorizza nel browser…",
+      "msg_browser_opened": "È stata aperta una scheda del browser.\nAccetta l'autorizzazione e torna qui.",
+      "msg_module_unavailable": "Modulo Spotify non disponibile: {error}"
+    }
+  },
+
+  "help": {
+    "title_window": "Aiuto — TrackLab",
+    "header": "TrackLab",
+    "subtitle": "Catalogatore intelligente di musica latina",
+    "btn_changelog": "📝  Changelog",
+    "btn_email_support": "📧  Email supporto",
+    "btn_updates": "🔄  Aggiornamenti",
+    "btn_documentation": "📚  Documentazione",
+    "changelog_title": "Changelog — TrackLab",
+    "changelog_only_italian_notice": ""
+  },
+
+  "login": {
+    "title_window": "TrackLab — Accedi",
+    "header": "Accedi a TrackLab",
+    "field_email": "Email",
+    "field_password": "Password",
+    "field_server": "URL server",
+    "chk_remember_email": "Ricorda email",
+    "btn_login": "Entra",
+    "btn_register_link": "Non hai un account? Registrati",
+    "btn_offline": "Continua offline",
+    "err_invalid_credentials": "Email o password non corretti.",
+    "err_server_unreachable": "Server irraggiungibile: {url}",
+    "err_invalid_url": "URL server non valido",
+    "err_invalid_url_body": "Configura prima l'URL del server nel campo in fondo.",
+    "status_login_in_progress": "Login in corso…",
+    "status_logged_in": "Accesso riuscito"
+  },
+
+  "register": {
+    "title_window": "Registrazione nuovo account",
+    "header": "Crea un nuovo account",
+    "subtitle": "Partirai con il piano Base.\nPotrai richiedere un upgrade dopo il login.",
+    "field_email": "Email",
+    "field_username": "Nome utente",
+    "field_password": "Password (minimo 8 caratteri)",
+    "field_confirm_password": "Conferma password",
+    "btn_submit": "✓  Registrati",
+    "btn_submitting": "Registrazione…",
+    "err_fill_all": "Compila tutti i campi",
+    "err_invalid_email": "Email non valida",
+    "err_password_short": "Password di almeno 8 caratteri",
+    "err_password_mismatch": "Le password non coincidono",
+    "status_sending": "Invio al server…",
+    "status_success": "Account creato ✓  Accedi con email e password.",
+    "err_email_taken": "Email già registrata.",
+    "err_invalid_data": "Dati non validi — controlla email e password.",
+    "err_server_generic": "Errore server (HTTP {status})",
+    "err_unknown": "Errore: {detail}"
+  },
+
+  "change_password": {
+    "title_window": "Cambia password",
+    "header": "🔒  Cambia password",
+    "subtitle": "Inserisci la password attuale e la nuova.",
+    "field_current": "Password attuale",
+    "field_new": "Nuova password (minimo 8 caratteri)",
+    "field_confirm_new": "Conferma nuova password",
+    "btn_submit": "Conferma",
+    "err_fill_all": "Compila tutti i campi",
+    "err_new_too_short": "La nuova password deve avere almeno 8 caratteri",
+    "err_new_mismatch": "Le nuove password non coincidono",
+    "err_current_wrong": "Password attuale non corretta.",
+    "msg_success_title": "Password aggiornata",
+    "msg_success_body": "La tua password è stata cambiata.\nTi consigliamo di riaccedere."
+  }
+}

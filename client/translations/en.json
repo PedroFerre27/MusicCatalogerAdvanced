@@ -1,0 +1,148 @@
+{
+  "_meta": {
+    "language": "English",
+    "code": "en",
+    "version": "1091.0",
+    "_comment": "TrackLab — EN translations. Keys follow scheme 'section.subsection.key'. Python-style placeholders: {variable}. See services/i18n.py for details."
+  },
+
+  "app": {
+    "name": "TrackLab",
+    "title_with_plan": "TrackLab  |  {plan}"
+  },
+
+  "common": {
+    "btn_close": "Close",
+    "btn_cancel": "Cancel",
+    "btn_confirm": "Confirm",
+    "btn_save": "Save",
+    "btn_ok": "OK",
+    "btn_back": "← Back"
+  },
+
+  "profile_flyout": {
+    "menu_settings": "Settings",
+    "menu_language": "Language",
+    "menu_plans": "Subscription plans",
+    "menu_help": "Help",
+    "menu_exit": "Quit"
+  },
+
+  "settings_sub": {
+    "title": "Settings",
+    "section_account": "Account",
+    "btn_change_password": "🔒  Change password",
+    "section_services": "External services",
+    "btn_linked_accounts": "🎵  Linked accounts",
+    "footer_advanced_hint": "Cataloging options are in the\nAdvanced tab of the main window."
+  },
+
+  "language_sub": {
+    "title": "Language",
+    "intro": "Choose the interface language. Changing it requires restarting the app.",
+    "lang_it": "Italiano",
+    "lang_en": "English",
+    "lang_es_disabled": "Español  (coming soon)",
+    "auto_detected_suffix": "  (auto)",
+    "current_suffix": "  (active)",
+    "restart_required_title": "Restart required",
+    "restart_required_body": "The new language will be active on next TrackLab launch."
+  },
+
+  "linked_accounts": {
+    "title": "Linked accounts",
+    "header_subtitle": "Link your external services to use your own account\ninstead of the system proxy (privacy + no shared rate-limit).",
+    "spotify": {
+      "name": "Spotify",
+      "status_not_configured": "Coming soon",
+      "detail_not_configured": "Will be enabled in a future release.\nRequires Spotify Developer app setup.",
+      "btn_not_configured": "Connect Spotify (unavailable)",
+      "status_disconnected": "Not connected",
+      "detail_disconnected": "Use your Spotify account for metadata lookups.\nThe token stays only on your PC.",
+      "btn_disconnected": "🔗  Connect Spotify",
+      "status_connected": "Connected",
+      "detail_connected": "Connected as: {user}",
+      "btn_connected": "Disconnect",
+      "confirm_disconnect_title": "Confirm",
+      "confirm_disconnect_msg": "Disconnect Spotify account?\nThe local token will be cleared. To revoke consent on Spotify's side too, use Account → Apps on the Spotify website.",
+      "msg_connected_title": "Spotify connected",
+      "msg_connected_body": "Spotify account connected successfully. From now on lookups will use your token.",
+      "msg_cancelled_title": "Authorization cancelled",
+      "msg_cancelled_body": "You cancelled the Spotify connection.",
+      "msg_timeout_title": "Timeout",
+      "msg_timeout_body": "Time expired. Try connecting again.",
+      "msg_error_title": "Spotify error",
+      "msg_waiting_btn": "Waiting: authorize in your browser…",
+      "msg_browser_opened": "A browser tab has been opened.\nAccept the authorization and come back here.",
+      "msg_module_unavailable": "Spotify module unavailable: {error}"
+    }
+  },
+
+  "help": {
+    "title_window": "Help — TrackLab",
+    "header": "TrackLab",
+    "subtitle": "Smart catalog for Latin dance music",
+    "btn_changelog": "📝  Changelog",
+    "btn_email_support": "📧  Email support",
+    "btn_updates": "🔄  Updates",
+    "btn_documentation": "📚  Documentation",
+    "changelog_title": "Changelog — TrackLab",
+    "changelog_only_italian_notice": "ℹ  The changelog is currently only available in Italian.\nA fully translated version will follow in a future release."
+  },
+
+  "login": {
+    "title_window": "TrackLab — Sign in",
+    "header": "Sign in to TrackLab",
+    "field_email": "Email",
+    "field_password": "Password",
+    "field_server": "Server URL",
+    "chk_remember_email": "Remember email",
+    "btn_login": "Sign in",
+    "btn_register_link": "Don't have an account? Register",
+    "btn_offline": "Continue offline",
+    "err_invalid_credentials": "Wrong email or password.",
+    "err_server_unreachable": "Server unreachable: {url}",
+    "err_invalid_url": "Invalid server URL",
+    "err_invalid_url_body": "Please configure the server URL in the field below first.",
+    "status_login_in_progress": "Signing in…",
+    "status_logged_in": "Sign-in successful"
+  },
+
+  "register": {
+    "title_window": "Register new account",
+    "header": "Create a new account",
+    "subtitle": "You'll start with the Base plan.\nYou can request an upgrade after login.",
+    "field_email": "Email",
+    "field_username": "Username",
+    "field_password": "Password (minimum 8 characters)",
+    "field_confirm_password": "Confirm password",
+    "btn_submit": "✓  Register",
+    "btn_submitting": "Registering…",
+    "err_fill_all": "Fill in all fields",
+    "err_invalid_email": "Invalid email",
+    "err_password_short": "Password must be at least 8 characters",
+    "err_password_mismatch": "Passwords do not match",
+    "status_sending": "Sending to server…",
+    "status_success": "Account created ✓  Sign in with email and password.",
+    "err_email_taken": "Email already registered.",
+    "err_invalid_data": "Invalid data — check email and password.",
+    "err_server_generic": "Server error (HTTP {status})",
+    "err_unknown": "Error: {detail}"
+  },
+
+  "change_password": {
+    "title_window": "Change password",
+    "header": "🔒  Change password",
+    "subtitle": "Enter your current password and the new one.",
+    "field_current": "Current password",
+    "field_new": "New password (minimum 8 characters)",
+    "field_confirm_new": "Confirm new password",
+    "btn_submit": "Confirm",
+    "err_fill_all": "Fill in all fields",
+    "err_new_too_short": "New password must be at least 8 characters",
+    "err_new_mismatch": "New passwords do not match",
+    "err_current_wrong": "Current password is incorrect.",
+    "msg_success_title": "Password updated",
+    "msg_success_body": "Your password has been changed.\nWe recommend signing in again."
+  }
+}

@@ -811,18 +811,20 @@ class TrackLabGUI:
         list_frm = ctk.CTkFrame(inner, fg_color="transparent")
         list_frm.pack(fill="both", expand=True, pady=(8, 4))
 
-        _mk_row(list_frm, "settings_ph", "Impostazioni",
+        # v1091.0 (R6.0): voci flyout localizzate
+        from services.i18n import t as _t
+        _mk_row(list_frm, "settings_ph", _t("profile_flyout.menu_settings"),
                 on_click=lambda: _toggle_sub("settings"),
                 has_submenu=True, sub_id="settings")
-        _mk_row(list_frm, "lang", "Lingua",
+        _mk_row(list_frm, "lang", _t("profile_flyout.menu_language"),
                 on_click=lambda: _toggle_sub("lang"),
                 has_submenu=True, sub_id="lang")
-        _mk_row(list_frm, "plans", "Piani di abbonamento",
+        _mk_row(list_frm, "plans", _t("profile_flyout.menu_plans"),
                 on_click=lambda: _toggle_sub("plans"),
                 has_submenu=True, sub_id="plans")
-        _mk_row(list_frm, "help_ph", "Aiuto",
+        _mk_row(list_frm, "help_ph", _t("profile_flyout.menu_help"),
                 on_click=lambda: (self._close_profile_flyout(), self._show_help()))
-        _mk_row(list_frm, "logout", "Esci",
+        _mk_row(list_frm, "logout", _t("profile_flyout.menu_exit"),
                 on_click=lambda: _handle_exit())
 
         def _handle_exit():
@@ -938,9 +940,11 @@ class TrackLabGUI:
 
             # Header del sub — titolo sezione (niente Back: la freccia chiude
             # cliccando di nuovo la voce nel pannello principale)
-            titles = {"settings": "Impostazioni",
-                      "lang":     "Lingua",
-                      "plans":    "Piani di abbonamento"}
+            # v1091.0: titoli localizzati
+            from services.i18n import t as _t
+            titles = {"settings": _t("settings_sub.title"),
+                      "lang":     _t("language_sub.title"),
+                      "plans":    _t("profile_flyout.menu_plans")}
             s_hdr = ctk.CTkFrame(s_inner, fg_color=PALETTE.get("primary", "#3b6fd4"),
                                  corner_radius=0, height=46)
             s_hdr.pack(fill="x")
@@ -969,17 +973,20 @@ class TrackLabGUI:
 
         # ── Contenuti dei sottomenu ────────────────────────────────────────
         def _fill_settings(parent):
+            # v1091.0 (R6.0): tutte le stringhe localizzate via i18n
+            from services.i18n import t as _t
+
             # v0.0.2.3: in modalità server mostra anche "Cambia password"
             if self.api_client is not None:
                 ctk.CTkLabel(parent,
-                             text="Account",
+                             text=_t("settings_sub.section_account"),
                              font=(FONT_SMALL[0], FONT_SMALL[1], "bold"),
                              text_color=PALETTE["text"],
                              anchor="w"
                              ).pack(fill="x", padx=10, pady=(10, 6))
                 ctk.CTkButton(
                     parent,
-                    text="🔒  Cambia password",
+                    text=_t("settings_sub.btn_change_password"),
                     font=FONT_SMALL,
                     fg_color=PALETTE.get("surface2", "#2a3344"),
                     hover_color=PALETTE.get("primary_hover", "#2d5ab8"),
@@ -994,20 +1001,15 @@ class TrackLabGUI:
                              ).pack(fill="x", padx=10, pady=(0, 10))
 
             # v1089.0 (R4): voce "Account collegati" → dialog Spotify.
-            # Resta sotto il blocco Account (sopra) e prima del placeholder
-            # per le opzioni future. Mostrata sempre, anche quando
-            # l'app Spotify Developer non e' ancora configurata: in quel
-            # caso il dialog spiega all'utente che la feature e' in
-            # preparazione.
             ctk.CTkLabel(parent,
-                         text="Servizi esterni",
+                         text=_t("settings_sub.section_services"),
                          font=(FONT_SMALL[0], FONT_SMALL[1], "bold"),
                          text_color=PALETTE["text"],
                          anchor="w"
                          ).pack(fill="x", padx=10, pady=(4, 6))
             ctk.CTkButton(
                 parent,
-                text="🎵  Account collegati",
+                text=_t("settings_sub.btn_linked_accounts"),
                 font=FONT_SMALL,
                 fg_color=PALETTE.get("surface2", "#2a3344"),
                 hover_color=PALETTE.get("primary_hover", "#2d5ab8"),
@@ -1022,32 +1024,87 @@ class TrackLabGUI:
                          ).pack(fill="x", padx=10, pady=(0, 10))
 
             ctk.CTkLabel(parent,
-                         text="Le opzioni di catalogazione sono nel\ntab Avanzate della finestra principale.",
+                         text=_t("settings_sub.footer_advanced_hint"),
                          font=(FONT_SMALL[0], FONT_SMALL[1]-1),
                          text_color=PALETTE["text_dim"],
                          justify="center"
                          ).pack(pady=(8, 8))
 
         def _fill_language(parent):
+            """v1091.0 (R6.0): selettore lingua funzionale.
+
+            Click su una lingua supportata:
+              1. salva client_config.lang
+              2. mostra messagebox "Riavvia per applicare"
+              3. chiude il flyout
+
+            La lingua attiva e' marcata con ✓. Se il client_config.lang
+            era None (mai scelta), la lingua attiva e' quella detected
+            al boot e mostriamo "(auto)" accanto.
+            """
+            from services.i18n import t, current_lang, SUPPORTED_LANGS
+            from config.app_config import config as _ccfg, save as _ccfg_save
+
+            active = current_lang()
+            user_chose = _ccfg.lang is not None
+
             ctk.CTkLabel(parent,
-                         text="La traduzione sarà disponibile\nin una prossima versione.",
+                         text=t("language_sub.intro"),
                          font=FONT_SMALL, text_color=PALETTE["text_dim"],
-                         justify="center"
-                         ).pack(pady=(20, 12))
-            for code, name in [("it", "Italiano  (default)"),
-                               ("en", "English"),
-                               ("es", "Español")]:
-                r = ctk.CTkFrame(parent, fg_color=PALETTE["surface2"],
+                         justify="center", wraplength=240
+                         ).pack(pady=(14, 10), padx=10)
+
+            def _select_lang(code: str):
+                _ccfg.lang = code
+                _ccfg_save(_ccfg)
+                self._close_profile_flyout()
+                messagebox.showinfo(
+                    t("language_sub.restart_required_title"),
+                    t("language_sub.restart_required_body"))
+
+            # Voci lingua supportate (IT, EN) + ES disabilitata placeholder.
+            lang_rows = [
+                ("it", t("language_sub.lang_it"), True),
+                ("en", t("language_sub.lang_en"), True),
+                ("es", t("language_sub.lang_es_disabled"), False),
+            ]
+            for code, name, enabled in lang_rows:
+                is_active = (code == active and enabled)
+                row_bg = (PALETTE.get("primary", "#3b6fd4") if is_active
+                          else PALETTE["surface2"])
+                txt_color = ("#ffffff" if is_active
+                             else (PALETTE["text"] if enabled
+                                   else PALETTE["text_dim"]))
+                r = ctk.CTkFrame(parent, fg_color=row_bg,
                                  corner_radius=6, height=34)
                 r.pack(fill="x", padx=14, pady=3)
                 r.pack_propagate(False)
-                ctk.CTkLabel(r, text=f"  {name}", font=FONT_SMALL,
-                             text_color=PALETTE["text_dim"] if code != "it" else PALETTE["text"],
-                             anchor="w"
-                             ).pack(side="left", padx=10, fill="y")
-                if code == "it":
-                    ctk.CTkLabel(r, text="✓", font=(FONT_SMALL[0], FONT_SMALL[1], "bold"),
-                                 text_color="#50aa70").pack(side="right", padx=10)
+
+                # Suffix: (active) o (auto) se lingua attiva non scelta
+                suffix = ""
+                if is_active:
+                    suffix = (t("language_sub.auto_detected_suffix")
+                              if not user_chose
+                              else t("language_sub.current_suffix"))
+
+                lbl = ctk.CTkLabel(r, text=f"  {name}{suffix}",
+                                   font=FONT_SMALL, text_color=txt_color,
+                                   anchor="w")
+                lbl.pack(side="left", padx=10, fill="y")
+
+                if is_active:
+                    ctk.CTkLabel(r, text="✓",
+                                 font=(FONT_SMALL[0], FONT_SMALL[1], "bold"),
+                                 text_color="#ffffff"
+                                 ).pack(side="right", padx=10)
+
+                # Bind click solo se enabled e non gia' attiva
+                if enabled and not is_active:
+                    def _on_click(_e, c=code):
+                        _select_lang(c)
+                    for w in (r, lbl):
+                        w.bind("<Button-1>", _on_click)
+                        w.configure(cursor="hand2")
 
         def _fill_plans(parent):
             # v0.0.2.2: Due modalità.
@@ -1493,29 +1550,32 @@ class TrackLabGUI:
         import customtkinter as ctk
         from tkinter import messagebox
         import threading
+        # v1091.0 (R6.0): stringhe localizzate
+        from services.i18n import t as _t
 
         if self.api_client is None:
-            messagebox.showerror("Non disponibile",
-                                 "Il cambio password richiede la modalità connessa al server.")
+            messagebox.showerror(_t("change_password.title_window"),
+                                 _t("change_password.subtitle"))
             return
 
         win = ctk.CTkToplevel(self.root)
         # v1085o: finestra standalone Windows con icona/topmost/center
         # v1085p: aumentata altezza 400→480 perche' titlebar Windows nativa
         # mangia ~30px e i bottoni andavano sotto il bordo
-        _setup_standalone_dialog(win, self.root, "Cambia password", 460, 480)
+        _setup_standalone_dialog(win, self.root,
+                                 _t("change_password.title_window"), 460, 480)
         try:
             win.grab_set()
         except Exception:
             pass
 
         # Header
-        ctk.CTkLabel(win, text="🔒  Cambia password",
+        ctk.CTkLabel(win, text=_t("change_password.header"),
                      font=("Segoe UI", 15, "bold"),
                      text_color=PALETTE["text"]
                      ).pack(pady=(20, 4))
         ctk.CTkLabel(win,
-                     text="Inserisci la password attuale e la nuova.",
+                     text=_t("change_password.subtitle"),
                      font=("Segoe UI", 10),
                      text_color=PALETTE["text_dim"]
                      ).pack(pady=(0, 14))
@@ -1538,9 +1598,9 @@ class TrackLabGUI:
             e.pack(fill="x", padx=14, pady=(0, 6))
             return var, e
 
-        cur_var, cur_entry = _labeled_entry("Password corrente")
-        new_var, _         = _labeled_entry("Nuova password (minimo 8)")
-        cnf_var, _         = _labeled_entry("Conferma nuova")
+        cur_var, cur_entry = _labeled_entry(_t("change_password.field_current"))
+        new_var, _         = _labeled_entry(_t("change_password.field_new"))
+        cnf_var, _         = _labeled_entry(_t("change_password.field_confirm_new"))
         cur_entry.focus()
 
         # Status label (errori inline)
@@ -1564,21 +1624,21 @@ class TrackLabGUI:
             new = new_var.get()
             cnf = cnf_var.get()
             if not cur or not new:
-                _set_status("Compila tutti i campi", "error")
+                _set_status(_t("change_password.err_fill_all"), "error")
                 return
             if len(new) < 8:
-                _set_status("La nuova password deve essere di almeno 8 caratteri", "error")
+                _set_status(_t("change_password.err_new_too_short"), "error")
                 return
             if new != cnf:
-                _set_status("Le due password nuove non coincidono", "error")
+                _set_status(_t("change_password.err_new_mismatch"), "error")
                 return
             if new == cur:
-                _set_status("La nuova password deve essere diversa dalla corrente", "error")
+                _set_status(_t("change_password.err_new_mismatch"), "error")
                 return
 
-            btn_ok.configure(text="Aggiornamento…", state="disabled")
+            btn_ok.configure(text=_t("register.btn_submitting"), state="disabled")
             btn_cancel.configure(state="disabled")
-            _set_status("Invio al server…", "text_dim")
+            _set_status(_t("register.status_sending"), "text_dim")
 
             def _worker():
                 try:
@@ -1586,27 +1646,25 @@ class TrackLabGUI:
                     self.root.after(0, lambda: (
                         win.destroy(),
                         messagebox.showinfo(
-                            "Password aggiornata",
-                            "La tua password è stata cambiata con successo.\n\n"
-                            "La sessione corrente resta attiva. I token esistenti\n"
-                            "non sono invalidati automaticamente."
+                            _t("change_password.msg_success_title"),
+                            _t("change_password.msg_success_body")
                         )
                     ))
                 except Exception as e:
                     msg = str(e)
                     if "403" in msg:
-                        msg = "Password corrente errata"
+                        msg = _t("change_password.err_current_wrong")
                     elif "400" in msg:
-                        msg = "La nuova password non è valida"
+                        msg = _t("register.err_invalid_data")
                     self.root.after(0, lambda: (
                         _set_status(msg, "error"),
-                        btn_ok.configure(text="Conferma", state="normal"),
+                        btn_ok.configure(text=_t("common.btn_confirm"), state="normal"),
                         btn_cancel.configure(state="normal"),
                     ))
             threading.Thread(target=_worker, daemon=True).start()
 
         btn_cancel = ctk.CTkButton(
-            btn_row, text="Annulla", width=110, height=34,
+            btn_row, text=_t("common.btn_cancel"), width=110, height=34,
             fg_color="transparent", hover_color=PALETTE.get("surface", "#1e2533"),
             text_color=PALETTE["text_dim"],
             font=("Segoe UI", 10),
@@ -1614,7 +1672,7 @@ class TrackLabGUI:
         )
         btn_cancel.pack(side="right", padx=(4, 0))
         btn_ok = ctk.CTkButton(
-            btn_row, text="Conferma", width=150, height=34,
+            btn_row, text=_t("common.btn_confirm"), width=150, height=34,
             fg_color=PALETTE.get("primary", "#3b6fd4"),
             hover_color=PALETTE.get("primary_hover", "#2d5ab8"),
             text_color="#ffffff",
@@ -1647,17 +1705,21 @@ class TrackLabGUI:
         import customtkinter as ctk
         from tkinter import messagebox
         import threading
+        # v1091.0 (R6.0): tutte le stringhe del dialog localizzate
+        from services.i18n import t as _t
 
         try:
             from services import spotify_oauth
         except Exception as e:
             messagebox.showerror(
-                "Modulo non disponibile",
-                f"spotify_oauth non importabile: {e}")
+                _t("linked_accounts.title"),
+                _t("linked_accounts.spotify.msg_module_unavailable",
+                   error=str(e)))
             return
 
         win = ctk.CTkToplevel(self.root)
-        _setup_standalone_dialog(win, self.root, "Account collegati",
+        _setup_standalone_dialog(win, self.root,
+                                 _t("linked_accounts.title"),
                                  460, 420)
         try:
             win.grab_set()
@@ -1665,14 +1727,12 @@ class TrackLabGUI:
             pass
 
         # Header
-        ctk.CTkLabel(win, text="🎵  Account collegati",
+        ctk.CTkLabel(win, text=f"🎵  {_t('linked_accounts.title')}",
                      font=("Segoe UI", 15, "bold"),
                      text_color=PALETTE["text"]
                      ).pack(pady=(20, 4))
         ctk.CTkLabel(win,
-                     text="Collega i tuoi servizi esterni per usare il "
-                          "tuo account personale\ninvece del proxy di "
-                          "sistema (privacy + nessun rate-limit condiviso).",
+                     text=_t("linked_accounts.header_subtitle"),
                      font=("Segoe UI", 10),
                      text_color=PALETTE["text_dim"],
                      justify="center"
@@ -1686,7 +1746,7 @@ class TrackLabGUI:
         # Riga 1: nome servizio + stato a destra
         head = ctk.CTkFrame(card, fg_color="transparent")
         head.pack(fill="x", padx=14, pady=(12, 4))
-        ctk.CTkLabel(head, text="Spotify",
+        ctk.CTkLabel(head, text=_t("linked_accounts.spotify.name"),
                      font=("Segoe UI", 13, "bold"),
                      text_color=PALETTE["text"]
                      ).pack(side="left")
@@ -1714,13 +1774,13 @@ class TrackLabGUI:
             """Aggiorna la card in base allo stato corrente."""
             if not spotify_oauth.is_configured():
                 # NOT_CONFIGURED
-                status_lbl.configure(text="In preparazione",
-                                     text_color=PALETTE["text_dim"])
+                status_lbl.configure(
+                    text=_t("linked_accounts.spotify.status_not_configured"),
+                    text_color=PALETTE["text_dim"])
                 detail_lbl.configure(
-                    text="Verra' attivato in una release futura.\n"
-                         "Richiede setup dell'app Spotify Developer.")
+                    text=_t("linked_accounts.spotify.detail_not_configured"))
                 action_btn.configure(
-                    text="Collega Spotify (non disponibile)",
+                    text=_t("linked_accounts.spotify.btn_not_configured"),
                     state="disabled",
                     fg_color=PALETTE.get("surface2", "#2a3344"),
                     hover_color=PALETTE.get("surface2", "#2a3344"),
@@ -1732,13 +1792,13 @@ class TrackLabGUI:
             info = spotify_oauth.get_connection_info()
             if info is None:
                 # DISCONNECTED
-                status_lbl.configure(text="Non collegato",
-                                     text_color=PALETTE["text_dim"])
+                status_lbl.configure(
+                    text=_t("linked_accounts.spotify.status_disconnected"),
+                    text_color=PALETTE["text_dim"])
                 detail_lbl.configure(
-                    text="Usa il tuo account Spotify per i lookup "
-                         "metadati.\nIl token resta solo sul tuo PC.")
+                    text=_t("linked_accounts.spotify.detail_disconnected"))
                 action_btn.configure(
-                    text="🔗  Collega Spotify",
+                    text=_t("linked_accounts.spotify.btn_disconnected"),
                     state="normal",
                     fg_color=PALETTE.get("primary", "#3b6fd4"),
                     hover_color=PALETTE.get("primary_hover", "#2d5ab8"),
@@ -1748,13 +1808,15 @@ class TrackLabGUI:
             else:
                 # CONNECTED
                 who = (info.get("display_name") or info.get("email")
-                       or info.get("user_id") or "(utente)")
-                status_lbl.configure(text="Collegato",
-                                     text_color=PALETTE.get("success",
-                                                            "#50aa70"))
-                detail_lbl.configure(text=f"Collegato come: {who}")
+                       or info.get("user_id") or "(?)")
+                status_lbl.configure(
+                    text=_t("linked_accounts.spotify.status_connected"),
+                    text_color=PALETTE.get("success", "#50aa70"))
+                detail_lbl.configure(
+                    text=_t("linked_accounts.spotify.detail_connected",
+                            user=who))
                 action_btn.configure(
-                    text="Scollega",
+                    text=_t("linked_accounts.spotify.btn_connected"),
                     state="normal",
                     fg_color="transparent",
                     hover_color=PALETTE.get("error", "#d84545"),
@@ -1764,11 +1826,11 @@ class TrackLabGUI:
 
         def _start_connect():
             """Avvia OAuth in worker thread per non bloccare la UI."""
-            action_btn.configure(text="Attendi: autorizza nel browser…",
-                                 state="disabled")
+            action_btn.configure(
+                text=_t("linked_accounts.spotify.msg_waiting_btn"),
+                state="disabled")
             detail_lbl.configure(
-                text="E' stata aperta una scheda del browser.\n"
-                     "Accetta l'autorizzazione e torna qui.")
+                text=_t("linked_accounts.spotify.msg_browser_opened"))
 
             def _worker():
                 try:
@@ -1776,25 +1838,24 @@ class TrackLabGUI:
                     self.root.after(0, lambda: (
                         _refresh_card(),
                         messagebox.showinfo(
-                            "Spotify collegato",
-                            "Account Spotify collegato con successo. "
-                            "Da ora i lookup useranno il tuo token.",
+                            _t("linked_accounts.spotify.msg_connected_title"),
+                            _t("linked_accounts.spotify.msg_connected_body"),
                             parent=win),
                     ))
                 except spotify_oauth.SpotifyOAuthCancelled:
                     self.root.after(0, lambda: (
                         _refresh_card(),
                         messagebox.showinfo(
-                            "Autorizzazione annullata",
-                            "Hai annullato il collegamento Spotify.",
+                            _t("linked_accounts.spotify.msg_cancelled_title"),
+                            _t("linked_accounts.spotify.msg_cancelled_body"),
                             parent=win),
                     ))
                 except spotify_oauth.SpotifyOAuthTimeout:
                     self.root.after(0, lambda: (
                         _refresh_card(),
                         messagebox.showwarning(
-                            "Timeout",
-                            "Tempo scaduto. Riprova il collegamento.",
+                            _t("linked_accounts.spotify.msg_timeout_title"),
+                            _t("linked_accounts.spotify.msg_timeout_body"),
                             parent=win),
                     ))
                 except spotify_oauth.SpotifyOAuthError as e:
@@ -1802,31 +1863,32 @@ class TrackLabGUI:
                     self.root.after(0, lambda: (
                         _refresh_card(),
                         messagebox.showerror(
-                            "Errore Spotify", err, parent=win),
+                            _t("linked_accounts.spotify.msg_error_title"),
+                            err, parent=win),
                     ))
 
             threading.Thread(target=_worker, daemon=True).start()
 
         def _do_disconnect():
             ok = messagebox.askyesno(
-                "Conferma",
-                "Scollegare l'account Spotify?\n"
-                "Il token locale verra' cancellato. Per revocare il "
-                "consenso anche lato Spotify usa Account → Apps sul "
-                "sito Spotify.", parent=win)
+                _t("linked_accounts.spotify.confirm_disconnect_title"),
+                _t("linked_accounts.spotify.confirm_disconnect_msg"),
+                parent=win)
             if not ok:
                 return
             try:
                 spotify_oauth.disconnect()
             except Exception as e:
-                messagebox.showerror("Errore", str(e), parent=win)
+                messagebox.showerror(
+                    _t("linked_accounts.spotify.msg_error_title"),
+                    str(e), parent=win)
             _refresh_card()
 
         _refresh_card()
 
         # Bottone Chiudi in fondo
         ctk.CTkButton(
-            win, text="Chiudi", width=120, height=34,
+            win, text=_t("common.btn_close"), width=120, height=34,
             fg_color="transparent",
             hover_color=PALETTE.get("surface", "#1e2533"),
             text_color=PALETTE["text_dim"],
@@ -2913,7 +2975,10 @@ class TrackLabGUI:
             _plan = _get_plan()
             # v1085o: titolo "TrackLab | <Piano>" — niente "Advanced",
             # niente versione (sono dentro l'app, non utili nel chrome OS)
-            self.root.title(f"TrackLab  |  {_plan.display_name}")
+            # v1091.0: stringa i18n (plan e' uno string display_name del piano)
+            from services.i18n import t as _t
+            self.root.title(_t("app.title_with_plan",
+                               plan=_plan.display_name))
         except Exception:
             pass
 
@@ -7645,8 +7710,11 @@ class TrackLabGUI:
         """R2: finestra Help/About con 4 pulsanti contestuali (Changelog,
         Email, Aggiornamenti, Documentazione). Sostituisce _show_about()."""
         import webbrowser as _wb
+        # v1091.0 (R6.0): stringhe localizzate
+        from services.i18n import t as _t
         win = ctk.CTkToplevel(self.root)
-        _setup_standalone_dialog(win, self.root, "Help — TrackLab", 460, 440)
+        _setup_standalone_dialog(win, self.root,
+                                 _t("help.title_window"), 460, 440)
 
         # ── Logo (stesso meccanismo MEIPASS-aware dell'ex _show_about) ──
         _logo_done = False
@@ -7675,9 +7743,12 @@ class TrackLabGUI:
         if not _logo_done:
             ctk.CTkLabel(win, text="🎵", font=("Segoe UI", 40)).pack(pady=(22, 4))
 
-        ctk.CTkLabel(win, text="TrackLab", font=FONT_TITLE).pack()
+        ctk.CTkLabel(win, text=_t("help.header"), font=FONT_TITLE).pack()
+        ctk.CTkLabel(win, text=_t("help.subtitle"),
+                     font=FONT_SMALL, text_color=PALETTE["text_dim"]
+                     ).pack(pady=(2, 2))
         ctk.CTkLabel(win, text=f"{APP_VERSION}  ·  Python / CustomTkinter",
-                     font=FONT_SMALL, text_color=PALETTE["text_dim"]).pack(pady=(2, 12))
+                     font=FONT_SMALL, text_color=PALETTE["text_dim"]).pack(pady=(0, 12))
         ctk.CTkFrame(win, height=1, fg_color=PALETTE["border"]).pack(fill="x", padx=30, pady=(0, 16))
 
         # ── 4 pulsanti 2×2 ──────────────────────────────────────────
@@ -7699,20 +7770,20 @@ class TrackLabGUI:
             from services.updater import check_and_offer_update
             check_and_offer_update(self.api_client, self.root, silent=False)
 
-        _mk(0, 0, "📋  Changelog",
+        _mk(0, 0, _t("help.btn_changelog"),
             lambda: self._show_help_changelog(win))
-        _mk(0, 1, "✉  Email supporto",
+        _mk(0, 1, _t("help.btn_email_support"),
             lambda: _wb.open("mailto:captainjoker27@gmail.com"
-                             "?subject=Music%20Cataloger%20Advanced%20-%20Supporto"))
-        _mk(1, 0, "🔄  Aggiornamenti", _do_updates)
-        _mk(1, 1, "📖  Documentazione",
+                             "?subject=TrackLab%20-%20Supporto"))
+        _mk(1, 0, _t("help.btn_updates"), _do_updates)
+        _mk(1, 1, _t("help.btn_documentation"),
             lambda: _wb.open("https://github.com/PedroFerre27/TrackLab"))
 
         # ── Footer ──────────────────────────────────────────────────
         ctk.CTkFrame(win, height=1, fg_color=PALETTE["border"]).pack(fill="x", padx=30, pady=(0, 10))
-        ctk.CTkLabel(win, text="© 2026 Pedro Marques — Uso personale ed educativo",
+        ctk.CTkLabel(win, text="© 2026 Pedro Marques",
                      font=FONT_SMALL, text_color=PALETTE["text_dim"]).pack(pady=(0, 8))
-        ctk.CTkButton(win, text="Chiudi", command=win.destroy,
+        ctk.CTkButton(win, text=_t("common.btn_close"), command=win.destroy,
                       height=BTN_H, width=120,
                       fg_color=PALETTE["surface"], hover_color=PALETTE["primary"],
                       text_color=PALETTE["text"]).pack(pady=(0, 16))
@@ -7742,10 +7813,17 @@ class TrackLabGUI:
                 "In modalità EXE viene bundlato automaticamente."
             )
 
+        # v1091.0 (R6.0): titolo e nota EN localizzati
+        from services.i18n import t as _t, current_lang as _cur_lang
         parent = help_win or self.root
         clog = ctk.CTkToplevel(parent)
-        clog.title("Changelog")
+        clog.title(_t("help.changelog_title"))
         clog.geometry("640x520")
+        # Nota: il changelog (UPGRADES.md) e' scritto in italiano.
+        # Quando l'utente e' in modalita' EN, prefiggi una nota.
+        notice = _t("help.changelog_only_italian_notice")
+        if notice and _cur_lang() != "it":
+            content = notice + "\n\n" + ("─" * 60) + "\n\n" + content
         clog.resizable(True, True)
         clog.configure(fg_color=PALETTE["bg"])
         clog.columnconfigure(0, weight=1)
@@ -7781,7 +7859,7 @@ class TrackLabGUI:
         txt.see("end")   # posiziona sulle righe più recenti (= più nuove)
 
         ctk.CTkButton(
-            clog, text="Chiudi", command=clog.destroy,
+            clog, text=_t("common.btn_close"), command=clog.destroy,
             height=BTN_H, width=120,
             fg_color=PALETTE["surface"], hover_color=PALETTE["primary"],
             text_color=PALETTE["text"],

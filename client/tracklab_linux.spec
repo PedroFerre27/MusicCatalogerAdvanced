@@ -33,6 +33,7 @@ datas = [
     ('services',               'services'),
     ('core',                   'core'),
     ('gui',                    'gui'),
+    ('translations',           'translations'),   # R6.0: bundle i18n
     ('run_cataloger.py',       '.'),
     ('version.py',             '.'),
     ('../docs/UPGRADES.md',    '.'),   # R2: bundlato per Help → Changelog
@@ -46,6 +47,8 @@ hiddenimports = [
     'services.api_client', 'services.jwt_store',
     'services.catalog_reporter', 'services.updater',
     'services.cache_manager',
+    'services.spotify_oauth', 'services.spotify_store',
+    'services.i18n',                    # R6.0
     'core.cataloger', 'core.genre_classifier',
     'core.file_manager', 'core.metadata_extractor',
     'gui.main_window', 'gui.login_window', 'gui.app_icon',
