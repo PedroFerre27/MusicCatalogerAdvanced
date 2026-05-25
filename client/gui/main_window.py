@@ -989,17 +989,40 @@ class MusicCatalogerGUI:
                              fg_color=PALETTE["border"]
                              ).pack(fill="x", padx=10, pady=(0, 10))
 
+            # v1089.0 (R4): voce "Account collegati" → dialog Spotify.
+            # Resta sotto il blocco Account (sopra) e prima del placeholder
+            # per le opzioni future. Mostrata sempre, anche quando
+            # l'app Spotify Developer non e' ancora configurata: in quel
+            # caso il dialog spiega all'utente che la feature e' in
+            # preparazione.
             ctk.CTkLabel(parent,
-                         text="Altre preferenze disponibili\nin una prossima versione.",
-                         font=FONT_SMALL, text_color=PALETTE["text_dim"],
-                         justify="center"
-                         ).pack(pady=(20, 8))
+                         text="Servizi esterni",
+                         font=(FONT_SMALL[0], FONT_SMALL[1], "bold"),
+                         text_color=PALETTE["text"],
+                         anchor="w"
+                         ).pack(fill="x", padx=10, pady=(4, 6))
+            ctk.CTkButton(
+                parent,
+                text="🎵  Account collegati",
+                font=FONT_SMALL,
+                fg_color=PALETTE.get("surface2", "#2a3344"),
+                hover_color=PALETTE.get("primary_hover", "#2d5ab8"),
+                text_color=PALETTE["text"],
+                anchor="w", height=32, corner_radius=6,
+                command=lambda: (self._close_profile_flyout(),
+                                 self._show_linked_accounts_dialog()),
+            ).pack(fill="x", padx=10, pady=(0, 14))
+
+            ctk.CTkFrame(parent, height=1,
+                         fg_color=PALETTE["border"]
+                         ).pack(fill="x", padx=10, pady=(0, 10))
+
             ctk.CTkLabel(parent,
                          text="Le opzioni di catalogazione sono nel\ntab Avanzate della finestra principale.",
                          font=(FONT_SMALL[0], FONT_SMALL[1]-1),
                          text_color=PALETTE["text_dim"],
                          justify="center"
-                         ).pack(pady=(0, 8))
+                         ).pack(pady=(8, 8))
 
         def _fill_language(parent):
             ctk.CTkLabel(parent,
@@ -1596,6 +1619,216 @@ class MusicCatalogerGUI:
         )
         btn_ok.pack(side="right")
         win.bind("<Return>", lambda e: _do_submit())
+        win.bind("<Escape>", lambda e: win.destroy())
+
+
+    def _show_linked_accounts_dialog(self):
+        """
+        v1089.0 (R4): dialog "Account collegati" — gestisce il
+        collegamento OAuth dei servizi esterni dell'utente.
+
+        Per ora un solo servizio: Spotify. La struttura e' a card cosi'
+        in futuro aggiungere Last.fm/Apple Music/ecc. e' add-only.
+
+        Tre stati per la card Spotify:
+        - NOT_CONFIGURED: SPOTIFY_CLIENT_ID vuoto → pulsante grigio
+          disabilitato + label "Funzione in preparazione". E' lo stato
+          della predisposizione v1089.0 finche' Pedro non avra' l'app
+          Developer.
+        - DISCONNECTED: configurato ma utente non ha mai collegato →
+          pulsante "Collega Spotify" → click avvia OAuth in thread.
+        - CONNECTED: token presente → mostra email/display_name +
+          pulsante "Scollega".
+        """
+        import customtkinter as ctk
+        from tkinter import messagebox
+        import threading
+
+        try:
+            from services import spotify_oauth
+        except Exception as e:
+            messagebox.showerror(
+                "Modulo non disponibile",
+                f"spotify_oauth non importabile: {e}")
+            return
+
+        win = ctk.CTkToplevel(self.root)
+        _setup_standalone_dialog(win, self.root, "Account collegati",
+                                 460, 420)
+        try:
+            win.grab_set()
+        except Exception:
+            pass
+
+        # Header
+        ctk.CTkLabel(win, text="🎵  Account collegati",
+                     font=("Segoe UI", 15, "bold"),
+                     text_color=PALETTE["text"]
+                     ).pack(pady=(20, 4))
+        ctk.CTkLabel(win,
+                     text="Collega i tuoi servizi esterni per usare il "
+                          "tuo account personale\ninvece del proxy di "
+                          "sistema (privacy + nessun rate-limit condiviso).",
+                     font=("Segoe UI", 10),
+                     text_color=PALETTE["text_dim"],
+                     justify="center"
+                     ).pack(pady=(0, 16))
+
+        # ── Card Spotify ─────────────────────────────────────────────
+        card = ctk.CTkFrame(win, fg_color=PALETTE["surface"],
+                            corner_radius=10)
+        card.pack(fill="x", padx=24, pady=(0, 12))
+
+        # Riga 1: nome servizio + stato a destra
+        head = ctk.CTkFrame(card, fg_color="transparent")
+        head.pack(fill="x", padx=14, pady=(12, 4))
+        ctk.CTkLabel(head, text="Spotify",
+                     font=("Segoe UI", 13, "bold"),
+                     text_color=PALETTE["text"]
+                     ).pack(side="left")
+        status_lbl = ctk.CTkLabel(head, text="",
+                                  font=("Segoe UI", 10, "bold"),
+                                  text_color=PALETTE["text_dim"])
+        status_lbl.pack(side="right")
+
+        # Riga 2: dettaglio (email/display_name oppure messaggio)
+        detail_lbl = ctk.CTkLabel(card, text="",
+                                  font=("Segoe UI", 10),
+                                  text_color=PALETTE["text_dim"],
+                                  anchor="w", justify="left")
+        detail_lbl.pack(fill="x", padx=14, pady=(0, 8))
+
+        # Riga 3: pulsante azione
+        action_btn = ctk.CTkButton(
+            card, text="", height=36, corner_radius=8,
+            font=("Segoe UI", 11, "bold"),
+            text_color="#ffffff",
+        )
+        action_btn.pack(fill="x", padx=14, pady=(0, 14))
+
+        def _refresh_card():
+            """Aggiorna la card in base allo stato corrente."""
+            if not spotify_oauth.is_configured():
+                # NOT_CONFIGURED
+                status_lbl.configure(text="In preparazione",
+                                     text_color=PALETTE["text_dim"])
+                detail_lbl.configure(
+                    text="Verra' attivato in una release futura.\n"
+                         "Richiede setup dell'app Spotify Developer.")
+                action_btn.configure(
+                    text="Collega Spotify (non disponibile)",
+                    state="disabled",
+                    fg_color=PALETTE.get("surface2", "#2a3344"),
+                    hover_color=PALETTE.get("surface2", "#2a3344"),
+                    text_color=PALETTE["text_dim"],
+                    command=lambda: None,
+                )
+                return
+
+            info = spotify_oauth.get_connection_info()
+            if info is None:
+                # DISCONNECTED
+                status_lbl.configure(text="Non collegato",
+                                     text_color=PALETTE["text_dim"])
+                detail_lbl.configure(
+                    text="Usa il tuo account Spotify per i lookup "
+                         "metadati.\nIl token resta solo sul tuo PC.")
+                action_btn.configure(
+                    text="🔗  Collega Spotify",
+                    state="normal",
+                    fg_color=PALETTE.get("primary", "#3b6fd4"),
+                    hover_color=PALETTE.get("primary_hover", "#2d5ab8"),
+                    text_color="#ffffff",
+                    command=_start_connect,
+                )
+            else:
+                # CONNECTED
+                who = (info.get("display_name") or info.get("email")
+                       or info.get("user_id") or "(utente)")
+                status_lbl.configure(text="Collegato",
+                                     text_color=PALETTE.get("success",
+                                                            "#50aa70"))
+                detail_lbl.configure(text=f"Collegato come: {who}")
+                action_btn.configure(
+                    text="Scollega",
+                    state="normal",
+                    fg_color="transparent",
+                    hover_color=PALETTE.get("error", "#d84545"),
+                    text_color=PALETTE["text_dim"],
+                    command=_do_disconnect,
+                )
+
+        def _start_connect():
+            """Avvia OAuth in worker thread per non bloccare la UI."""
+            action_btn.configure(text="Attendi: autorizza nel browser…",
+                                 state="disabled")
+            detail_lbl.configure(
+                text="E' stata aperta una scheda del browser.\n"
+                     "Accetta l'autorizzazione e torna qui.")
+
+            def _worker():
+                try:
+                    spotify_oauth.start_connect_flow()
+                    self.root.after(0, lambda: (
+                        _refresh_card(),
+                        messagebox.showinfo(
+                            "Spotify collegato",
+                            "Account Spotify collegato con successo. "
+                            "Da ora i lookup useranno il tuo token.",
+                            parent=win),
+                    ))
+                except spotify_oauth.SpotifyOAuthCancelled:
+                    self.root.after(0, lambda: (
+                        _refresh_card(),
+                        messagebox.showinfo(
+                            "Autorizzazione annullata",
+                            "Hai annullato il collegamento Spotify.",
+                            parent=win),
+                    ))
+                except spotify_oauth.SpotifyOAuthTimeout:
+                    self.root.after(0, lambda: (
+                        _refresh_card(),
+                        messagebox.showwarning(
+                            "Timeout",
+                            "Tempo scaduto. Riprova il collegamento.",
+                            parent=win),
+                    ))
+                except spotify_oauth.SpotifyOAuthError as e:
+                    err = str(e)
+                    self.root.after(0, lambda: (
+                        _refresh_card(),
+                        messagebox.showerror(
+                            "Errore Spotify", err, parent=win),
+                    ))
+
+            threading.Thread(target=_worker, daemon=True).start()
+
+        def _do_disconnect():
+            ok = messagebox.askyesno(
+                "Conferma",
+                "Scollegare l'account Spotify?\n"
+                "Il token locale verra' cancellato. Per revocare il "
+                "consenso anche lato Spotify usa Account → Apps sul "
+                "sito Spotify.", parent=win)
+            if not ok:
+                return
+            try:
+                spotify_oauth.disconnect()
+            except Exception as e:
+                messagebox.showerror("Errore", str(e), parent=win)
+            _refresh_card()
+
+        _refresh_card()
+
+        # Bottone Chiudi in fondo
+        ctk.CTkButton(
+            win, text="Chiudi", width=120, height=34,
+            fg_color="transparent",
+            hover_color=PALETTE.get("surface", "#1e2533"),
+            text_color=PALETTE["text_dim"],
+            font=("Segoe UI", 10),
+            command=win.destroy,
+        ).pack(side="bottom", pady=(0, 18))
         win.bind("<Escape>", lambda e: win.destroy())
 
 
