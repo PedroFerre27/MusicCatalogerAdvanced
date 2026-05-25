@@ -28,8 +28,9 @@ env/
 .DS_Store
 Thumbs.db
 
-# Icona generata da build_ico.py (rigenerabile)
-/icons/tracklab.ico
+# Icona generata da build_ico.py (rigenerabile in qualunque
+# sottocartella icons/ del monorepo, attuale: client/icons/)
+**/icons/tracklab.ico
 
 # File temporanei updater
 tracklab_updater.bat
