@@ -148,7 +148,7 @@ def _download_to_temp(url: str, expected_sha256: Optional[str] = None,
     # Filename safe basato sul path
     fname = url.rsplit("/", 1)[-1] or "update.exe"
     fname = re.sub(r"[^A-Za-z0-9._-]", "_", fname)
-    dest = Path(tempfile.gettempdir()) / "music_cataloger_update" / fname
+    dest = Path(tempfile.gettempdir()) / "tracklab_update" / fname
     dest.parent.mkdir(parents=True, exist_ok=True)
 
     with requests.get(url, stream=True, timeout=(10, 300)) as r:
@@ -199,8 +199,8 @@ def _make_windows_updater_script(current_exe: Path, new_exe: Path) -> Path:
     if sys.platform != "win32":
         raise RuntimeError("Updater batch script disponibile solo su Windows")
 
-    script_path = Path(tempfile.gettempdir()) / "music_cataloger_updater.bat"
-    log_file = Path(tempfile.gettempdir()) / "music_cataloger_updater.log"
+    script_path = Path(tempfile.gettempdir()) / "tracklab_updater.bat"
+    log_file = Path(tempfile.gettempdir()) / "tracklab_updater.log"
 
     # Strategia: copy /Y semplice come v1085f con retry per gestire lock.
     # Niente rename, niente .old backup, niente roba "atomica":
@@ -208,7 +208,7 @@ def _make_windows_updater_script(current_exe: Path, new_exe: Path) -> Path:
     # perche' il vecchio EXE chiude i suoi handle prima che il batch
     # parta (il batch aspetta 2 sec per sicurezza).
     content = f"""@echo off
-REM Music Cataloger auto-updater (v1085p: stile v1085f + env cleanup)
+REM TrackLab auto-updater (v1085p: stile v1085f + env cleanup)
 
 setlocal
 set LOG="{log_file}"
@@ -532,11 +532,11 @@ def _show_update_dialog(api_client, parent_window, info: dict, local_ver: str):
                         f"Errore: {e}\n\n"
                         f"PROCEDURA MANUALE:\n"
                         f"1. Chiudi questa finestra\n"
-                        f"2. Chiudi Music Cataloger\n"
+                        f"2. Chiudi TrackLab\n"
                         f"3. Copia il file scaricato sopra quello corrente:\n"
                         f"   FROM: {new_exe_path}\n"
                         f"   TO:   {current}\n"
-                        f"4. Riapri Music Cataloger"
+                        f"4. Riapri TrackLab"
                     )
                     win.after(0, lambda: _show_fallback_manual(
                         win, parent_window, new_exe_path, current, str(e)))
@@ -618,12 +618,12 @@ def _show_fallback_manual(parent_dialog, main_window,
     # Istruzioni
     instructions = (
         "Per applicare l'aggiornamento manualmente:\n\n"
-        "  1. Chiudi Music Cataloger (questa finestra + finestra principale)\n"
+        "  1. Chiudi TrackLab (questa finestra + finestra principale)\n"
         "  2. Apri la cartella 'File scaricato' (sotto)\n"
         "  3. Copia il file Music_Cataloger_*.exe\n"
         "  4. Apri la cartella 'App corrente' (sotto)\n"
         "  5. Incolla sostituendo il file esistente\n"
-        "  6. Riapri Music Cataloger"
+        "  6. Riapri TrackLab"
     )
     ctk.CTkLabel(fb, text=instructions, font=("Consolas", 9),
                  justify="left", anchor="w").pack(padx=24, pady=(0, 16),

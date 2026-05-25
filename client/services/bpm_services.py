@@ -1,6 +1,6 @@
 """
 Gestione servizi BPM: GetSong, TuneBat, SongBPM, Beatport, Librosa
-Estratto da MusicCatalogerAdvanced_v0020.py
+Estratto da TrackLab_v0020.py
 """
 
 import logging
@@ -197,7 +197,7 @@ class BPMServices:
             }
             
             headers = {
-                'User-Agent': 'MusicCatalogerAdvanced/0.0.1.9'
+                'User-Agent': 'TrackLab/0.0.1.9'
             }
             
             self.logger.debug(f"GetSong query: {params['lookup']}")

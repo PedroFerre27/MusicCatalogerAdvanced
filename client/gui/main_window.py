@@ -1,5 +1,5 @@
 """
-Music Cataloger Advanced — GUI
+TrackLab — GUI
 """
 
 import os
@@ -344,7 +344,7 @@ class StatCard(ctk.CTkFrame):
 
 # ─── FINESTRA PRINCIPALE ─────────────────────────────────────────────────────
 
-class MusicCatalogerGUI:
+class TrackLabGUI:
     def __init__(self, root: ctk.CTk, api_client=None, user_info=None):
         # v0.0.2.2: api_client e user_info sono opzionali per retrocompatibilità.
         #   - api_client: istanza ApiClient o None (modalità locale-only)
@@ -353,9 +353,9 @@ class MusicCatalogerGUI:
         self.api_client = api_client
         self.user_info  = user_info or {}
         self.root = root
-        # v1085o: titolo barra "Music Cataloger | <Piano>" (no Advanced/version,
+        # v1085o: titolo barra "TrackLab | <Piano>" (no Advanced/version,
         # già visibili dentro l'app)
-        self.root.title("Music Cataloger")
+        self.root.title("TrackLab")
         # Icona finestra e taskbar — helper gestisce PyInstaller bundle
         try:
             from gui.app_icon import set_window_icon
@@ -2320,7 +2320,7 @@ class MusicCatalogerGUI:
         # ══ Zona HEADER (fisso in alto) ═════════════════════════════════════
         # v1078: layout a 2 righe, compatto per guadagnare spazio verticale
         # e nascondere la scrollbar della sidebar in configurazione standard.
-        #   Riga 1 → [icona] Music Cataloger  v1078
+        #   Riga 1 → [icona] TrackLab  v1078
         #   Riga 2 → [ph-user  NomeUtente  ▼]   (full-width, stile pill blu)
         # Badge piano rimosso (refuso: il piano è nel flyout, voce "Piani").
         _hdr = ctk.CTkFrame(left, fg_color="transparent")
@@ -2331,7 +2331,7 @@ class MusicCatalogerGUI:
         # Riga 1: titolo + versione come appendice inline
         _title_row = ctk.CTkFrame(_hdr, fg_color="transparent")
         _title_row.grid(row=0, column=0, sticky="ew")
-        ctk.CTkLabel(_title_row, text="  Music Cataloger",
+        ctk.CTkLabel(_title_row, text="  TrackLab",
                      font=FONT_TITLE, text_color=PALETTE["text"],
                      image=_ic_title, compound="left"
                      ).pack(side="left")
@@ -2911,9 +2911,9 @@ class MusicCatalogerGUI:
         try:
             from config.user_plans import get_plan as _get_plan
             _plan = _get_plan()
-            # v1085o: titolo "Music Cataloger | <Piano>" — niente "Advanced",
+            # v1085o: titolo "TrackLab | <Piano>" — niente "Advanced",
             # niente versione (sono dentro l'app, non utili nel chrome OS)
-            self.root.title(f"Music Cataloger  |  {_plan.display_name}")
+            self.root.title(f"TrackLab  |  {_plan.display_name}")
         except Exception:
             pass
 
@@ -4768,7 +4768,7 @@ class MusicCatalogerGUI:
                 encoding="utf-8"
             )
             # Invalida la cache metadati per i file latini salvando il timestamp
-            MusicCatalogerGUI._mark_caribbean_cache_dirty_static()
+            TrackLabGUI._mark_caribbean_cache_dirty_static()
             messagebox.showinfo("Salvato",
                 "Impostazioni Caraibica salvate.\nVerranno caricate ad ogni avvio.")
         except Exception as e:
@@ -7623,7 +7623,7 @@ class MusicCatalogerGUI:
             from core.metadata_extractor import MetadataExtractor
             from core.genre_classifier import GenreClassifier
             from core.file_manager import FileManager
-            from core.cataloger import MusicCataloger
+            from core.cataloger import TrackLab
             self._log.append("✓  Tutti i moduli caricati correttamente", "SUCCESS")
             self._log.append("=== TEST OK ===", "SUCCESS")
             messagebox.showinfo("Test OK", f"Configurazione valida!\n\nAPI: {ok}/{total}\nModuli: tutti OK")
@@ -7646,7 +7646,7 @@ class MusicCatalogerGUI:
         Email, Aggiornamenti, Documentazione). Sostituisce _show_about()."""
         import webbrowser as _wb
         win = ctk.CTkToplevel(self.root)
-        _setup_standalone_dialog(win, self.root, "Help — Music Cataloger", 460, 440)
+        _setup_standalone_dialog(win, self.root, "Help — TrackLab", 460, 440)
 
         # ── Logo (stesso meccanismo MEIPASS-aware dell'ex _show_about) ──
         _logo_done = False
@@ -7675,7 +7675,7 @@ class MusicCatalogerGUI:
         if not _logo_done:
             ctk.CTkLabel(win, text="🎵", font=("Segoe UI", 40)).pack(pady=(22, 4))
 
-        ctk.CTkLabel(win, text="Music Cataloger", font=FONT_TITLE).pack()
+        ctk.CTkLabel(win, text="TrackLab", font=FONT_TITLE).pack()
         ctk.CTkLabel(win, text=f"{APP_VERSION}  ·  Python / CustomTkinter",
                      font=FONT_SMALL, text_color=PALETTE["text_dim"]).pack(pady=(2, 12))
         ctk.CTkFrame(win, height=1, fg_color=PALETTE["border"]).pack(fill="x", padx=30, pady=(0, 16))
@@ -7706,7 +7706,7 @@ class MusicCatalogerGUI:
                              "?subject=Music%20Cataloger%20Advanced%20-%20Supporto"))
         _mk(1, 0, "🔄  Aggiornamenti", _do_updates)
         _mk(1, 1, "📖  Documentazione",
-            lambda: _wb.open("https://github.com/PedroFerre27/MusicCatalogerAdvanced"))
+            lambda: _wb.open("https://github.com/PedroFerre27/TrackLab"))
 
         # ── Footer ──────────────────────────────────────────────────
         ctk.CTkFrame(win, height=1, fg_color=PALETTE["border"]).pack(fill="x", padx=30, pady=(0, 10))
@@ -7805,7 +7805,7 @@ class MusicCatalogerGUI:
 
 def main():
     root = ctk.CTk()
-    app = MusicCatalogerGUI(root)
+    app = TrackLabGUI(root)
     root.update_idletasks()
     sw = root.winfo_screenwidth()
     sh = root.winfo_screenheight()

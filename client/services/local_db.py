@@ -1,5 +1,5 @@
 """
-services/local_db.py — Music Cataloger Advanced v1086.3
+services/local_db.py — TrackLab v1086.3
 
 DB locale UNIFICATO (v2): un solo file `local_db.json` contiene sia la
 mappatura permanente file→metadati (ex music_library.json) sia la cache

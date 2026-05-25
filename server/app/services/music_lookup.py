@@ -49,7 +49,7 @@ logger = logging.getLogger("music_lookup")
 
 # Timeout uniforme per tutte le chiamate esterne (secondi)
 _HTTP_TIMEOUT = 10
-_USER_AGENT = f"MusicCatalogerServer/{settings.APP_VERSION}"
+_USER_AGENT = f"TrackLabServer/{settings.APP_VERSION}"
 
 
 # ─────────────────────────────────────────────────────────────────

@@ -14,7 +14,7 @@ def test_gui_imports():
         from gui.styles import AppStyles
         from gui.widgets import StatusBar, LogViewer, StatsPanel
         from gui.dialogs import AboutDialog, SettingsDialog
-        from gui.main_window import MusicCatalogerGUI
+        from gui.main_window import TrackLabGUI
         
         print("  ✓ Tutti i moduli GUI importati")
         return True
@@ -42,12 +42,12 @@ def test_gui_creation():
     print("\nTest 3: Creazione GUI...")
     try:
         import tkinter as tk
-        from gui.main_window import MusicCatalogerGUI
+        from gui.main_window import TrackLabGUI
         
         root = tk.Tk()
         root.withdraw()
         
-        app = MusicCatalogerGUI(root)
+        app = TrackLabGUI(root)
         
         # Verifica componenti
         assert hasattr(app, 'log_viewer')

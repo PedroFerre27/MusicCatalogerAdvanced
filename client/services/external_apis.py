@@ -1,6 +1,6 @@
 """
 Gestione API esterne: MusicBrainz, Last.fm, Spotify
-Estratto da MusicCatalogerAdvanced_v0020.py
+Estratto da TrackLab_v0020.py
 """
 
 import logging
@@ -1081,7 +1081,7 @@ class ExternalAPIs:
                 },
                 headers={
                     "Authorization": f"Discogs token={token}",
-                    "User-Agent":    "MusicCatalogerAdvanced/v1046",
+                    "User-Agent":    "TrackLab/v1046",
                 },
                 timeout=self.settings.api.timeout,
             )

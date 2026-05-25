@@ -1,25 +1,40 @@
 #!/bin/bash
 #
-# deploy-nas.sh — Build + run del container sul NAS Synology DS415+
+# deploy-nas.sh — Build + run del container TrackLab Server sul NAS
+# Synology DS415+
 #
 # Questo script non usa docker-compose (che potrebbe non essere
 # installato su DSM 7.1.1 standard). Usa solo "docker" V1.
 #
 # Prerequisiti:
-#   - Stare nella cartella music-cataloger-server/
+#   - Stare nella cartella server/ del repo TrackLab
 #   - Aver creato /volume1/docker/music-cataloger/{data,output}
 #   - File .env presente con SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD
 #
 # Uso:
 #   chmod +x deploy-nas.sh
 #   sudo ./deploy-nas.sh
+#
+# v0.2.5 (R5 rebrand "TrackLab"): IMAGE_NAME e CONTAINER_NAME cambiano
+# da "music-cataloger-server" a "tracklab-server". Al PRIMO deploy
+# dopo l'upgrade, il vecchio container resta orfano:
+#   docker stop music-cataloger-server || true
+#   docker rm   music-cataloger-server || true
+#   docker rmi  music-cataloger-server:latest || true
+# Lo script nuovo creera' il container "tracklab-server" che monta
+# gli stessi path "/volume1/docker/music-cataloger/..." — il DB e
+# i dati utente NON vengono toccati (path filesystem invariati).
+# La migrazione dei path da "music-cataloger" a "tracklab" sotto
+# /volume1/docker/ e' rimandata a un branch dedicato (vedi ROADMAP).
 
 set -euo pipefail
 
-IMAGE_NAME="music-cataloger-server:latest"
-CONTAINER_NAME="music-cataloger-server"
+IMAGE_NAME="tracklab-server:latest"
+CONTAINER_NAME="tracklab-server"
 
-# Path sul NAS — cambia se diversi
+# Path sul NAS — INTENZIONALMENTE invariati nel rebrand R5 perche'
+# contengono il DB e i dati degli utenti esistenti. Migrazione a
+# /volume1/docker/tracklab/... rimandata a un branch dedicato.
 DATA_DIR="/volume1/docker/music-cataloger/data"
 OUTPUT_DIR="/volume1/docker/music-cataloger/output"
 MUSIC_DIR="/volume1/Multimedia/Musica"

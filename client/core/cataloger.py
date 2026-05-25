@@ -1,5 +1,5 @@
 """
-Music Cataloger Advanced — Core Cataloger v0.0.2.2
+TrackLab — Core Cataloger v0.0.2.2
 Logica principale con:
 - Fix unicode cp1252
 - Metadati sempre aggiornati
@@ -94,7 +94,7 @@ class CatalogProgress:
         self.error: Optional[str] = None
 
 
-class MusicCataloger:
+class TrackLab:
     """
     Classe principale per la catalogazione musicale.
     Versione v0.0.2.2 — tutti i fix dal log inclusi.
@@ -215,7 +215,7 @@ class MusicCataloger:
 
         # MusicBrainz
         if musicbrainzngs and self.use_external_db:
-            musicbrainzngs.set_useragent("MusicCatalogerAdvanced", "v0022", self.musicbrainz_contact)
+            musicbrainzngs.set_useragent("TrackLab", "v0022", self.musicbrainz_contact)
             musicbrainzngs.set_rate_limit(limit_or_interval=1.2, new_requests=1)
             self._suppress_musicbrainz_warnings()
 
@@ -261,7 +261,7 @@ class MusicCataloger:
         # ── Log in output/ ────────────────────────────────────────────────
         output_dir = self.script_dir / "output"
         output_dir.mkdir(exist_ok=True)
-        log_filename = f"MusicCatalogerAdvanced_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+        log_filename = f"TrackLab_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
         log_path = output_dir / log_filename
 
         # v1050: non pulire il root logger
@@ -281,7 +281,7 @@ class MusicCataloger:
         console_handler.setLevel(level)
         console_handler.setFormatter(logging.Formatter(fmt_str))
 
-        self.logger = logging.getLogger('MusicCataloger')
+        self.logger = logging.getLogger('TrackLab')
         self.logger.setLevel(logging.DEBUG)
         self.logger.propagate = False
         self.logger.handlers.clear()

@@ -56,7 +56,7 @@ class APIKeys:
         # Deezer e iTunes non richiedono chiave — API pubbliche gratuite
         
         # MusicBrainz (configurazione) - Presa dal tuo file linea ~95
-        self.MUSICBRAINZ_USER_AGENT = "MusicCatalogerAdvanced"
+        self.MUSICBRAINZ_USER_AGENT = "TrackLab"
         self.MUSICBRAINZ_VERSION = "v1086"
         self.MUSICBRAINZ_CONTACT = "captainjoker27@gmail.com"
     

@@ -1,5 +1,5 @@
 """
-services/api_client.py — Client HTTP verso il Music Cataloger Server.
+services/api_client.py — Client HTTP verso il TrackLab Server.
 
 Responsabilità:
 - Wrapper su `requests` con autenticazione Bearer automatica

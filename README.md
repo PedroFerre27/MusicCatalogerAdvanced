@@ -1,4 +1,4 @@
-# Music Cataloger Advanced
+# TrackLab
 
 Applicazione desktop per organizzare automaticamente librerie musicali
 MP3 — pensata in particolare per la musica da ballo latino-americana
@@ -17,7 +17,7 @@ incompleti o sbagliati, nomi file incoerenti, generi generici
 ("Latina" per qualunque cosa), nessuna idea del BPM utile per
 costruire scalette da ballo. Sistemare tutto a mano è impraticabile.
 
-Music Cataloger Advanced automatizza questo lavoro:
+TrackLab automatizza questo lavoro:
 
 - **Classificazione di genere** con strategia multi-segnale: prima il
   nome del file, poi i tag ID3, poi l'analisi del BPM, infine i

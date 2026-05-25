@@ -1,27 +1,27 @@
-# docker-compose.yml — Music Cataloger Server
+# docker-compose.yml — TrackLab Server
 #
 # USO LOCALE (test sul tuo PC prima del NAS):
-#   cd music-cataloger-server/
+#   cd tracklab-server/
 #   cp .env.example .env
 #   # edita .env e metti una SECRET_KEY generata davvero
 #   docker compose up --build
 #   # apri http://localhost:8020/docs
 #
 # USO NAS (DS415+ DSM 7.1.1 via Container Manager / Portainer):
-#   Stack name: music-cataloger
+#   Stack name: tracklab
 #   Portainer → Stacks → Add stack → incolla questo yaml
 #   Poi configura Reverse Proxy DSM per: api.choros27.synology.me → 8020
 #
 # Volume mapping da cambiare per il NAS:
-#   /volume1/docker/music-cataloger/data     → /srv/app/data
+#   /volume1/docker/tracklab/data     → /srv/app/data
 #   /volume1/Multimedia/Musica                           → /music
-#   /volume1/docker/music-cataloger/output    → /output
+#   /volume1/docker/tracklab/output    → /output
 
 services:
   server:
     build: .
-    image: music-cataloger-server:latest
-    container_name: music-cataloger-server
+    image: tracklab-server:latest
+    container_name: tracklab-server
     restart: unless-stopped
 
     # In LOCALE: pubblica sul PC
@@ -52,13 +52,13 @@ services:
 
     volumes:
       # ── DATI (SQLite + config runtime) ─────────────────────────
-      # Sul NAS: /volume1/docker/music-cataloger/data
+      # Sul NAS: /volume1/docker/tracklab/data
       # In locale: ./data (cartella relativa al compose file)
-      - /volume1/docker/music-cataloger/data:/srv/app/data
+      - /volume1/docker/tracklab/data:/srv/app/data
       # ── LIBRERIA MUSICALE — da adattare alla tua cartella reale
       - /volume1/Multimedia/Musica:/music:rw
       # ── OUTPUT (report, export CSV/M3U)
-      - /volume1/docker/music-cataloger/output:/output
+      - /volume1/docker/tracklab/output:/output
 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8020/health"]

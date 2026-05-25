@@ -1,6 +1,6 @@
-# Music Cataloger Server
+# TrackLab Server
 
-FastAPI backend per Music Cataloger Advanced.
+FastAPI backend per TrackLab.
 Gestisce autenticazione JWT, piani utente, richieste upgrade, catalogazione remota.
 
 ---
@@ -28,7 +28,7 @@ Container Docker su DS415+
 Su qualsiasi macchina con Docker Desktop:
 
 ```bash
-cd music-cataloger-server/
+cd tracklab-server/
 cp .env.example .env
 
 # Genera una SECRET_KEY reale
@@ -67,8 +67,8 @@ curl http://localhost:8020/auth/me \
 Via SSH o File Station, crea le cartelle:
 
 ```bash
-mkdir -p /volume1/docker/music-cataloger/data
-mkdir -p /volume1/docker/music-cataloger/output
+mkdir -p /volume1/docker/tracklab/data
+mkdir -p /volume1/docker/tracklab/output
 # Cartella musica esistente (es. /volume1/Multimedia/Musica) resta dov'è
 ```
 
@@ -76,7 +76,7 @@ mkdir -p /volume1/docker/music-cataloger/output
 
 ```bash
 # Dal PC
-scp -r music-cataloger-server/ pedro@choros27.synology.me:/volume1/docker/
+scp -r tracklab-server/ pedro@choros27.synology.me:/volume1/docker/
 ```
 
 Oppure tramite File Station: trascina la cartella in `/volume1/docker/`.
@@ -85,7 +85,7 @@ Oppure tramite File Station: trascina la cartella in `/volume1/docker/`.
 
 ```bash
 ssh pedro@choros27.synology.me
-cd /volume1/docker/music-cataloger-server
+cd /volume1/docker/tracklab-server
 cp .env.example .env
 nano .env
 ```
@@ -106,9 +106,9 @@ Edita la sezione `volumes:`:
 
 ```yaml
     volumes:
-      - /volume1/docker/music-cataloger/data:/srv/app/data
+      - /volume1/docker/tracklab/data:/srv/app/data
       - /volume1/Multimedia/Musica:/music:rw
-      - /volume1/docker/music-cataloger/output:/output
+      - /volume1/docker/tracklab/output:/output
 ```
 
 E rimuovi la sezione `ports:` (il reverse proxy DSM gestirà l'esposizione).
@@ -119,7 +119,7 @@ Portainer già installato nel tuo NAS:
 
 1. Login Portainer
 2. **Stacks** → **Add stack**
-3. Nome: `music-cataloger`
+3. Nome: `tracklab`
 4. **Build method**: *Upload* → seleziona il `docker-compose.yml` modificato
 5. **Environment variables**: carica il file `.env`
 6. **Deploy the stack**

@@ -152,7 +152,7 @@ def _start_main_window(api_client: ApiClient, user_info: dict, offline: bool):
     # tutti gli has_feature() leggevano il default "base" perché
     # set_plan_from_server (introdotta nell'audit security) non era
     # mai chiamata da nessuno. Effetto bug: utente Advanced vedeva
-    # "Music Cataloger | Base" e tutte le feature pro-only nascoste.
+    # "TrackLab | Base" e tutte le feature pro-only nascoste.
     if user_info:
         try:
             from config.user_plans import set_plan_from_server
@@ -166,17 +166,17 @@ def _start_main_window(api_client: ApiClient, user_info: dict, offline: bool):
 
     root = ctk.CTk()
     # Import lazy della main window (è grossa)
-    from gui.main_window import MusicCatalogerGUI
+    from gui.main_window import TrackLabGUI
 
-    # v0.0.2.2: MusicCatalogerGUI accetta api_client e user_info opzionali.
+    # v0.0.2.2: TrackLabGUI accetta api_client e user_info opzionali.
     # Per retrocompatibilità, se la main window corrente non li accetta,
     # fallback al costruttore vecchio.
     try:
-        gui = MusicCatalogerGUI(root, api_client=api_client, user_info=user_info)
+        gui = TrackLabGUI(root, api_client=api_client, user_info=user_info)
     except TypeError:
         # Main window non ancora adattata → parte in modalità legacy
         print("[run_gui] Main window in modalità legacy (no server integration)")
-        gui = MusicCatalogerGUI(root)
+        gui = TrackLabGUI(root)
 
     if offline:
         # Visual warning: banner giallo in cima
@@ -204,7 +204,7 @@ def _start_main_window(api_client: ApiClient, user_info: dict, offline: bool):
 
 def main():
     print("=" * 60)
-    print(f"Music Cataloger Advanced GUI {APP_VERSION}")
+    print(f"TrackLab GUI {APP_VERSION}")
     print("=" * 60)
     print(f"Server: {client_config.server_url}")
 

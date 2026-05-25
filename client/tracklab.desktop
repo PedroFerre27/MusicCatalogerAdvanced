@@ -1,13 +1,13 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=Music Cataloger
+Name=TrackLab
 GenericName=Music Library Organizer
 Comment=Organizza la tua libreria MP3 con classificazione automatica per generi
-Exec=%h/.local/bin/music-cataloger-advanced
-Icon=music-cataloger
+Exec=%h/.local/bin/tracklab-advanced
+Icon=tracklab
 Terminal=false
 Categories=AudioVideo;Audio;Music;
 Keywords=music;audio;mp3;catalog;dj;salsa;bachata;
 StartupNotify=true
-StartupWMClass=music-cataloger-advanced
+StartupWMClass=tracklab-advanced

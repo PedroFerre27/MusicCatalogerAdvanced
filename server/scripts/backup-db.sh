@@ -1,5 +1,10 @@
 #!/bin/bash
-# backup-db.sh — Backup quotidiano DB Music Cataloger su Synology NAS.
+# backup-db.sh — Backup quotidiano DB TrackLab Server su Synology NAS.
+#
+# v0.2.5 (R5 rebrand): nome prodotto cambiato in TrackLab, ma i path
+# filesystem NAS restano /volume1/docker/music-cataloger/... per non
+# spostare il DB in produzione. Migrazione path rimandata a branch
+# dedicato (vedi ROADMAP).
 #
 # Cosa fa:
 #   1. Copia /volume1/docker/music-cataloger/data/app.db
@@ -13,7 +18,7 @@
 #   2. chmod +x /volume1/docker/music-cataloger/scripts/backup-db.sh
 #   3. DSM → Pannello di controllo → Utilità di pianificazione → Crea
 #      → "Attività pianificata" → "Script definito dall'utente"
-#         Generale: nome "DB Backup Music Cataloger", utente: root
+#         Generale: nome "DB Backup TrackLab", utente: root
 #         Pianificazione: Giornaliera, alle 03:30
 #         Impostazioni attività: comando =
 #            /volume1/docker/music-cataloger/scripts/backup-db.sh

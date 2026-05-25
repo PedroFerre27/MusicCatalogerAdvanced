@@ -5,8 +5,8 @@ GET  /version/latest             → {version, exe_url, sha256, changelog, manda
 GET  /downloads/{filename}       → serve il file EXE dal volume /srv/app/data/releases
 
 DEPLOYMENT NAS:
-- L'admin carica gli EXE in /volume1/docker/music-cataloger/data/releases/
-- Aggiorna /volume1/docker/music-cataloger/data/version.json con i metadati
+- L'admin carica gli EXE in /volume1/docker/tracklab/data/releases/
+- Aggiorna /volume1/docker/tracklab/data/version.json con i metadati
 - Il client al boot fa check e si auto-aggiorna
 
 version.json (formato):

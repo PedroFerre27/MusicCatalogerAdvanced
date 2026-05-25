@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-# Music Cataloger Advanced — PyInstaller spec
+# TrackLab — PyInstaller spec
 # v1085m: passato a ONEFILE mode per supportare auto-update via copy
 #
 # Modalità precedente (onedir COLLECT): EXE+_internal/ in cartella.
@@ -19,7 +19,7 @@ project_root = Path('.').absolute()
 # v1085m: assicuro che .ico esista prima della build. Se manca, lo
 # genero dal PNG sorgente con build_ico.py — evita che pyinstaller
 # fallisca silenziosamente sul `icon=` del blocco EXE.
-ico_path = project_root / 'icons' / 'music_cataloger.ico'
+ico_path = project_root / 'icons' / 'tracklab.ico'
 src_png  = project_root / 'icons' / 'app' / 'taskbar_active.png'
 if not ico_path.exists() and src_png.exists():
     print(f"[spec] {ico_path} non trovato, lo genero da {src_png}")
@@ -90,7 +90,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='Music Cataloger Advanced',
+    name='TrackLab',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -111,6 +111,6 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='icons/music_cataloger.ico',
+    icon='icons/tracklab.ico',
     version='version_info.txt',
 )

@@ -1,12 +1,12 @@
-# music_cataloger_macos.spec — Build macOS (Intel + Apple Silicon)
+# tracklab_macos.spec — Build macOS (Intel + Apple Silicon)
 #
 # USAGE su una macchina macOS:
 #   pip install pyinstaller customtkinter Pillow eyed3 mutagen requests
-#   pyinstaller music_cataloger_macos.spec --clean
+#   pyinstaller tracklab_macos.spec --clean
 #
 # Output:
-#   dist/Music Cataloger Advanced.app   (bundle .app)
-#   dist/Music Cataloger Advanced       (binary nudo, dentro al .app)
+#   dist/TrackLab.app   (bundle .app)
+#   dist/TrackLab       (binary nudo, dentro al .app)
 #
 # IMPORTANTE per gli amici di Pedro:
 # - L'app NON è firmata col certificato Apple Developer ($99/anno).
@@ -72,7 +72,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='Music Cataloger Advanced',
+    name='TrackLab',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -91,15 +91,15 @@ exe = EXE(
 # ── BUNDLE .app (specifico macOS) ─────────────────────────────
 # Senza questo blocco PyInstaller produce solo un binario, non un
 # bundle aprible da Finder. Il BUNDLE wrappa l'EXE in una struttura
-# Music Cataloger Advanced.app/
+# TrackLab.app/
 #   Contents/
 #     Info.plist
-#     MacOS/Music Cataloger Advanced
+#     MacOS/TrackLab
 #     Resources/icon.icns
 app = BUNDLE(
     exe,
-    name='Music Cataloger Advanced.app',
-    icon='icons/music_cataloger.icns',  # se presente, altrimenti None
+    name='TrackLab.app',
+    icon='icons/tracklab.icns',  # se presente, altrimenti None
     bundle_identifier='com.pedromarques.musiccataloger',
     info_plist={
         'CFBundleShortVersionString': '1.0.85',
@@ -108,6 +108,6 @@ app = BUNDLE(
         'LSMinimumSystemVersion': '10.13.0',
         # Necessario per Tk + accesso alla cartella musica utente
         'NSAppleEventsUsageDescription':
-            'Music Cataloger needs to access music files to organize them.',
+            'TrackLab needs to access music files to organize them.',
     },
 )

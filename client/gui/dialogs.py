@@ -12,7 +12,7 @@ class AboutDialog(tk.Toplevel):
     def __init__(self, parent):
         super().__init__(parent)
         
-        self.title("About Music Cataloger Advanced")
+        self.title("About TrackLab")
         self.resizable(False, False)
         
         # Centra il dialog
@@ -27,7 +27,7 @@ class AboutDialog(tk.Toplevel):
         # Logo/Title
         title_label = tk.Label(
             main_frame,
-            text="🎵 Music Cataloger Advanced",
+            text="🎵 TrackLab",
             font=AppStyles.FONTS['title']
         )
         title_label.pack(pady=(0, 10))

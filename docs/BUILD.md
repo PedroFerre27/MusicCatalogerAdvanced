@@ -1,4 +1,4 @@
-# BUILD — Music Cataloger Advanced
+# BUILD — TrackLab
 
 Guida unica per buildare il programma su Windows, Linux e macOS.
 Sostituisce i vecchi BUILD_INSTRUCTIONS.md, BUILD_CROSS_PLATFORM.md
@@ -28,7 +28,7 @@ cross-platform vedi la sezione finale.
 - Pip aggiornato: `python -m pip install --upgrade pip`
 
 ```cmd
-cd C:\dev\music-cataloger
+cd C:\dev\tracklab
 pip install -r requirements.txt
 pip install pyinstaller
 ```
@@ -36,32 +36,32 @@ pip install pyinstaller
 ### Build (raccomandato — directory mode)
 ```cmd
 python build_ico.py
-pyinstaller music_cataloger.spec --clean --noconfirm
+pyinstaller tracklab.spec --clean --noconfirm
 ```
 
-Output: `dist\Music Cataloger Advanced\Music Cataloger Advanced.exe`
+Output: `dist\TrackLab\TrackLab.exe`
 
 Avvio più veloce, ma è una cartella intera da distribuire.
 
 ### Build alternativa — file singolo portable
 ```cmd
 pyinstaller --onefile --windowed ^
-    --icon=icons\music_cataloger.ico ^
+    --icon=icons\tracklab.ico ^
     --version-file=version_info.txt ^
-    --name "MusicCataloger" ^
+    --name "TrackLab" ^
     --add-data "config;config" ^
     --add-data "gui;gui" ^
     --add-data "icons;icons" ^
     run_gui.py
 ```
 
-Output: `dist\MusicCataloger.exe` (file singolo, ~100MB+).
+Output: `dist\TrackLab.exe` (file singolo, ~100MB+).
 
 Più lento al primo avvio (estrae in `/tmp`) ma più facile da
 distribuire (1 solo file).
 
 ### Verifica versione nell'EXE
-Dopo il build, click destro su `Music Cataloger Advanced.exe` →
+Dopo il build, click destro su `TrackLab.exe` →
 Proprietà → Dettagli. Devi vedere la versione corrente (es.
 `1.0.88.0` per v1088.0). Se non corrisponde, hai dimenticato di
 aggiornare `version_info.txt` (vedi nota sotto).
@@ -98,8 +98,8 @@ sudo pacman -S --needed python python-pip tk git \
 
 ### Clone e setup
 ```bash
-git clone https://github.com/PedroFerre27/MusicCatalogerAdvanced.git
-cd MusicCatalogerAdvanced
+git clone https://github.com/PedroFerre27/TrackLab.git
+cd TrackLab
 git checkout vXXXX-stable    # ultimo tag stabile
 
 python3 -m venv .venv
@@ -112,14 +112,14 @@ pip install pyinstaller
 ### Build
 ```bash
 rm -rf ~/.cache/pyinstaller build/ dist/ 2>/dev/null
-pyinstaller music_cataloger_linux.spec --clean --noconfirm
+pyinstaller tracklab_linux.spec --clean --noconfirm
 ```
 
-Output: `dist/music-cataloger-advanced` (~100-130 MB, file singolo).
+Output: `dist/tracklab-advanced` (~100-130 MB, file singolo).
 
 ### Test
 ```bash
-./dist/music-cataloger-advanced
+./dist/tracklab-advanced
 ```
 
 Server (configurato di default): `https://api.choros27.synology.me`.
@@ -128,30 +128,30 @@ Le credenziali le fornisce Pedro.
 ### Installazione "vera" (opzionale)
 ```bash
 mkdir -p ~/.local/bin
-cp dist/music-cataloger-advanced ~/.local/bin/
+cp dist/tracklab-advanced ~/.local/bin/
 
 mkdir -p ~/.local/share/icons/hicolor/256x256/apps
 cp icons/app/taskbar_active.png \
-   ~/.local/share/icons/hicolor/256x256/apps/music-cataloger.png
+   ~/.local/share/icons/hicolor/256x256/apps/tracklab.png
 
 mkdir -p ~/.local/share/applications
-cp music-cataloger.desktop ~/.local/share/applications/
+cp tracklab.desktop ~/.local/share/applications/
 
 update-desktop-database ~/.local/share/applications/
 gtk-update-icon-cache ~/.local/share/icons/hicolor/ 2>/dev/null || true
 ```
 
-Trovi "Music Cataloger" nelle Activities/menu app.
+Trovi "TrackLab" nelle Activities/menu app.
 
 ### Aggiornamenti
 L'auto-update non funziona ancora su Linux. Aggiorna manualmente:
 ```bash
-cd ~/MusicCatalogerAdvanced
+cd ~/TrackLab
 git fetch --tags
 git checkout vNUOVATAG-stable
 source .venv/bin/activate
-pyinstaller music_cataloger_linux.spec --clean --noconfirm
-cp dist/music-cataloger-advanced ~/.local/bin/
+pyinstaller tracklab_linux.spec --clean --noconfirm
+cp dist/tracklab-advanced ~/.local/bin/
 ```
 
 ---
@@ -166,27 +166,27 @@ Se hai un Mac (Intel o Apple Silicon):
 ```bash
 pip install pyinstaller customtkinter Pillow eyed3 mutagen \
     requests pyjwt musicbrainzngs
-pyinstaller music_cataloger_macos.spec --clean
+pyinstaller tracklab_macos.spec --clean
 ```
 
-Output: `dist/Music Cataloger Advanced.app` (bundle macOS).
+Output: `dist/TrackLab.app` (bundle macOS).
 
 ### Conversione PNG → ICNS (icona macOS)
 Per avere l'icona "vera" su macOS serve un file `.icns`:
 
 ```bash
 # Su macOS (sips e iconutil sono preinstallati)
-mkdir music_cataloger.iconset
+mkdir tracklab.iconset
 for size in 16 32 128 256 512; do
     sips -z $size $size icons/app/taskbar_active.png \
-        --out music_cataloger.iconset/icon_${size}x${size}.png
+        --out tracklab.iconset/icon_${size}x${size}.png
     sips -z $((size*2)) $((size*2)) icons/app/taskbar_active.png \
-        --out music_cataloger.iconset/icon_${size}x${size}@2x.png
+        --out tracklab.iconset/icon_${size}x${size}@2x.png
 done
 cp icons/app/taskbar_active.png \
-   music_cataloger.iconset/icon_512x512@2x.png
-iconutil -c icns music_cataloger.iconset \
-   -o icons/music_cataloger.icns
+   tracklab.iconset/icon_512x512@2x.png
+iconutil -c icns tracklab.iconset \
+   -o icons/tracklab.icns
 ```
 
 ### Avvertenza distribuzione macOS
@@ -250,21 +250,21 @@ DEVONO coincidere.
 ### Step 2 — Build EXE
 ```cmd
 python build_ico.py
-pyinstaller music_cataloger.spec --clean --noconfirm
+pyinstaller tracklab.spec --clean --noconfirm
 ```
 
 ### Step 3 — Verifica versione nell'EXE
-Click destro su `dist\...\Music Cataloger Advanced.exe` → Proprietà
+Click destro su `dist\...\TrackLab.exe` → Proprietà
 → Dettagli. La FileVersion deve corrispondere.
 
 ### Step 4 — Calcola SHA256
 ```cmd
-certutil -hashfile "dist\Music Cataloger Advanced\Music Cataloger Advanced.exe" SHA256
+certutil -hashfile "dist\TrackLab\TrackLab.exe" SHA256
 ```
 Copia l'hash (riga sotto al messaggio "SHA256 hash...").
 
 ### Step 5 — Carica l'EXE sul NAS
-Carica l'EXE in `/volume1/docker/music-cataloger-server/data/releases/`
+Carica l'EXE in `/volume1/docker/tracklab-server/data/releases/`
 sul NAS (via DSM File Station, scp, o quello che preferisci).
 Convenzione nome: `Music_Cataloger_vXXXX.exe`.
 
@@ -293,9 +293,9 @@ git push origin v1088.0-stable
 ```
 
 ### Step 8 — GitHub Release (opzionale ma utile)
-Vai su https://github.com/PedroFerre27/MusicCatalogerAdvanced/releases/new
+Vai su https://github.com/PedroFerre27/TrackLab/releases/new
 - Tag: `v1088.0-stable`
-- Title: `Music Cataloger v1088.0`
+- Title: `TrackLab v1088.0`
 - Description: changelog
 - Attach: l'EXE buildato (trascinalo)
 - Publish

@@ -1,10 +1,10 @@
 @echo off
-title Music Cataloger Advanced GUI
+title TrackLab GUI
 color 0A
 
 echo.
 echo ====================================
-echo  Music Cataloger Advanced v0.0.2.0
+echo  TrackLab v0.0.2.0
 echo  GUI Launcher
 echo ====================================
 echo.

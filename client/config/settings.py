@@ -1,5 +1,5 @@
 """
-Configurazioni generali per Music Cataloger Advanced
+Configurazioni generali per TrackLab
 Tutte le impostazioni non sensibili (non API keys)
 """
 
@@ -291,7 +291,7 @@ class CacheSettings:
 
 @dataclass
 class LoggingSettings:
-    log_filename_pattern: str = "MusicCatalogerAdvanced_{timestamp}.log"
+    log_filename_pattern: str = "TrackLab_{timestamp}.log"
     console_level: str = "INFO"
     file_level: str = "DEBUG"
     max_log_files: int = 10
@@ -323,7 +323,7 @@ class Settings:
         self.files = FileSettings()
 
     def print_summary(self):
-        print("=== Configurazioni Music Cataloger ===")
+        print("=== Configurazioni TrackLab ===")
         print(f"API Timeout: {self.api.timeout}s")
         print(f"BPM Range: {self.bpm.valid_range_min}-{self.bpm.valid_range_max}")
         print(f"Generi mappati: {len(self.genre.genre_mapping)}")

@@ -239,7 +239,7 @@ class CoverService:
             r = requests.get(
                 'https://musicbrainz.org/ws/2/release/',
                 params={'query': q, 'limit': 1, 'fmt': 'json'},
-                headers={'User-Agent': 'MusicCatalogerAdvanced/0.20 (music@cataloger.local)'},
+                headers={'User-Agent': 'TrackLab/0.20 (music@cataloger.local)'},
                 timeout=10
             )
             if r.status_code != 200:
