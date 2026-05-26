@@ -194,6 +194,38 @@
     "title_select_dir": "Seleziona cartella musicale"
   },
 
+  "progress_bar": {
+    "waiting":   "In attesa...",
+    "completed": "Completato ✓",
+    "phase_cataloging":      "Fase 1/2 — Catalogazione",
+    "phase_classify_salsa":  "Fase 2/2 — Classifica Salsa"
+  },
+
+  "db_tab": {
+    "tip_reload":      "Aggiorna",
+    "search_placeholder": "🔍  Cerca nome file, genere, sottogenere...",
+    "count_records":   "{count} record",
+    "count_with_pages":"{count} record  •  pag. {page}/{pages}  ({start}-{end})",
+    "err_read":        "Errore lettura: {detail}",
+    "col_file":        "File",
+    "col_genre":       "Genere",
+    "col_subgenre":    "Subgenere",
+    "col_cataloged":   "Catalogato",
+    "btn_prev":        "◀ Prec",
+    "btn_next":        "Succ ▶"
+  },
+
+  "genres_tab": {
+    "intro":            "Seleziona i generi attivi nella tua collezione.",
+    "btn_save":         "💾  Salva",
+    "tip_hint":         "💡 Deseleziona i generi da escludere dalla catalogazione, poi clicca Salva",
+    "btn_select_all":   "✓ Tutto",
+    "btn_select_none":  "✗ Nessuno",
+    "status_saved":     "✓  Preferenze generi salvate",
+    "err_save_title":   "Errore",
+    "err_save_body":    "Impossibile salvare le preferenze:\n{detail}"
+  },
+
   "plans_sub": {
     "current_plan_label": "Piano corrente: {plan}",
     "btn_request_upgrade": "⬆  Richiedi upgrade del piano",

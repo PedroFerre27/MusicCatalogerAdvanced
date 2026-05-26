@@ -194,6 +194,38 @@
     "title_select_dir": "Select music folder"
   },
 
+  "progress_bar": {
+    "waiting":   "Waiting...",
+    "completed": "Done ✓",
+    "phase_cataloging":      "Phase 1/2 — Cataloging",
+    "phase_classify_salsa":  "Phase 2/2 — Classify Salsa"
+  },
+
+  "db_tab": {
+    "tip_reload":      "Refresh",
+    "search_placeholder": "🔍  Search file name, genre, subgenre...",
+    "count_records":   "{count} records",
+    "count_with_pages":"{count} records  •  page {page}/{pages}  ({start}-{end})",
+    "err_read":        "Read error: {detail}",
+    "col_file":        "File",
+    "col_genre":       "Genre",
+    "col_subgenre":    "Subgenre",
+    "col_cataloged":   "Cataloged",
+    "btn_prev":        "◀ Prev",
+    "btn_next":        "Next ▶"
+  },
+
+  "genres_tab": {
+    "intro":            "Select the genres active in your collection.",
+    "btn_save":         "💾  Save",
+    "tip_hint":         "💡 Uncheck the genres to exclude from cataloging, then click Save",
+    "btn_select_all":   "✓ All",
+    "btn_select_none":  "✗ None",
+    "status_saved":     "✓  Genre preferences saved",
+    "err_save_title":   "Error",
+    "err_save_body":    "Could not save preferences:\n{detail}"
+  },
+
   "plans_sub": {
     "current_plan_label": "Current plan: {plan}",
     "btn_request_upgrade": "⬆  Request a plan upgrade",

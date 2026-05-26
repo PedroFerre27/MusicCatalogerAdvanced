@@ -163,9 +163,12 @@ BTN_H = 36
 class LabeledProgressBar(ctk.CTkFrame):
     def __init__(self, parent, **kwargs):
         super().__init__(parent, fg_color="transparent", **kwargs)
+        # v1092.0 (R6.1 fase 3): stringhe i18n (init_i18n e' gia' stato
+        # chiamato in run_gui.py PRIMA della costruzione della GUI).
+        from services.i18n import t as _t
 
         self._pct_var   = ctk.StringVar(value="0%")
-        self._file_var  = ctk.StringVar(value="In attesa...")
+        self._file_var  = ctk.StringVar(value=_t("progress_bar.waiting"))
         self._phase_var = ctk.StringVar(value="")
         self._eta_var   = ctk.StringVar(value="")  # v1045: ETA dedicata
 
@@ -226,23 +229,27 @@ class LabeledProgressBar(ctk.CTkFrame):
             short = filename if len(filename) <= 50 else "..." + filename[-47:]
             self._file_var.set(short)
         if phase:
+            # v1092.0: phase id (chiave invariante) -> label i18n
+            from services.i18n import t as _t
             labels = {
-                'catalogazione': 'Fase 1/2 — Catalogazione',
-                'classifica_salsa': 'Fase 2/2 — Classifica Salsa',
+                'catalogazione':    _t("progress_bar.phase_cataloging"),
+                'classifica_salsa': _t("progress_bar.phase_classify_salsa"),
             }
             self._phase_var.set(labels.get(phase, phase))
 
     def reset(self):
+        from services.i18n import t as _t
         self._bar.set(0)
         self._pct_var.set("0%")
-        self._file_var.set("In attesa...")
+        self._file_var.set(_t("progress_bar.waiting"))
         self._phase_var.set("")
         self._eta_var.set("")
 
     def complete(self):
+        from services.i18n import t as _t
         self._bar.set(1.0)
         self._pct_var.set("100%")
-        self._file_var.set("Completato ✓")
+        self._file_var.set(_t("progress_bar.completed"))
         self._phase_var.set("")
         self._eta_var.set("")
 
@@ -3045,6 +3052,8 @@ class TrackLabGUI:
 
     def _build_db_tab(self, parent):
         """v1068: toolbar compatta su singola riga, header integrato."""
+        # v1092.0 (R6.1 fase 3.c): tab interamente i18n
+        from services.i18n import t as _t
         parent.rowconfigure(1, weight=1)
 
         # ── Riga unica: Ricarica | Cerca | Contatore ─────────────────────────
@@ -3059,7 +3068,7 @@ class TrackLabGUI:
             font=FONT_SMALL, image=_ic_rel, command=self._db_reload,
         )
         _btn_db_reload.grid(row=0, column=0, padx=(4, 2), pady=3)
-        self._add_tooltip(_btn_db_reload, "Aggiorna")
+        self._add_tooltip(_btn_db_reload, _t("db_tab.tip_reload"))
 
         self._db_search_var = ctk.StringVar()
         self._db_search_after = None
@@ -3070,12 +3079,12 @@ class TrackLabGUI:
         self._db_search_var.trace_add("write", _db_search_debounced)
         ctk.CTkEntry(
             toolbar, textvariable=self._db_search_var, height=28,
-            placeholder_text="🔍  Cerca nome file, genere, sottogenere...",
+            placeholder_text=_t("db_tab.search_placeholder"),
             font=FONT_SMALL, fg_color=PALETTE["bg"],
             border_width=0,
         ).grid(row=0, column=1, sticky="ew", padx=(2, 6), pady=3)
 
-        self._db_count_var = ctk.StringVar(value="0 record")
+        self._db_count_var = ctk.StringVar(value=_t("db_tab.count_records", count=0))
         ctk.CTkLabel(toolbar, textvariable=self._db_count_var,
                      font=FONT_SMALL, text_color=PALETTE["text_dim"]
                      ).grid(row=0, column=2, padx=(0, 8))
@@ -3086,7 +3095,10 @@ class TrackLabGUI:
         db_hdr.grid_propagate(False)
         db_hdr.columnconfigure(0, weight=1)
         for _hc, (_hl, _hw) in enumerate([
-            ("File", 0), ("Genere", 120), ("Subgenere", 110), ("Catalogato", 130)
+            (_t("db_tab.col_file"), 0),
+            (_t("db_tab.col_genre"), 120),
+            (_t("db_tab.col_subgenre"), 110),
+            (_t("db_tab.col_cataloged"), 130),
         ]):
             ctk.CTkLabel(db_hdr, text=_hl,
                          font=(FONT_SMALL[0], FONT_SMALL[1], "bold"),
@@ -3127,7 +3139,8 @@ class TrackLabGUI:
                     if not p.startswith("__orphan__:")
                 }
             except Exception as e:
-                self._db_count_var.set(f"Errore lettura: {e}")
+                from services.i18n import t as _t
+                self._db_count_var.set(_t("db_tab.err_read", detail=str(e)))
         self._db_filter()
 
     def _db_filter(self, page: int = 0):
@@ -3156,12 +3169,14 @@ class TrackLabGUI:
         page_items = items[start:end]
 
         # Contatore con info pagina
+        from services.i18n import t as _t
         if total > PAGE_SIZE:
             self._db_count_var.set(
-                f"{total} record  •  pag. {page+1}/{pages}  ({start+1}-{end})"
+                _t("db_tab.count_with_pages", count=total,
+                   page=page+1, pages=pages, start=start+1, end=end)
             )
         else:
-            self._db_count_var.set(f"{total} record")
+            self._db_count_var.set(_t("db_tab.count_records", count=total))
 
         row_offset = 0  # header ora è fisso fuori dallo scrollframe
 
@@ -3195,7 +3210,7 @@ class TrackLabGUI:
             nav = ctk.CTkFrame(self._db_list_frame, fg_color="transparent")
             nav.grid(row=len(page_items) + row_offset, column=0, pady=6)
             if page > 0:
-                ctk.CTkButton(nav, text="◀ Prec", width=80, font=FONT_SMALL,
+                ctk.CTkButton(nav, text=_t("db_tab.btn_prev"), width=80, font=FONT_SMALL,
                               fg_color=PALETTE["surface2"],
                               command=lambda: self._db_filter(page - 1)
                               ).pack(side="left", padx=4)
@@ -3203,7 +3218,7 @@ class TrackLabGUI:
                          font=FONT_SMALL, text_color=PALETTE["text_dim"]
                          ).pack(side="left", padx=8)
             if page < pages - 1:
-                ctk.CTkButton(nav, text="Succ ▶", width=80, font=FONT_SMALL,
+                ctk.CTkButton(nav, text=_t("db_tab.btn_next"), width=80, font=FONT_SMALL,
                               fg_color=PALETTE["surface2"],
                               command=lambda: self._db_filter(page + 1)
                               ).pack(side="left", padx=4)
@@ -4298,6 +4313,8 @@ class TrackLabGUI:
 
     def _build_genres_tab(self, parent):
         """v1049: tab Generi Preferiti — l'utente personalizza macro e subgeneri attivi."""
+        # v1092.0 (R6.1 fase 3.c): i18n
+        from services.i18n import t as _t
         import json as _json
 
         # Carica preferenze salvate
@@ -4313,22 +4330,22 @@ class TrackLabGUI:
         toolbar = ctk.CTkFrame(parent, fg_color="transparent")
         toolbar.pack(fill="x", padx=8, pady=(8, 4))
         ctk.CTkLabel(toolbar,
-                     text="Seleziona i generi attivi nella tua collezione.",
+                     text=_t("genres_tab.intro"),
                      font=FONT_SMALL, text_color=PALETTE["text_dim"]
                      ).pack(side="left", padx=(4, 12))
-        ctk.CTkButton(toolbar, text="💾  Salva", width=90,
+        ctk.CTkButton(toolbar, text=_t("genres_tab.btn_save"), width=90,
                       fg_color=PALETTE["primary"], hover_color=PALETTE["primary_hover"],
                       font=FONT_SMALL, command=self._save_genre_prefs,
                       ).pack(side="right", padx=(4, 0))
         ctk.CTkLabel(toolbar,
-                     text="💡 Deseleziona i generi da escludere dalla catalogazione, poi clicca Salva",
+                     text=_t("genres_tab.tip_hint"),
                      font=(FONT_SMALL[0], FONT_SMALL[1]-1), text_color=PALETTE["text_dim"]
                      ).pack(side="left", padx=(8, 0))
-        ctk.CTkButton(toolbar, text="✓ Tutto", width=80,
+        ctk.CTkButton(toolbar, text=_t("genres_tab.btn_select_all"), width=80,
                       fg_color=PALETTE["surface2"], hover_color=PALETTE["primary"],
                       font=FONT_SMALL, command=lambda: self._set_all_genres(True),
                       ).pack(side="right", padx=4)
-        ctk.CTkButton(toolbar, text="✗ Nessuno", width=90,
+        ctk.CTkButton(toolbar, text=_t("genres_tab.btn_select_none"), width=90,
                       fg_color=PALETTE["surface2"], hover_color=PALETTE["accent"],
                       font=FONT_SMALL, command=lambda: self._set_all_genres(False),
                       ).pack(side="right", padx=4)
@@ -4414,15 +4431,18 @@ class TrackLabGUI:
             f"{mk}::{sub}": var.get()
             for (mk, sub), var in self._genre_vars.items()
         }
+        from services.i18n import t as _t
         try:
             self._genre_prefs_file.write_text(
                 _json.dumps(prefs, indent=2, ensure_ascii=False), encoding="utf-8"
             )
             # Feedback visivo breve
-            self._status_var.set("✓  Preferenze generi salvate")
-            self.root.after(2500, lambda: self._status_var.set("✓  Pronto"))
+            self._status_var.set(_t("genres_tab.status_saved"))
+            self.root.after(2500,
+                            lambda: self._status_var.set(_t("left_panel.status_ready")))
         except Exception as e:
-            messagebox.showerror("Errore", f"Impossibile salvare le preferenze:\n{e}")
+            messagebox.showerror(_t("genres_tab.err_save_title"),
+                                 _t("genres_tab.err_save_body", detail=str(e)))
 
     # ─── TAB: IMPOSTAZIONI AVANZATE ───────────────────────────────────────────
 
