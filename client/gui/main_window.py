@@ -4512,6 +4512,8 @@ class TrackLabGUI:
 
     def _build_caribbean_tab(self, parent):
         """v1071b: Tab Classificazione Caraibica — gestione artisti noti, BPM, priorità."""
+        # v1092.0 (R6.1 fase 3.f): tab interamente i18n
+        from services.i18n import t as _t
         import json as _json
 
         def _load_carib_settings():
@@ -4543,16 +4545,18 @@ class TrackLabGUI:
             return frm
 
         # ── Priorità classificazione — DRAG & DROP con Listbox ──────────
-        frm_prio = csection("  Priorità Classificazione", "Trascina le voci per riordinare la priorità. La prima ha la precedenza massima.", icon_name="classify")
+        frm_prio = csection(_t("caribbean_tab.section_priority"),
+                            _t("caribbean_tab.section_priority_desc"),
+                            icon_name="classify")
 
         import tkinter as _tk_prio
 
         self._prio_items = [
-            "Nome file (parola 'Salsa'/'Bachata'…)",
-            "Artisti noti (lista configurata sotto)",
-            "DB online (MusicBrainz, Deezer, iTunes)",
-            "Detection BPM + indicatori testuali",
-            "Metadati ID3 già presenti nel file",
+            _t("caribbean_tab.prio_filename"),
+            _t("caribbean_tab.prio_artists"),
+            _t("caribbean_tab.prio_online_db"),
+            _t("caribbean_tab.prio_bpm_detect"),
+            _t("caribbean_tab.prio_id3"),
         ]
 
         prio_frame = ctk.CTkFrame(frm_prio, fg_color=PALETTE["bg"], corner_radius=6)
@@ -4570,7 +4574,7 @@ class TrackLabGUI:
             self._prio_listbox.insert("end", f"  {i+1}°  {item}")
 
         hint_prio = ctk.CTkLabel(prio_frame,
-            text="⬆ Su / ⬇ Giù  — seleziona e clicca per spostare",
+            text=_t("caribbean_tab.prio_hint"),
             font=(FONT_SMALL[0], FONT_SMALL[1]-1), text_color=PALETTE["text_dim"])
         hint_prio.pack(pady=(0, 4))
 
@@ -4616,7 +4620,7 @@ class TrackLabGUI:
                       fg_color=PALETTE["surface2"], hover_color=PALETTE["primary"],
                       command=lambda: _prio_move(-1))
         btn_su.pack(side="left", padx=4)
-        _tooltip_carib(btn_su, "Sposta su — aumenta priorità")
+        _tooltip_carib(btn_su, _t("caribbean_tab.tip_move_up"))
 
         btn_giu = ctk.CTkButton(btn_prio_frm,
                        text="" if _ic_down else "⬇", image=_ic_down,
@@ -4624,10 +4628,12 @@ class TrackLabGUI:
                        fg_color=PALETTE["surface2"], hover_color=PALETTE["primary"],
                        command=lambda: _prio_move(1))
         btn_giu.pack(side="left", padx=4)
-        _tooltip_carib(btn_giu, "Sposta giù — diminuisce priorità")
+        _tooltip_carib(btn_giu, _t("caribbean_tab.tip_move_down"))
 
         # ── Range BPM ────────────────────────────────────────────────────
-        frm_bpm = csection("  Range BPM", "I range BPM usati per supportare la classificazione Salsa/Bachata.", icon_name="bpm_range")
+        frm_bpm = csection(_t("caribbean_tab.section_bpm_range"),
+                           _t("caribbean_tab.section_bpm_range_desc"),
+                           icon_name="bpm_range")
 
         try:
             from config.settings import settings as _s
@@ -4643,8 +4649,12 @@ class TrackLabGUI:
         self._carib_s_max = ctk.StringVar(value=str(s_max))
 
         for label, vmin, vmax, hint in [
-            ("Bachata BPM:", self._carib_b_min, self._carib_b_max, "tipico: 90–130"),
-            ("Salsa BPM:",   self._carib_s_min, self._carib_s_max, "tipico: 70–200"),
+            (_t("caribbean_tab.label_bachata_bpm"),
+             self._carib_b_min, self._carib_b_max,
+             _t("caribbean_tab.hint_bachata_typical")),
+            (_t("caribbean_tab.label_salsa_bpm"),
+             self._carib_s_min, self._carib_s_max,
+             _t("caribbean_tab.hint_salsa_typical")),
         ]:
             row_bpm = ctk.CTkFrame(frm_bpm, fg_color="transparent")
             row_bpm.pack(fill="x", padx=12, pady=4)
@@ -4664,7 +4674,9 @@ class TrackLabGUI:
         ctk.CTkLabel(frm_bpm, text="", font=FONT_SMALL).pack(pady=2)
 
         # ── Difficoltà Salsa (range BPM per classificazione velocità) ────
-        frm_sal_diff = csection("  Velocità Salsa per BPM", "Range BPM usati per classificare la difficoltà della Salsa in fase di catalogazione.", icon_name="velocita_bpm")
+        frm_sal_diff = csection(_t("caribbean_tab.section_salsa_speed"),
+                                _t("caribbean_tab.section_salsa_speed_desc"),
+                                icon_name="velocita_bpm")
 
         # difficulty_ranges: struttura {level: {min_bpm, max_bpm, description}} o {level: (min, max)}
         try:
@@ -4685,11 +4697,27 @@ class TrackLabGUI:
                 "3 - Media": (95, 99), "4 - Veloce": (100, 119), "5 - Crazy": (120, 999),
             }
 
+        # v1092.0 (R6.1 fase 3.f): mappa display ↔ chiave i18n per BPM levels.
+        # I level ID restano invarianti (italiani: "1 - Romantica", "2 - Lenta",
+        # ecc.) perché sono usati come chiavi in config/settings.py
+        # difficulty_ranges → cambiarli romperebbe la classificazione esistente.
+        # Solo il DISPLAY passa per i18n. Refactor strutturale (id puro
+        # vs display localizzato) pianificato in fase 4.1.
+        _BPM_LEVEL_I18N = {
+            "1 - Romantica": "level_1",
+            "2 - Lenta":     "level_2",
+            "3 - Media":     "level_3",
+            "4 - Veloce":    "level_4",
+            "5 - Crazy":     "level_5",
+        }
         self._carib_diff_vars = {}
         for level, (bmin, bmax) in diff_ranges.items():
             row_d = ctk.CTkFrame(frm_sal_diff, fg_color="transparent")
             row_d.pack(fill="x", padx=12, pady=3)
-            ctk.CTkLabel(row_d, text=f"{level}:", font=FONT_SMALL,
+            # Display localizzato; fallback al level ID se sconosciuto
+            level_key = _BPM_LEVEL_I18N.get(level)
+            level_display = (_t(f"bpm_levels.{level_key}") if level_key else level)
+            ctk.CTkLabel(row_d, text=f"{level_display}:", font=FONT_SMALL,
                          text_color=PALETTE["text"], width=120, anchor="w"
                          ).pack(side="left")
             vmin_d = ctk.StringVar(value=str(bmin))
@@ -4706,7 +4734,9 @@ class TrackLabGUI:
         ctk.CTkLabel(frm_sal_diff, text="", font=FONT_SMALL).pack(pady=2)
 
         # ── Artisti Salsa ────────────────────────────────────────────────
-        frm_salsa = csection("  Artisti Salsa Noti", "Uno per riga. Corrispondenza parziale sul nome artista (case-insensitive).", icon_name="artisti_noti")
+        frm_salsa = csection(_t("caribbean_tab.section_salsa_artists"),
+                             _t("caribbean_tab.section_salsa_artists_desc"),
+                             icon_name="artisti_noti")
         try:
             from config.settings import settings as _s
             salsa_artists = [x for x in _s.genre.salsa_indicators
@@ -4722,7 +4752,9 @@ class TrackLabGUI:
         self._carib_salsa_txt.insert("end", "\n".join(salsa_artists))
 
         # ── Artisti Bachata ──────────────────────────────────────────────
-        frm_bach = csection("  Artisti Bachata Noti", "Uno per riga. Corrispondenza parziale sul nome artista (case-insensitive).", icon_name="artisti_noti")
+        frm_bach = csection(_t("caribbean_tab.section_bachata_artists"),
+                            _t("caribbean_tab.section_bachata_artists_desc"),
+                            icon_name="artisti_noti")
         try:
             from config.settings import settings as _s
             bach_artists = [x for x in _s.genre.bachata_indicators
@@ -4738,7 +4770,9 @@ class TrackLabGUI:
         self._carib_bach_txt.insert("end", "\n".join(bach_artists))
 
         # ── Indicatori testuali ──────────────────────────────────────────
-        frm_ind = csection("  Indicatori Testuali (Salsa)", "Parole chiave cercate nel titolo/artista/filename per identificare la Salsa. Una per riga.", icon_name="indicatori")
+        frm_ind = csection(_t("caribbean_tab.section_salsa_keywords"),
+                           _t("caribbean_tab.section_salsa_keywords_desc"),
+                           icon_name="indicatori")
         try:
             from config.settings import settings as _s
             salsa_kw = [x for x in _s.genre.salsa_indicators
@@ -4754,7 +4788,9 @@ class TrackLabGUI:
         self._carib_salkw_txt.insert("end", "\n".join(salsa_kw))
 
         # ── Indicatori testuali Bachata ──────────────────────────────────
-        frm_ind_bach = csection("  Indicatori Testuali (Bachata)", "Parole chiave per identificare la Bachata nel titolo/artista/filename. Una per riga.", icon_name="indicatori")
+        frm_ind_bach = csection(_t("caribbean_tab.section_bachata_keywords"),
+                                _t("caribbean_tab.section_bachata_keywords_desc"),
+                                icon_name="indicatori")
         try:
             from config.settings import settings as _s
             bach_kw = [x for x in _s.genre.bachata_indicators
@@ -4775,14 +4811,14 @@ class TrackLabGUI:
         btn_row_carib = ctk.CTkFrame(scroll, fg_color="transparent")
         btn_row_carib.pack(pady=(8, 16))
         ctk.CTkButton(
-            btn_row_carib, text="💾  Salva impostazioni",
+            btn_row_carib, text=_t("caribbean_tab.btn_save"),
             fg_color=PALETTE["primary"], hover_color=PALETTE["primary_hover"],
             font=FONT_BODY, command=self._save_caribbean_settings
         ).pack(side="left", padx=4)
         if (self.api_client is not None
                 and self.user_info.get("is_admin", False)):
             ctk.CTkButton(
-                btn_row_carib, text="📤  Pubblica come default per tutti",
+                btn_row_carib, text=_t("caribbean_tab.btn_publish_admin"),
                 fg_color="#50aa70", hover_color="#3d8856",
                 text_color="#ffffff",
                 font=FONT_BODY,
@@ -4797,6 +4833,8 @@ class TrackLabGUI:
         ancora un file locale `caribbean_settings.json` li riceveranno
         al prossimo boot.
         """
+        # v1092.0 (R6.1 fase 3.f): i18n
+        from services.i18n import t as _t
         from tkinter import messagebox
         import threading
 
@@ -4822,22 +4860,18 @@ class TrackLabGUI:
                         self._carib_bachkw_txt.get("1.0", "end").split("\n")
                         if l.strip()] if hasattr(self, "_carib_bachkw_txt") else []
         except Exception as e:
-            messagebox.showerror("Errore", f"Lettura impostazioni fallita:\n{e}")
+            messagebox.showerror(
+                _t("caribbean_tab.err_read_settings_title"),
+                _t("caribbean_tab.err_read_settings_body", detail=str(e)))
             return
 
         if not messagebox.askyesno(
-            "Pubblica default",
-            f"Pubblicare queste impostazioni come DEFAULT per tutti gli "
-            f"utenti?\n\n"
-            f"• Salsa BPM: {s_min}-{s_max}\n"
-            f"• Bachata BPM: {b_min}-{b_max}\n"
-            f"• Artisti salsa: {len(salsa_artists)}\n"
-            f"• Keyword salsa: {len(salsa_kw)}\n"
-            f"• Artisti bachata: {len(bach_artists)}\n"
-            f"• Keyword bachata: {len(bach_kw)}\n\n"
-            f"I clienti senza impostazioni locali le scaricheranno "
-            f"al prossimo avvio.\n"
-            f"Chi ha già una configurazione locale NON verrà sovrascritto."):
+            _t("caribbean_tab.publish_title"),
+            _t("caribbean_tab.publish_body",
+               s_min=s_min, s_max=s_max,
+               b_min=b_min, b_max=b_max,
+               n_sal_a=len(salsa_artists), n_sal_k=len(salsa_kw),
+               n_bac_a=len(bach_artists), n_bac_k=len(bach_kw))):
             return
 
         payload = {
@@ -4853,14 +4887,13 @@ class TrackLabGUI:
             try:
                 self.api_client.set_caribbean_defaults(payload)
                 self._safe_after(0, lambda: messagebox.showinfo(
-                    "Default pubblicati",
-                    "Le impostazioni caraibiche sono ora i default condivisi.\n\n"
-                    "I clienti senza file locale le scaricheranno al "
-                    "prossimo avvio dell'applicazione."))
+                    _t("caribbean_tab.publish_ok_title"),
+                    _t("caribbean_tab.publish_ok_body")))
             except Exception as e:
                 err_str = str(e)
                 self._safe_after(0, lambda: messagebox.showerror(
-                    "Errore", f"Pubblicazione fallita:\n{err_str}"))
+                    _t("caribbean_tab.publish_err_title"),
+                    _t("caribbean_tab.publish_err_body", detail=err_str)))
         threading.Thread(target=_w, daemon=True).start()
 
     @staticmethod
@@ -4916,6 +4949,8 @@ class TrackLabGUI:
 
     def _save_caribbean_settings(self):
         """v1072c: Salva le impostazioni caraibiche nelle settings runtime e su file JSON."""
+        # v1092.0 (R6.1 fase 3.f): i18n
+        from services.i18n import t as _t
         try:
             from config.settings import settings as _s
             import json as _json
@@ -4970,10 +5005,10 @@ class TrackLabGUI:
             )
             # Invalida la cache metadati per i file latini salvando il timestamp
             TrackLabGUI._mark_caribbean_cache_dirty_static()
-            messagebox.showinfo("Salvato",
-                "Impostazioni Caraibica salvate.\nVerranno caricate ad ogni avvio.")
+            messagebox.showinfo(_t("caribbean_tab.msg_saved_title"),
+                                _t("caribbean_tab.msg_saved_body"))
         except Exception as e:
-            messagebox.showerror("Errore", str(e))
+            messagebox.showerror(_t("caribbean_tab.err_save_title"), str(e))
 
     def _load_caribbean_settings(self):
         """Carica le impostazioni caraibiche da file JSON se disponibili.

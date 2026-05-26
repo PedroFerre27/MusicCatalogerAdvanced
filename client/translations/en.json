@@ -215,6 +215,64 @@
     "btn_next":        "Next ▶"
   },
 
+  "caribbean_tab": {
+    "section_priority":          "  Classification priority",
+    "section_priority_desc":     "Drag entries to reorder priority. The first one has top precedence.",
+    "prio_filename":             "File name (word 'Salsa'/'Bachata'…)",
+    "prio_artists":              "Known artists (list configured below)",
+    "prio_online_db":            "Online DB (MusicBrainz, Deezer, iTunes)",
+    "prio_bpm_detect":           "BPM detection + text indicators",
+    "prio_id3":                  "ID3 metadata already in the file",
+    "prio_hint":                 "⬆ Up / ⬇ Down  — select and click to move",
+    "tip_move_up":               "Move up — raise priority",
+    "tip_move_down":             "Move down — lower priority",
+
+    "section_bpm_range":         "  BPM range",
+    "section_bpm_range_desc":    "BPM ranges used to support Salsa/Bachata classification.",
+    "label_bachata_bpm":         "Bachata BPM:",
+    "label_salsa_bpm":           "Salsa BPM:",
+    "hint_bachata_typical":      "typical: 90–130",
+    "hint_salsa_typical":        "typical: 70–200",
+
+    "section_salsa_speed":       "  Salsa speed by BPM",
+    "section_salsa_speed_desc":  "BPM ranges used to classify Salsa difficulty during cataloging.",
+
+    "section_salsa_artists":     "  Known Salsa artists",
+    "section_salsa_artists_desc":"One per line. Partial match on artist name (case-insensitive).",
+    "section_bachata_artists":   "  Known Bachata artists",
+    "section_bachata_artists_desc":"One per line. Partial match on artist name (case-insensitive).",
+
+    "section_salsa_keywords":    "  Text indicators (Salsa)",
+    "section_salsa_keywords_desc":"Keywords searched in title/artist/filename to identify Salsa. One per line.",
+    "section_bachata_keywords":  "  Text indicators (Bachata)",
+    "section_bachata_keywords_desc":"Keywords to identify Bachata in title/artist/filename. One per line.",
+
+    "btn_save":                  "💾  Save settings",
+    "btn_publish_admin":         "📤  Publish as default for all users",
+
+    "msg_saved_title":           "Saved",
+    "msg_saved_body":            "Caribbean settings saved.\nWill be loaded at every launch.",
+    "err_save_title":            "Error",
+
+    "err_read_settings_title":   "Error",
+    "err_read_settings_body":    "Failed to read settings:\n{detail}",
+
+    "publish_title":             "Publish default",
+    "publish_body":               "Publish these settings as DEFAULT for all users?\n\n• Salsa BPM: {s_min}-{s_max}\n• Bachata BPM: {b_min}-{b_max}\n• Salsa artists: {n_sal_a}\n• Salsa keywords: {n_sal_k}\n• Bachata artists: {n_bac_a}\n• Bachata keywords: {n_bac_k}\n\nClients without local settings will download them on next launch.\nThose with a local config will NOT be overwritten.",
+    "publish_ok_title":          "Defaults published",
+    "publish_ok_body":           "Caribbean settings are now the shared defaults.\n\nClients without a local file will download them on the next application start.",
+    "publish_err_title":         "Error",
+    "publish_err_body":          "Publish failed:\n{detail}"
+  },
+
+  "bpm_levels": {
+    "level_1": "1 - Romantic",
+    "level_2": "2 - Slow",
+    "level_3": "3 - Medium",
+    "level_4": "4 - Fast",
+    "level_5": "5 - Crazy"
+  },
+
   "quality_tab": {
     "btn_analyze":     "🔍  Analyze",
     "btn_rescan":      "  Rescan",
