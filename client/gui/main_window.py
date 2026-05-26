@@ -3235,6 +3235,8 @@ class TrackLabGUI:
 
     def _build_quality_tab(self, parent):
         """v1065: tab Qualità — toolbar compatta, Treeview con intestazioni integrate."""
+        # v1092.0 (R6.1 fase 3.d): tab interamente i18n
+        from services.i18n import t as _t
         parent.rowconfigure(0, weight=0)  # toolbar
         parent.rowconfigure(1, weight=0)  # header fisso
         parent.rowconfigure(2, weight=1)  # lista scrollabile
@@ -3248,7 +3250,7 @@ class TrackLabGUI:
         toolbar.columnconfigure(2, weight=1)
 
         self._quality_scan_btn = ctk.CTkButton(
-            toolbar, text="🔍  Analizza", width=110,
+            toolbar, text=_t("quality_tab.btn_analyze"), width=110,
             fg_color=PALETTE["primary"], hover_color=PALETTE["primary_hover"],
             font=FONT_SMALL, command=self._quality_scan,
         )
@@ -3257,7 +3259,7 @@ class TrackLabGUI:
         # Riscansiona — a sinistra, vicino ad Analizza, nascosto finché non c'è cache
         _ic_reload2 = _get_icon("reload2", 20) if _ICONS_AVAILABLE else None
         self._quality_rescan_btn = ctk.CTkButton(
-            toolbar, text="  Riscansiona", width=120,
+            toolbar, text=_t("quality_tab.btn_rescan"), width=120,
             fg_color=PALETTE["surface2"], hover_color=PALETTE["primary"],
             font=FONT_SMALL, image=_ic_reload2, compound="left",
             command=self._quality_rescan,
@@ -3267,7 +3269,7 @@ class TrackLabGUI:
 
         # Col 2 = spacer elastico con contatore + ⚡ in una sola StringVar
         self._quality_count_var = ctk.StringVar(
-            value="Clicca Analizza — usa DB locale o legge i file MP3"
+            value=_t("quality_tab.intro_hint")
         )
         ctk.CTkLabel(toolbar, textvariable=self._quality_count_var,
                      font=FONT_SMALL, text_color=PALETTE["text_dim"]
@@ -3279,7 +3281,7 @@ class TrackLabGUI:
         )
         self._quality_cache_lbl.grid(row=0, column=2, padx=(10, 0), sticky="e")
 
-        ctk.CTkLabel(toolbar, text="Soglia:", font=FONT_SMALL,
+        ctk.CTkLabel(toolbar, text=_t("quality_tab.threshold_label"), font=FONT_SMALL,
                      text_color=PALETTE["text_dim"]).grid(row=0, column=4, padx=(0, 6))
         self._quality_threshold_var = ctk.StringVar(value="320")
         self._quality_built = False
@@ -3315,8 +3317,12 @@ class TrackLabGUI:
 
         self._quality_hdr_labels = []   # tenuti per poter aggiornare le frecce
         _hdr_defs = [
-            ("File", 0),  ("kbps", 60),        ("Qualità", 140),
-            ("Sample Rate", 90), ("RG", 30),   ("Cartella", 180),
+            (_t("quality_tab.col_file"), 0),
+            (_t("quality_tab.col_kbps"), 60),
+            (_t("quality_tab.col_quality"), 140),
+            (_t("quality_tab.col_sample_rate"), 90),
+            (_t("quality_tab.col_rg"), 30),
+            (_t("quality_tab.col_folder"), 180),
         ]
         for _c, (_l, _w) in enumerate(_hdr_defs):
             lbl = ctk.CTkLabel(
@@ -3363,10 +3369,13 @@ class TrackLabGUI:
 
     def _quality_scan(self, force: bool = False):
         """v1063: avvia analisi qualità — riusa data/quality_analysis.json se disponibile."""
+        # v1092.0 (R6.1 fase 3.d): i18n
+        from services.i18n import t as _t
         import threading, json as _json
         path = self._selected_path.get().strip()
         if not path or not Path(path).is_dir():
-            messagebox.showwarning("Attenzione", "Seleziona prima una directory musicale valida.")
+            messagebox.showwarning(_t("quality_tab.warn_select_dir_title"),
+                                   _t("quality_tab.warn_select_dir_body"))
             return
 
         for w in self._quality_list.winfo_children():
@@ -3385,7 +3394,7 @@ class TrackLabGUI:
                         # Mostra ⚡ etichetta e pulsante Riscansiona
                         self._quality_rescan_btn.grid()
                         self._quality_count_var.set(
-                            f"⚡  Risultati da cache — {total} file analizzati"
+                            _t("quality_tab.cache_results", total=total)
                         )
                         self._quality_cache_lbl.configure(text="")
                         self._quality_filter()
@@ -3397,7 +3406,7 @@ class TrackLabGUI:
         # Usiamo topmost + pulsante disabilitato per evitare doppi click
         self._quality_scan_btn.configure(state="disabled")
         prog_win = ctk.CTkToplevel(self.root)
-        prog_win.title("Analisi qualità in corso...")
+        prog_win.title(_t("quality_tab.prog_title"))
         self._set_win_icon(prog_win)          # v1074: icona uniforme su tutte le finestre
         prog_win.resizable(False, False)
         prog_win.attributes("-topmost", True)
@@ -3408,16 +3417,17 @@ class TrackLabGUI:
                 self._quality_prog_bar.stop()
                 prog_win.destroy()
                 self._quality_scan_btn.configure(state="normal")
-                self._quality_count_var.set("Analisi interrotta")
+                self._quality_count_var.set(_t("quality_tab.prog_interrupted"))
             except Exception:
                 pass
         prog_win.protocol("WM_DELETE_WINDOW", _force_close)
         prog_win.lift()
 
-        ctk.CTkLabel(prog_win, text="🔍  Analisi bitrate in corso...",
+        ctk.CTkLabel(prog_win, text=_t("quality_tab.prog_header"),
                      font=(FONT_SMALL[0], 13, "bold")).pack(pady=(20, 8))
         self._quality_prog_label = ctk.CTkLabel(prog_win,
-            text="Lettura DB locale...", font=FONT_SMALL, text_color=PALETTE["text_dim"])
+            text=_t("quality_tab.prog_reading_db"),
+            font=FONT_SMALL, text_color=PALETTE["text_dim"])
         self._quality_prog_label.pack()
         prog_bar = ctk.CTkProgressBar(prog_win, width=340, mode="indeterminate")
         prog_bar.pack(pady=(8, 16))
@@ -3425,7 +3435,7 @@ class TrackLabGUI:
 
         self._quality_prog_win = prog_win
         self._quality_prog_bar = prog_bar
-        self._quality_count_var.set("⏳  Analisi in corso...")
+        self._quality_count_var.set(_t("quality_tab.prog_running"))
 
         threading.Thread(target=self._quality_scan_thread, args=(path,), daemon=True).start()
 
@@ -3455,8 +3465,9 @@ class TrackLabGUI:
             except Exception:
                 pass
 
+        from services.i18n import t as _t
         self.root.after(0, lambda: self._quality_prog_label.configure(
-            text=f"DB locale: {len(db_kbps)} voci. Scansione file..."))
+            text=_t("quality_tab.prog_db_done", n=len(db_kbps))))
 
         # Fase 2: scansiona i file fisici, mutagen come fallback
         try:
@@ -3498,7 +3509,8 @@ class TrackLabGUI:
                 results.append((fname, kbps, folder, sr_khz, rg))
 
             if i % 30 == 0:
-                msg = f"File {i}/{total}  (mutagen: {mutagen_count})"
+                msg = _t("quality_tab.prog_file_count",
+                         i=i, total=total, n=mutagen_count)
                 self.root.after(0, lambda m=msg: self._quality_prog_label.configure(text=m))
 
         results.sort(key=lambda x: x[1])
@@ -3519,7 +3531,8 @@ class TrackLabGUI:
         except Exception:
             pass
 
-        db_note = f" — DB: {len(db_kbps)}, mutagen: {mutagen_count}"
+        db_note = _t("quality_tab.note_db_mutagen",
+                     db=len(db_kbps), mu=mutagen_count)
         self.root.after(0, lambda: self._quality_done(total, db_note))
 
     def _quality_done(self, total: int, note: str):
@@ -3625,19 +3638,22 @@ class TrackLabGUI:
         items  = filtered[start:end]
 
         # Contatore
+        from services.i18n import t as _t
         if total > PAGE_SIZE:
             self._quality_count_var.set(
-                f"{total} file ≤ {threshold} kbps  (su {n_tot} totali)"
-                f"  •  pag. {page+1}/{pages}  ({start+1}-{end})"
+                _t("quality_tab.count_with_pages", count=total,
+                   threshold=threshold, total_all=n_tot,
+                   page=page+1, pages=pages, start=start+1, end=end)
             )
         else:
             self._quality_count_var.set(
-                f"{total} file ≤ {threshold} kbps  (su {n_tot} totali)"
+                _t("quality_tab.count_results", count=total,
+                   threshold=threshold, total_all=n_tot)
             )
 
         if not filtered:
             ctk.CTkLabel(self._quality_list,
-                         text="Nessun file sotto questa soglia.",
+                         text=_t("quality_tab.empty_under_threshold"),
                          font=FONT_SMALL, text_color=PALETTE["text_dim"]
                          ).pack(pady=20)
             return
@@ -3651,10 +3667,10 @@ class TrackLabGUI:
 
         # Righe come CTkFrame (stesso stile DB Locale — collaudato)
         def _sem(kbps):
-            if kbps < 160: return "🔴 Scarsa", PALETTE.get("error",   "#cc4444")
-            if kbps < 256: return "🟡 Media",  PALETTE.get("warning", "#e0a030")
-            if kbps < 320: return "🟢 Buona",  "#50aa70"
-            return             "💎 Alta",   "#4db8ff"
+            if kbps < 160: return _t("quality_tab.sem_poor"),   PALETTE.get("error",   "#cc4444")
+            if kbps < 256: return _t("quality_tab.sem_medium"), PALETTE.get("warning", "#e0a030")
+            if kbps < 320: return _t("quality_tab.sem_good"),   "#50aa70"
+            return             _t("quality_tab.sem_high"),   "#4db8ff"
 
         for idx, item in enumerate(items):
             fname, kbps, folder = item[0], item[1], item[2]
@@ -3696,7 +3712,7 @@ class TrackLabGUI:
             nav = ctk.CTkFrame(self._quality_list, fg_color="transparent")
             nav.pack(pady=8)
             if page > 0:
-                ctk.CTkButton(nav, text="◀ Prec", width=80, font=FONT_SMALL,
+                ctk.CTkButton(nav, text=_t("quality_tab.btn_prev"), width=80, font=FONT_SMALL,
                               fg_color=PALETTE["surface2"],
                               command=lambda: self._quality_filter(page - 1)
                               ).pack(side="left", padx=4)
@@ -3704,7 +3720,7 @@ class TrackLabGUI:
                          font=FONT_SMALL, text_color=PALETTE["text_dim"]
                          ).pack(side="left", padx=8)
             if page < pages - 1:
-                ctk.CTkButton(nav, text="Succ ▶", width=80, font=FONT_SMALL,
+                ctk.CTkButton(nav, text=_t("quality_tab.btn_next"), width=80, font=FONT_SMALL,
                               fg_color=PALETTE["surface2"],
                               command=lambda: self._quality_filter(page + 1)
                               ).pack(side="left", padx=4)
