@@ -1967,15 +1967,17 @@ class TrackLabGUI:
 
 
     def _apply_tab_icons(self):
-        """v1073: applica icone ai pulsanti del CTkTabview dopo la renderizzazione."""
+        """v1073: applica icone ai pulsanti del CTkTabview dopo la renderizzazione.
+        v1092.0 (R6.1 fase 3): chiavi del dict allineate ai nomi i18n dei tab."""
+        from services.i18n import t as _t
         tab_icon_map = {
-            "  Log":        ("log",      18),
-            "  DB Locale":  ("db_locale",18),
-            "  Generi":     ("generi",   18),
-            "  Cache":      ("cache",    18),
-            "  Qualità":    ("qualita",  18),
-            "  Caraibica":  ("caraibica",18),
-            "  Avanzate":   ("avanzate", 18),
+            _t("tabs.log"):       ("log",      18),
+            _t("tabs.db_local"):  ("db_locale",18),
+            _t("tabs.genres"):    ("generi",   18),
+            _t("tabs.cache"):     ("cache",    18),
+            _t("tabs.quality"):   ("qualita",  18),
+            _t("tabs.caribbean"): ("caraibica",18),
+            _t("tabs.advanced"):  ("avanzate", 18),
         }
         try:
             # CTkTabview espone i bottoni via _segmented_button._buttons_dict
@@ -2021,11 +2023,13 @@ class TrackLabGUI:
             return
 
         # Mappa tab_name → feature_key
+        # v1092.0 (R6.1 fase 3): tab_name i18n
+        from services.i18n import t as _t
         tab_feature_map = {
-            "  Cache":    "tab_cache",
-            "  Qualità":  "tab_quality",
-            "  Caraibica": "tab_caribbean",
-            "  Avanzate":  "tab_advanced",
+            _t("tabs.cache"):     "tab_cache",
+            _t("tabs.quality"):   "tab_quality",
+            _t("tabs.caribbean"): "tab_caribbean",
+            _t("tabs.advanced"):  "tab_advanced",
         }
 
         # Trova i nomi reali dei tab (variano con icone/spazi)
@@ -2511,18 +2515,23 @@ class TrackLabGUI:
         self._left_dup_frame     = self._build_duplicate_section(_middle)
         self._left_cover_frame   = self._build_cover_section_slim(_middle)
 
-        self._status_var = ctk.StringVar(value="✓  Pronto")
+        # v1092.0 (R6.1 fase 3): status bar i18n
+        from services.i18n import t as _t
+        self._status_var = ctk.StringVar(value=_t("left_panel.status_ready"))
         ctk.CTkLabel(left, textvariable=self._status_var,
                      font=FONT_SMALL, text_color=PALETTE["text_dim"], anchor="w"
                      ).pack(padx=20, pady=(8, 20), fill="x")
 
     def _build_dir_section(self, parent):
+        # v1092.0 (R6.1 fase 3): i18n
+        from services.i18n import t as _t
+
         frm = ctk.CTkFrame(parent, fg_color=PALETTE["bg"], corner_radius=10)
         frm.pack(fill="x", padx=16, pady=(0, 10))
         frm.columnconfigure(0, weight=1)
 
         _ic_dir = _get_icon("directory", 22) if _ICONS_AVAILABLE else None
-        ctk.CTkLabel(frm, text="  Directory Musicale", font=FONT_HEAD,
+        ctk.CTkLabel(frm, text=_t("dir_section.header"), font=FONT_HEAD,
                      image=_ic_dir, compound="left"
                      ).grid(row=0, column=0, columnspan=3, padx=14, pady=(12, 6), sticky="w")
 
@@ -2535,7 +2544,7 @@ class TrackLabGUI:
         self._breadcrumb_frame.columnconfigure(0, weight=1)
         self._breadcrumb_lbl = ctk.CTkLabel(
             self._breadcrumb_frame,
-            text="  Seleziona una cartella...",
+            text=_t("dir_section.breadcrumb_empty"),
             font=FONT_SMALL, text_color=PALETTE["text_dim"], anchor="w",
         )
         self._breadcrumb_lbl.grid(row=0, column=0, padx=4, sticky="ew")
@@ -2548,7 +2557,7 @@ class TrackLabGUI:
 
         # Bottone Sfoglia principale
         _sfoglia_icon = _get_icon("folder_32", 20) if _ICONS_AVAILABLE else None
-        ctk.CTkButton(frm, text="  Sfoglia", command=self._browse,
+        ctk.CTkButton(frm, text=_t("dir_section.btn_browse"), command=self._browse,
                       height=BTN_H, width=95, font=FONT_BODY,
                       image=_sfoglia_icon, compound="left",
                       fg_color=PALETTE["primary"], hover_color=PALETTE["primary_hover"],
@@ -2592,7 +2601,10 @@ class TrackLabGUI:
             label = d if len(d) <= 55 else "…" + d[-52:]
             menu.add_command(label=label, command=lambda p=d: self._select_path(p))
         menu.add_separator()
-        menu.add_command(label="Cancella storico", command=self._clear_recent)
+        # v1092.0 (R6.1 fase 3): i18n
+        from services.i18n import t as _t
+        menu.add_command(label=_t("dir_section.menu_clear_recent"),
+                         command=self._clear_recent)
         try:
             x = self._btn_recent.winfo_rootx()
             y = self._btn_recent.winfo_rooty() + self._btn_recent.winfo_height()
@@ -2601,12 +2613,15 @@ class TrackLabGUI:
             menu.grab_release()
 
     def _build_options_section(self, parent):
+        # v1092.0 (R6.1 fase 3): i18n
+        from services.i18n import t as _t
+
         frm = ctk.CTkFrame(parent, fg_color=PALETTE["bg"], corner_radius=10)
         frm.pack(fill="x", padx=16, pady=(0, 10))
         frm.columnconfigure(0, weight=1)
 
         _ic_opt = _get_icon("opzioni", 20) if _ICONS_AVAILABLE else None
-        ctk.CTkLabel(frm, text="  Opzioni Catalogazione",
+        ctk.CTkLabel(frm, text=_t("options_section.header"),
                      image=_ic_opt, compound="left", font=FONT_HEAD
                      ).grid(row=0, column=0, padx=14, pady=(12, 6), sticky="w")
 
@@ -2617,38 +2632,33 @@ class TrackLabGUI:
             self._add_tooltip(widget, tip_text)
 
         checks = [
-            (self._opt_analyze, "Solo Analisi",
-             "Analizza la collezione senza spostare file — modalità di sola lettura"),
-            (self._opt_cleanup, "Rimuovi Cartelle Vuote",
-             "Elimina le cartelle vuote dopo lo spostamento dei file"),
+            (self._opt_analyze, _t("options_section.opt_analyze"),
+             _t("options_section.tip_analyze")),
+            (self._opt_cleanup, _t("options_section.opt_cleanup"),
+             _t("options_section.tip_cleanup")),
         ]
         for i, (var, label, tooltip) in enumerate(checks):
-            cb = ctk.CTkCheckBox(frm, variable=var, text=f"  {label}", font=FONT_SMALL,
+            cb = ctk.CTkCheckBox(frm, variable=var, text=label, font=FONT_SMALL,
                                  text_color=PALETTE["text"], fg_color=PALETTE["primary"],
                                  hover_color=PALETTE["primary_hover"],
                                  checkmark_color=PALETTE["bg"])
             cb.grid(row=i + 1, column=0, padx=20, pady=3, sticky="w")
             _bind_tooltip(cb, tooltip)
 
-        # v1079: rimosso il separatore orizzontale interno — tutte e 3 le
-        # checkbox sono "Opzioni Catalogazione", non c'era un gruppo semantico
-        # diverso da dividere. Ora tutte e 3 hanno lo stesso pady=3 e l'aspetto
-        # è coeso senza buco visibile tra la 2ª e la 3ª voce.
-
         # Checkbox sorgenti DB con tooltip
         cb_db = ctk.CTkCheckBox(
             frm, variable=self._opt_use_ext_db,
             command=self._on_ext_db_toggle,
-            text="  Abilita Sorgenti DB Online",
+            text=_t("options_section.opt_use_ext_db"),
             font=FONT_SMALL, text_color=PALETTE["text"],
             fg_color=PALETTE["primary"], hover_color=PALETTE["primary_hover"],
             checkmark_color=PALETTE["bg"],
         )
         cb_db.grid(row=3, column=0, padx=20, pady=3, sticky="w")
-        _bind_tooltip(cb_db, "Interroga MusicBrainz, Deezer, iTunes per arricchire i metadati")
+        _bind_tooltip(cb_db, _t("options_section.tip_use_ext_db"))
 
         ctk.CTkLabel(frm,
-                     text="  Altre opzioni (dry-run, verbose, BPM...) → tab  ⚙️  Avanzate",
+                     text=_t("options_section.footer_hint"),
                      font=(FONT_SMALL[0], FONT_SMALL[1] - 1),
                      text_color=PALETTE["text_dim"]
                      ).grid(row=4, column=0, padx=20, pady=(6, 10), sticky="w")
@@ -2657,24 +2667,27 @@ class TrackLabGUI:
 
     def _build_cover_section_slim(self, parent):
         """v1053: solo checkbox 'Recupera cover mancanti' — resto nel tab Avanzate."""
+        # v1092.0 (R6.1 fase 3): i18n
+        from services.i18n import t as _t
+
         frm = ctk.CTkFrame(parent, fg_color=PALETTE["bg"], corner_radius=10)
         frm.pack(fill="x", padx=16, pady=(0, 10))
         frm.columnconfigure(0, weight=1)
 
         _ic_cov = _get_icon("cover_album", 20) if _ICONS_AVAILABLE else None
-        ctk.CTkLabel(frm, text="  Cover Album",
+        ctk.CTkLabel(frm, text=_t("cover_slim.header"),
                      image=_ic_cov, compound="left", font=FONT_HEAD
                      ).grid(row=0, column=0, padx=14, pady=(12, 6), sticky="w")
 
         ctk.CTkCheckBox(frm, variable=self._cover_enabled, font=FONT_SMALL,
-                        text="Recupera cover mancanti automaticamente",
+                        text=_t("cover_slim.opt_enabled"),
                         text_color=PALETTE["text"], fg_color=PALETTE["primary"],
                         hover_color=PALETTE["primary_hover"],
                         checkmark_color=PALETTE["bg"],
                         ).grid(row=1, column=0, padx=20, pady=(0, 4), sticky="w")
 
         ctk.CTkLabel(frm,
-                     text="  Strategia, sorgenti, sovrascrittura → tab  ⚙️  Avanzate",
+                     text=_t("cover_slim.footer_hint"),
                      font=(FONT_SMALL[0], FONT_SMALL[1] - 1),
                      text_color=PALETTE["text_dim"]
                      ).grid(row=2, column=0, padx=20, pady=(0, 10), sticky="w")
@@ -2682,22 +2695,25 @@ class TrackLabGUI:
 
 
     def _build_duplicate_section(self, parent):
+        # v1092.0 (R6.1 fase 3): i18n
+        from services.i18n import t as _t
+
         frm = ctk.CTkFrame(parent, fg_color=PALETTE["bg"], corner_radius=10)
         frm.pack(fill="x", padx=16, pady=(0, 10))
         frm.columnconfigure(0, weight=1)
 
         _ic_dup = _get_icon("gestione_dup", 20) if _ICONS_AVAILABLE else None
-        ctk.CTkLabel(frm, text="  Gestione Duplicati",
+        ctk.CTkLabel(frm, text=_t("duplicate_section.header"),
                      image=_ic_dup, compound="left", font=FONT_HEAD
                      ).grid(row=0, column=0, padx=14, pady=(12, 6), sticky="w")
-        ctk.CTkLabel(frm, text="Quando un file esiste già nella cartella di destinazione:",
+        ctk.CTkLabel(frm, text=_t("duplicate_section.intro"),
                      font=FONT_SMALL, text_color=PALETTE["text_dim"]
                      ).grid(row=1, column=0, padx=14, pady=(0, 4), sticky="w")
 
         options = [
-            ('keep_both',  "Mantieni entrambi (rinomina il nuovo)"),
-            ('skip',       "Salta (mantieni il file esistente)"),
-            ('overwrite',  "Sovrascrivi (sostituisce l'esistente)"),
+            ('keep_both',  _t("duplicate_section.opt_keep_both")),
+            ('skip',       _t("duplicate_section.opt_skip")),
+            ('overwrite',  _t("duplicate_section.opt_overwrite")),
         ]
         for i, (val, label) in enumerate(options):
             ctk.CTkRadioButton(
@@ -2835,27 +2851,31 @@ class TrackLabGUI:
         ctk.CTkFrame(frm, height=4, fg_color="transparent").grid(row=3, column=0)
 
     def _build_action_buttons(self, parent):
+        # v1092.0 (R6.1 fase 3): i18n
+        from services.i18n import t as _t
+
         frm = ctk.CTkFrame(parent, fg_color="transparent")
         frm.pack(fill="x", padx=16, pady=(0, 4))
         frm.columnconfigure(0, weight=1)
         frm.columnconfigure(1, weight=1)
 
         self._btn_run = ctk.CTkButton(
-            frm, text="▶  Avvia", command=self._run,
+            frm, text=_t("action_buttons.btn_run"), command=self._run,
             height=BTN_H, font=FONT_BODY,
             fg_color=PALETTE["success"], hover_color="#27ae60", text_color="#ffffff",
         )
         self._btn_run.grid(row=0, column=0, padx=(0, 4), pady=4, sticky="ew")
 
         self._btn_stop = ctk.CTkButton(
-            frm, text="■  Ferma", command=self._stop,
+            frm, text=_t("action_buttons.btn_stop"), command=self._stop,
             height=BTN_H, font=FONT_BODY,
             fg_color=PALETTE["error"], hover_color="#c0392b", text_color="#ffffff",
             state="disabled",
         )
         self._btn_stop.grid(row=0, column=1, padx=(4, 0), pady=4, sticky="ew")
 
-        ctk.CTkButton(frm, text="🗑  Pulisci Log", command=self._clear_log,
+        ctk.CTkButton(frm, text=_t("action_buttons.btn_clear_log"),
+                      command=self._clear_log,
                       height=BTN_H, font=FONT_BODY,
                       fg_color=PALETTE["surface2"], hover_color=PALETTE["border"],
                       ).grid(row=1, column=0, columnspan=2, pady=4, sticky="ew")
@@ -2889,7 +2909,9 @@ class TrackLabGUI:
         # v1081: placeholder v1080 rimosso — non serve più, resize gestito via minsize/maxsize
 
         # ── Tab 1: Log ───────────────────────────────────────────────────
-        tab_log = self._tabview.add("  Log")
+        # v1092.0 (R6.1 fase 3): tab labels i18n
+        from services.i18n import t as _t
+        tab_log = self._tabview.add(_t("tabs.log"))
         tab_log.columnconfigure(0, weight=1)
         tab_log.rowconfigure(1, weight=1)
 
@@ -2960,38 +2982,38 @@ class TrackLabGUI:
         self._log.append = _wrapped_append
 
         # ── Tab 2: DB Locale ─────────────────────────────────────────────
-        tab_db = self._tabview.add("  DB Locale")
+        tab_db = self._tabview.add(_t("tabs.db_local"))
         tab_db.columnconfigure(0, weight=1)
         tab_db.rowconfigure(1, weight=1)
         self._build_db_tab(tab_db)
 
         # ── Tab 3: Generi ────────────────────────────────────────────────
-        tab_genres = self._tabview.add("  Generi")
+        tab_genres = self._tabview.add(_t("tabs.genres"))
         tab_genres.columnconfigure(0, weight=1)
         tab_genres.rowconfigure(0, weight=1)
         self._build_genres_tab(tab_genres)
 
         # ── Tab 4: Cache Metadati ────────────────────────────────────────────
-        tab_cache = self._tabview.add("  Cache")
+        tab_cache = self._tabview.add(_t("tabs.cache"))
         tab_cache.columnconfigure(0, weight=1)
         tab_cache.rowconfigure(0, weight=0)  # toolbar compatta
         tab_cache.rowconfigure(1, weight=1)  # contenuto
         self._build_cache_tab(tab_cache)
 
         # ── Tab 5: Qualità Bassa ──────────────────────────────────────────
-        tab_quality = self._tabview.add("  Qualità")
+        tab_quality = self._tabview.add(_t("tabs.quality"))
         tab_quality.columnconfigure(0, weight=1)
         tab_quality.rowconfigure(1, weight=1)
         self._build_quality_tab(tab_quality)
 
         # ── Tab 6: Classificazione Caraibica ─────────────────────────────
-        tab_carib = self._tabview.add("  Caraibica")
+        tab_carib = self._tabview.add(_t("tabs.caribbean"))
         tab_carib.columnconfigure(0, weight=1)
         tab_carib.rowconfigure(0, weight=1)
         self._build_caribbean_tab(tab_carib)
 
         # ── Tab 7: Impostazioni Avanzate ─────────────────────────────────
-        tab_adv = self._tabview.add("  Avanzate")
+        tab_adv = self._tabview.add(_t("tabs.advanced"))
         tab_adv.columnconfigure(0, weight=1)
         tab_adv.rowconfigure(0, weight=1)
         self._build_advanced_tab(tab_adv)

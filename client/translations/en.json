@@ -78,6 +78,62 @@
     }
   },
 
+  "left_panel": {
+    "status_ready":   "✓  Ready",
+    "status_running": "▶  Cataloging in progress…",
+    "status_done":    "✓  Done",
+    "status_error":   "✗  Error"
+  },
+
+  "dir_section": {
+    "header": "  Music directory",
+    "breadcrumb_empty": "  Select a folder...",
+    "btn_browse": "  Browse",
+    "menu_clear_recent": "Clear history"
+  },
+
+  "options_section": {
+    "header": "  Cataloging options",
+    "opt_analyze":       "  Analysis only",
+    "opt_cleanup":       "  Remove empty folders",
+    "opt_use_ext_db":    "  Enable online DB sources",
+    "footer_hint":       "  Other options (dry-run, verbose, BPM...) → ⚙️  Advanced tab",
+    "tip_analyze":       "Analyze the collection without moving files — read-only mode",
+    "tip_cleanup":       "Delete empty folders after files have been moved",
+    "tip_use_ext_db":    "Query MusicBrainz, Deezer, iTunes to enrich metadata"
+  },
+
+  "cover_slim": {
+    "header":      "  Album cover",
+    "opt_enabled": "Automatically fetch missing covers",
+    "footer_hint": "  Strategy, sources, overwrite → ⚙️  Advanced tab"
+  },
+
+  "duplicate_section": {
+    "header":      "  Duplicate handling",
+    "intro":       "When a file already exists in the destination folder:",
+    "opt_keep_both": "Keep both (rename the new one)",
+    "opt_skip":      "Skip (keep the existing file)",
+    "opt_overwrite": "Overwrite (replace the existing one)"
+  },
+
+  "action_buttons": {
+    "btn_run":       "▶  Start",
+    "btn_running":   "▶  Running…",
+    "btn_stop":      "■  Stop",
+    "btn_clear_log": "🗑  Clear log"
+  },
+
+  "tabs": {
+    "log":       "  Log",
+    "db_local":  "  Local DB",
+    "genres":    "  Genres",
+    "cache":     "  Cache",
+    "quality":   "  Quality",
+    "caribbean": "  Caribbean",
+    "advanced":  "  Advanced"
+  },
+
   "plans_sub": {
     "current_plan_label": "Current plan: {plan}",
     "btn_request_upgrade": "⬆  Request a plan upgrade",

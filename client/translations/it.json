@@ -78,6 +78,62 @@
     }
   },
 
+  "left_panel": {
+    "status_ready":   "✓  Pronto",
+    "status_running": "▶  Catalogazione in corso…",
+    "status_done":    "✓  Completato",
+    "status_error":   "✗  Errore"
+  },
+
+  "dir_section": {
+    "header": "  Directory Musicale",
+    "breadcrumb_empty": "  Seleziona una cartella...",
+    "btn_browse": "  Sfoglia",
+    "menu_clear_recent": "Cancella storico"
+  },
+
+  "options_section": {
+    "header": "  Opzioni Catalogazione",
+    "opt_analyze":       "  Solo Analisi",
+    "opt_cleanup":       "  Rimuovi Cartelle Vuote",
+    "opt_use_ext_db":    "  Abilita Sorgenti DB Online",
+    "footer_hint":       "  Altre opzioni (dry-run, verbose, BPM...) → tab  ⚙️  Avanzate",
+    "tip_analyze":       "Analizza la collezione senza spostare file — modalità di sola lettura",
+    "tip_cleanup":       "Elimina le cartelle vuote dopo lo spostamento dei file",
+    "tip_use_ext_db":    "Interroga MusicBrainz, Deezer, iTunes per arricchire i metadati"
+  },
+
+  "cover_slim": {
+    "header":      "  Cover Album",
+    "opt_enabled": "Recupera cover mancanti automaticamente",
+    "footer_hint": "  Strategia, sorgenti, sovrascrittura → tab  ⚙️  Avanzate"
+  },
+
+  "duplicate_section": {
+    "header":      "  Gestione Duplicati",
+    "intro":       "Quando un file esiste già nella cartella di destinazione:",
+    "opt_keep_both": "Mantieni entrambi (rinomina il nuovo)",
+    "opt_skip":      "Salta (mantieni il file esistente)",
+    "opt_overwrite": "Sovrascrivi (sostituisce l'esistente)"
+  },
+
+  "action_buttons": {
+    "btn_run":       "▶  Avvia",
+    "btn_running":   "▶  In corso…",
+    "btn_stop":      "■  Ferma",
+    "btn_clear_log": "🗑  Pulisci Log"
+  },
+
+  "tabs": {
+    "log":       "  Log",
+    "db_local":  "  DB Locale",
+    "genres":    "  Generi",
+    "cache":     "  Cache",
+    "quality":   "  Qualità",
+    "caribbean": "  Caraibica",
+    "advanced":  "  Avanzate"
+  },
+
   "plans_sub": {
     "current_plan_label": "Piano corrente: {plan}",
     "btn_request_upgrade": "⬆  Richiedi upgrade del piano",
