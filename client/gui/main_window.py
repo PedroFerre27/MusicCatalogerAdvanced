@@ -835,12 +835,14 @@ class TrackLabGUI:
             - Mostra messaggio di conferma
             L'utente dovrà rilanciare l'app (o in futuro possiamo
             riaprire automaticamente la login window).
+
+            v1092.0 (R6.1): messagebox localizzate.
             """
+            from services.i18n import t as _t
             self._close_profile_flyout()
             if not messagebox.askyesno(
-                "Conferma logout",
-                "Vuoi disconnetterti?\n\n"
-                "Al prossimo avvio dovrai inserire nuovamente email e password."
+                _t("logout_dialog.confirm_title"),
+                _t("logout_dialog.confirm_body")
             ):
                 return
             # Clear JWT locale — funziona anche in modalità offline
@@ -856,9 +858,8 @@ class TrackLabGUI:
             except Exception:
                 pass
             messagebox.showinfo(
-                "Logout effettuato",
-                "Sessione chiusa. Rilancia il programma per accedere\n"
-                "con un altro account."
+                _t("logout_dialog.done_title"),
+                _t("logout_dialog.done_body")
             )
             # Chiudi la main window (l'utente rilancerà manualmente)
             try:
@@ -1127,25 +1128,34 @@ class TrackLabGUI:
             #     upgrade disponibile. Il server decide, non il client.
             #   - Locale mode (retrocompat): mantiene i 3 bottoni di switch
             #     diretto come in v1080. Utile per sviluppo standalone.
+            # v1092.0 (R6.1): stringhe localizzate i18n
+            from services.i18n import t as _t
+
             body = ctk.CTkScrollableFrame(parent, fg_color="transparent")
             body.pack(fill="both", expand=True, padx=10, pady=(8, 4))
             body.columnconfigure(0, weight=1)
-            ctk.CTkLabel(body, text=f"Piano corrente: {plan.display_name}",
+            ctk.CTkLabel(body,
+                         text=_t("plans_sub.current_plan_label",
+                                 plan=plan.display_name),
                          font=(FONT_SMALL[0], FONT_SMALL[1], "bold"),
                          text_color=PALETTE["text"]
                          ).pack(anchor="w", pady=(4, 6), padx=4)
+            # v1092.0: feature labels via i18n. Le chiavi tecniche
+            # (catalog_external_db, ecc.) restano invariate; cambia solo
+            # la stringa visualizzata. Variante "_short" per il
+            # sub-flyout compatto, "_long" per il dialog comparativo.
             feature_labels = {
-                "catalog_external_db": "DB online",
-                "catalog_cover":        "Cover album",
-                "catalog_bpm":          "Analisi BPM",
-                "tab_cache":            "Tab Cache",
-                "tab_quality":          "Tab Qualità",
-                "tab_advanced":         "Tab Avanzate",
-                "tab_caribbean":        "Tab Caraibica",
-                "export_m3u":           "Playlist M3U",
-                "maint_replaygain":     "ReplayGain",
-                "maint_batch_rename":   "Rinomina Batch",
-                "maint_integrity":      "Verifica MP3",
+                "catalog_external_db": _t("features.catalog_external_db_short"),
+                "catalog_cover":        _t("features.catalog_cover_short"),
+                "catalog_bpm":          _t("features.catalog_bpm_short"),
+                "tab_cache":            _t("features.tab_cache_short"),
+                "tab_quality":          _t("features.tab_quality"),
+                "tab_advanced":         _t("features.tab_advanced"),
+                "tab_caribbean":        _t("features.tab_caribbean"),
+                "export_m3u":           _t("features.export_m3u_short"),
+                "maint_replaygain":     _t("features.maint_replaygain"),
+                "maint_batch_rename":   _t("features.maint_batch_rename_short"),
+                "maint_integrity":      _t("features.maint_integrity_short"),
             }
             # Leggi features dall'utente server se disponibile, altrimenti da PLAN_FEATURES
             if self.api_client is not None and self.user_info.get("features"):
@@ -1181,7 +1191,7 @@ class TrackLabGUI:
 
                 if upgrades:
                     ctk.CTkButton(
-                        body, text="⬆  Richiedi upgrade del piano",
+                        body, text=_t("plans_sub.btn_request_upgrade"),
                         font=(FONT_SMALL[0], FONT_SMALL[1], "bold"),
                         fg_color=PALETTE.get("primary", "#3b6fd4"),
                         hover_color=PALETTE.get("primary_hover", "#2d5ab8"),
@@ -1198,20 +1208,22 @@ class TrackLabGUI:
                     ).pack(fill="x", padx=4, pady=(0, 4))
                 else:
                     ctk.CTkLabel(body,
-                                 text="Hai già il piano più alto disponibile ✨",
+                                 text=_t("plans_sub.msg_max_plan"),
                                  font=FONT_SMALL,
                                  text_color=PALETTE["text_dim"]
                                  ).pack(pady=(4, 8))
                 return
 
             # ── Sezione azione — LOCALE MODE (retrocompat) ──────────
-            ctk.CTkLabel(body, text="Cambia piano (modalità sviluppo):",
+            ctk.CTkLabel(body, text=_t("plans_sub.dev_section_label"),
                          font=FONT_SMALL,
                          text_color=PALETTE["text_dim"]
                          ).pack(anchor="w", padx=4, pady=(0, 4))
             plan_row = ctk.CTkFrame(body, fg_color="transparent")
             plan_row.pack(fill="x", pady=(0, 8))
-            for p, badge in [("base", "🆓 Base"), ("pro", "⭐ Pro"), ("advanced", "💎 Adv")]:
+            for p, badge in [("base",     _t("plan_display.base_short")),
+                             ("pro",      _t("plan_display.pro_short")),
+                             ("advanced", _t("plan_display.advanced_short"))]:
                 is_active = plan.plan == p
                 def _switch(np=p, _plan=plan):
                     _plan.plan = np
@@ -1249,35 +1261,42 @@ class TrackLabGUI:
         import customtkinter as ctk
         from tkinter import messagebox
         import threading
+        # v1092.0 (R6.1): stringhe i18n
+        from services.i18n import t as _t
 
         if self.api_client is None:
-            messagebox.showerror("Non disponibile",
-                "L'upgrade richiede la modalità connessa al server.")
+            messagebox.showerror(_t("upgrade_dialog.err_not_available_title"),
+                _t("upgrade_dialog.err_not_available_body"))
             return
         try:
             from config.user_plans import PLAN_FEATURES
         except Exception:
-            messagebox.showerror("Errore", "Impossibile caricare i dati dei piani")
+            messagebox.showerror(_t("upgrade_dialog.err_load_title"),
+                                 _t("upgrade_dialog.err_load_body"))
             return
 
         feature_labels = [
-            ("catalog_external_db",  "DB online (MusicBrainz, Deezer)"),
-            ("catalog_cover",        "Cover album automatica"),
-            ("catalog_bpm",          "Analisi BPM"),
-            ("tab_caribbean",        "Tab Caraibica"),
-            ("tab_cache",            "Tab Cache metadati"),
-            ("maint_duplicates",     "Trova duplicati"),
-            ("export_m3u",           "Export playlist M3U"),
-            ("export_csv",           "Export CSV"),
-            ("tab_advanced",         "Tab Avanzate"),
-            ("maint_replaygain",     "ReplayGain"),
-            ("maint_batch_rename",   "Rinomina batch"),
-            ("maint_integrity",      "Verifica integrità MP3"),
+            ("catalog_external_db",  _t("features.catalog_external_db_long")),
+            ("catalog_cover",        _t("features.catalog_cover_long")),
+            ("catalog_bpm",          _t("features.catalog_bpm_long")),
+            ("tab_caribbean",        _t("features.tab_caribbean")),
+            ("tab_cache",            _t("features.tab_cache_long")),
+            ("maint_duplicates",     _t("features.maint_duplicates")),
+            ("export_m3u",           _t("features.export_m3u_long")),
+            ("export_csv",           _t("features.export_csv")),
+            ("tab_advanced",         _t("features.tab_advanced")),
+            ("maint_replaygain",     _t("features.maint_replaygain")),
+            ("maint_batch_rename",   _t("features.maint_batch_rename_long")),
+            ("maint_integrity",      _t("features.maint_integrity_long")),
         ]
-        display_names = {"base": "🆓 Base", "pro": "⭐ Pro", "advanced": "💎 Advanced"}
+        display_names = {
+            "base":     _t("plan_display.base"),
+            "pro":      _t("plan_display.pro"),
+            "advanced": _t("plan_display.advanced"),
+        }
         limits_labels = {
-            "max_files_per_run": "File per run",
-            "max_runs_per_day":  "Run per giorno",
+            "max_files_per_run": _t("limits.max_files_per_run"),
+            "max_runs_per_day":  _t("limits.max_runs_per_day"),
         }
 
         plans_to_show = [current_plan] + available_upgrades
@@ -1312,7 +1331,7 @@ class TrackLabGUI:
                                 corner_radius=0, height=TITLEBAR_H)
         titlebar.pack(side="top", fill="x")
         titlebar.pack_propagate(False)
-        ctk.CTkLabel(titlebar, text="Confronto piani disponibili",
+        ctk.CTkLabel(titlebar, text=_t("upgrade_dialog.header"),
                      font=("Segoe UI", 14, "bold"),
                      text_color=PALETTE["text"]
                      ).pack(side="left", padx=18, pady=10)
@@ -1353,7 +1372,7 @@ class TrackLabGUI:
             btn_bar.columnconfigure(i, weight=1, minsize=PLAN_COL_W,
                                      uniform="cols")
         ctk.CTkLabel(btn_bar, text="").grid(row=0, column=0)
-        ctk.CTkLabel(btn_bar, text="(piano attuale)",
+        ctk.CTkLabel(btn_bar, text=_t("upgrade_dialog.current_plan_caption"),
                      font=("Segoe UI", 10, "italic"),
                      text_color=PALETTE["text_dim"]
                      ).grid(row=0, column=1, sticky="nsew")
@@ -1385,7 +1404,9 @@ class TrackLabGUI:
                 # Mini titlebar
                 mtb = ctk.CTkFrame(msg_win, fg_color=PALETTE["surface2"], height=36)
                 mtb.pack(side="top", fill="x"); mtb.pack_propagate(False)
-                ctk.CTkLabel(mtb, text=f"Richiedi → {display_names.get(target_plan)}",
+                ctk.CTkLabel(mtb,
+                             text=_t("request_upgrade.title",
+                                     plan=display_names.get(target_plan)),
                              font=("Segoe UI", 11, "bold"),
                              text_color=PALETTE["text"]).pack(side="left", padx=14, pady=8)
                 ctk.CTkButton(mtb, text="✕", width=28, height=24,
@@ -1404,7 +1425,7 @@ class TrackLabGUI:
                 body_msg = ctk.CTkFrame(msg_win, fg_color="transparent")
                 body_msg.pack(side="top", fill="both", expand=True, padx=20, pady=(8, 4))
                 ctk.CTkLabel(body_msg,
-                             text="Messaggio per l'amministratore (opzionale)",
+                             text=_t("request_upgrade.msg_label"),
                              font=("Segoe UI", 10, "bold"),
                              text_color=PALETTE["text"]).pack(anchor="w", pady=(4, 4))
                 msg_text = ctk.CTkTextbox(
@@ -1416,7 +1437,8 @@ class TrackLabGUI:
 
                 def _do_send():
                     text = msg_text.get("1.0", "end").strip()
-                    btn_send.configure(state="disabled", text="Invio…")
+                    btn_send.configure(state="disabled",
+                                       text=_t("request_upgrade.btn_sending"))
                     btn_cancel.configure(state="disabled")
                     def _w():
                         try:
@@ -1424,29 +1446,32 @@ class TrackLabGUI:
                             self.root.after(0, lambda: (
                                 msg_win.destroy(),
                                 win.destroy(),
-                                messagebox.showinfo("Richiesta inviata",
-                                    f"Richiesta di upgrade a "
-                                    f"{display_names.get(target_plan)} inviata.\n"
-                                    f"Riceverai notifica quando l'amministratore avrà risposto."),
+                                messagebox.showinfo(
+                                    _t("request_upgrade.msg_sent_title"),
+                                    _t("request_upgrade.msg_sent_body",
+                                       plan=display_names.get(target_plan))),
                             ))
                         except Exception as e:
                             err_str = str(e)
                             self.root.after(0, lambda: (
-                                btn_send.configure(state="normal", text="Invia richiesta"),
+                                btn_send.configure(state="normal",
+                                    text=_t("request_upgrade.btn_send")),
                                 btn_cancel.configure(state="normal"),
-                                messagebox.showerror("Errore",
-                                    f"Invio fallito:\n{err_str}"),
+                                messagebox.showerror(
+                                    _t("request_upgrade.err_title"),
+                                    _t("request_upgrade.err_body",
+                                       detail=err_str)),
                             ))
                     threading.Thread(target=_w, daemon=True).start()
 
                 btn_cancel = ctk.CTkButton(
-                    br, text="Annulla", width=110, height=34,
+                    br, text=_t("common.btn_cancel"), width=110, height=34,
                     fg_color="transparent", hover_color=PALETTE["surface"],
                     text_color=PALETTE["text_dim"],
                     font=("Segoe UI", 10), command=msg_win.destroy)
                 btn_cancel.pack(side="right", padx=(4, 0))
                 btn_send = ctk.CTkButton(
-                    br, text="Invia richiesta", width=150, height=34,
+                    br, text=_t("request_upgrade.btn_send"), width=150, height=34,
                     fg_color=PALETTE.get("primary", "#3b6fd4"),
                     hover_color=PALETTE.get("primary_hover", "#2d5ab8"),
                     text_color="#ffffff",
@@ -1459,7 +1484,9 @@ class TrackLabGUI:
             cell = ctk.CTkFrame(btn_bar, fg_color="transparent")
             cell.grid(row=0, column=ci, padx=8, pady=12, sticky="nsew")
             ctk.CTkButton(
-                cell, text=f"⬆  Richiedi  {display_names.get(p)}",
+                cell,
+                text=_t("upgrade_dialog.btn_request_target",
+                        plan=display_names.get(p)),
                 font=("Segoe UI", 10, "bold"),
                 fg_color=PALETTE.get("primary", "#3b6fd4"),
                 hover_color=PALETTE.get("primary_hover", "#2d5ab8"),
@@ -1490,7 +1517,9 @@ class TrackLabGUI:
                          text_color=PALETTE["text"] if is_current else "#ffffff"
                          ).pack(pady=(14, 2))
             ctk.CTkLabel(cell,
-                         text="(piano attuale)" if is_current else "disponibile",
+                         text=(_t("upgrade_dialog.current_plan_caption")
+                               if is_current
+                               else _t("upgrade_dialog.available_caption")),
                          font=("Segoe UI", 9),
                          text_color=PALETTE["text_dim"] if is_current else "#cfdaff"
                          ).pack()

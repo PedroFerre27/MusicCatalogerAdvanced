@@ -78,6 +78,81 @@
     }
   },
 
+  "plans_sub": {
+    "current_plan_label": "Current plan: {plan}",
+    "btn_request_upgrade": "⬆  Request a plan upgrade",
+    "msg_max_plan": "You already have the highest plan available ✨",
+    "dev_section_label": "Change plan (development mode):"
+  },
+
+  "plan_display": {
+    "base":     "🆓 Base",
+    "pro":      "⭐ Pro",
+    "advanced": "💎 Advanced",
+    "base_short":     "🆓 Base",
+    "pro_short":      "⭐ Pro",
+    "advanced_short": "💎 Adv"
+  },
+
+  "features": {
+    "catalog_external_db_short":  "Online DB",
+    "catalog_external_db_long":   "Online DB (MusicBrainz, Deezer)",
+    "catalog_cover_short":         "Album cover",
+    "catalog_cover_long":          "Automatic album cover",
+    "catalog_bpm_short":           "BPM analysis",
+    "catalog_bpm_long":            "BPM analysis",
+    "tab_cache_short":             "Cache tab",
+    "tab_cache_long":              "Metadata cache tab",
+    "tab_quality":                 "Quality tab",
+    "tab_advanced":                "Advanced tab",
+    "tab_caribbean":               "Caribbean tab",
+    "export_m3u_short":            "M3U playlist",
+    "export_m3u_long":             "Export M3U playlist",
+    "export_csv":                  "CSV export",
+    "maint_replaygain":            "ReplayGain",
+    "maint_batch_rename_short":    "Batch rename",
+    "maint_batch_rename_long":     "Batch rename",
+    "maint_integrity_short":       "MP3 integrity",
+    "maint_integrity_long":        "MP3 integrity check",
+    "maint_duplicates":            "Find duplicates"
+  },
+
+  "limits": {
+    "max_files_per_run": "Files per run",
+    "max_runs_per_day":  "Runs per day",
+    "unlimited":         "∞"
+  },
+
+  "upgrade_dialog": {
+    "title": "Upgrade Plan",
+    "header": "Available plans comparison",
+    "current_plan_caption": "(current plan)",
+    "available_caption":    "available",
+    "btn_request_target":   "⬆  Request  {plan}",
+    "err_not_available_title": "Unavailable",
+    "err_not_available_body":  "Upgrade requires server-connected mode.",
+    "err_load_title":          "Error",
+    "err_load_body":           "Could not load plan data"
+  },
+
+  "request_upgrade": {
+    "title": "Request → {plan}",
+    "msg_label": "Message to the administrator (optional)",
+    "btn_send": "Send request",
+    "btn_sending": "Sending…",
+    "msg_sent_title": "Request sent",
+    "msg_sent_body":  "Upgrade request to {plan} sent.\nYou will be notified when the administrator responds.",
+    "err_title":      "Error",
+    "err_body":       "Send failed:\n{detail}"
+  },
+
+  "logout_dialog": {
+    "confirm_title": "Logout confirmation",
+    "confirm_body":  "Do you want to sign out?\n\nOn next launch you will need to enter email and password again.",
+    "done_title":    "Logged out",
+    "done_body":     "Session closed. Relaunch the application to sign in\nwith another account."
+  },
+
   "help": {
     "title_window": "Help — TrackLab",
     "header": "TrackLab",
