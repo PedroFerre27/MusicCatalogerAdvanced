@@ -215,6 +215,37 @@
     "btn_next":        "Succ ▶"
   },
 
+  "cache_tab": {
+    "tip_reload":      "Aggiorna",
+    "search_placeholder": "🔍  Cerca artista, titolo...",
+    "count_entries":   "{count} voci",
+    "count_with_pages":"{count} voci  •  pag. {page}/{pages}  ({start}-{end})",
+    "err_read":        "Errore lettura cache: {detail}",
+    "btn_clear":       "🗑 Svuota",
+    "confirm_clear_body": "Svuotare la cache API esterne?\n\nI metadati grezzi recuperati da MusicBrainz/iTunes/ecc.\nverranno rimossi. La library file→genere NON viene\nmodificata.\n\nLe prossime catalogazioni saranno più lente.",
+    "col_artist_title": "Artista / Titolo",
+    "col_genre":        "Genere",
+    "col_source":       "Sorgente",
+    "detail_placeholder": "Seleziona un brano dalla lista",
+    "msg_cache_title":   "Cache",
+    "msg_cache_cleared": "Cache svuotata con successo.",
+    "err_clear_title":   "Errore",
+    "err_clear_body":    "Impossibile svuotare la cache:\n{detail}",
+    "detail_label_title":          "Titolo",
+    "detail_label_artists":        "Artisti Partecipanti",
+    "detail_label_album":          "Album",
+    "detail_label_year":           "Anno",
+    "detail_label_genre":          "Genere",
+    "detail_label_bpm":            "BPM",
+    "detail_label_duration":       "Durata",
+    "detail_label_quality":        "Qualità",
+    "detail_label_sample_rate":    "Sample rate",
+    "detail_label_size":           "Dimensione",
+    "detail_label_folder":         "Cartella",
+    "detail_label_cataloged_at":   "Catalogato il",
+    "detail_label_source":         "Sorgente"
+  },
+
   "genres_tab": {
     "intro":            "Seleziona i generi attivi nella tua collezione.",
     "btn_save":         "💾  Salva",

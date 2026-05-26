@@ -3713,6 +3713,8 @@ class TrackLabGUI:
 
     def _build_cache_tab(self, parent):
         """v1069b: tab Cache — layout a 3 righe: toolbar / header+lista / dettaglio."""
+        # v1092.0 (R6.1 fase 3.d): tab interamente i18n
+        from services.i18n import t as _t
         import json as _json
         import tkinter as _tk
 
@@ -3735,7 +3737,7 @@ class TrackLabGUI:
                       fg_color="transparent", hover_color=PALETTE["primary"],
                       font=FONT_SMALL, image=_ic_rel2, command=self._cache_reload)
         _btn_cache_reload.grid(row=0, column=0, padx=(4, 2), pady=3)
-        self._add_tooltip(_btn_cache_reload, "Aggiorna")
+        self._add_tooltip(_btn_cache_reload, _t("cache_tab.tip_reload"))
 
         self._cache_search_var = ctk.StringVar()
         self._cache_search_after = None
@@ -3747,16 +3749,17 @@ class TrackLabGUI:
             self._cache_search_after = self.root.after(600, self._cache_filter)
         self._cache_search_var.trace_add("write", _cache_search_debounced)
         ctk.CTkEntry(toolbar, textvariable=self._cache_search_var, height=28,
-                     placeholder_text="🔍  Cerca artista, titolo...",
+                     placeholder_text=_t("cache_tab.search_placeholder"),
                      font=FONT_SMALL, fg_color=PALETTE["bg"], border_width=0,
                      ).grid(row=0, column=1, sticky="ew", padx=(2, 6), pady=3)
 
-        self._cache_count_var = ctk.StringVar(value="0 voci")
+        self._cache_count_var = ctk.StringVar(
+            value=_t("cache_tab.count_entries", count=0))
         ctk.CTkLabel(toolbar, textvariable=self._cache_count_var,
                      font=FONT_SMALL, text_color=PALETTE["text_dim"]
                      ).grid(row=0, column=2, padx=(0, 6))
 
-        ctk.CTkButton(toolbar, text="🗑 Svuota", width=90, height=28,
+        ctk.CTkButton(toolbar, text=_t("cache_tab.btn_clear"), width=90, height=28,
                       fg_color=PALETTE["accent"], hover_color="#802020",
                       font=FONT_SMALL, command=self._clear_cache,
                       ).grid(row=0, column=3, padx=(0, 4), pady=3)
@@ -3772,7 +3775,9 @@ class TrackLabGUI:
         hdr.grid(row=0, column=0, sticky="ew", pady=(0, 1))
         hdr.columnconfigure(0, weight=1)
         for col, (lbl, w) in enumerate([
-            ("Artista / Titolo", 0), ("Genere", 100), ("Sorgente", 90)
+            (_t("cache_tab.col_artist_title"), 0),
+            (_t("cache_tab.col_genre"), 100),
+            (_t("cache_tab.col_source"), 90)
         ]):
             ctk.CTkLabel(hdr, text=lbl,
                          font=(FONT_SMALL[0], FONT_SMALL[1], "bold"),
@@ -3813,7 +3818,7 @@ class TrackLabGUI:
         # NON e' risolvibile in modo pulito con un singolo Label di testo
         # → come concordato con Pedro lo lasciamo cosi' per ora.
         self._cache_detail_var = ctk.StringVar(
-            value="Seleziona un brano dalla lista")
+            value=_t("cache_tab.detail_placeholder"))
         ctk.CTkLabel(detail, textvariable=self._cache_detail_var,
                      font=FONT_SMALL, text_color=PALETTE["text"],
                      wraplength=220, justify="left",
@@ -3886,7 +3891,8 @@ class TrackLabGUI:
                     }
                 self._cache_data = cache_view
             except Exception as e:
-                self._cache_count_var.set(f"Errore lettura cache: {e}")
+                from services.i18n import t as _t
+                self._cache_count_var.set(_t("cache_tab.err_read", detail=str(e)))
         self._cache_search_var.set("")
         self._cache_filter()
         if hasattr(self, '_cache_info_var'):
@@ -3948,12 +3954,14 @@ class TrackLabGUI:
         start = page * PAGE_SIZE
         end   = min(start + PAGE_SIZE, total)
 
+        from services.i18n import t as _t
         if total > PAGE_SIZE:
             self._cache_count_var.set(
-                f"{total} voci  •  pag. {page+1}/{pages}  ({start+1}-{end})"
+                _t("cache_tab.count_with_pages", count=total,
+                   page=page+1, pages=pages, start=start+1, end=end)
             )
         else:
-            self._cache_count_var.set(f"{total} voci")
+            self._cache_count_var.set(_t("cache_tab.count_entries", count=total))
 
         for idx, (key, meta) in enumerate(items[start:end]):
             bg = PALETTE["surface2"] if idx % 2 == 0 else PALETTE["surface"]
@@ -4117,21 +4125,23 @@ class TrackLabGUI:
         #   Titolo, Artisti Partecipanti  (header — primi due)
         #   Album, Anno, Genere, BPM, Durata, Qualità,
         #   Sample rate, Dimensione, Cartella, Catalogato il, Sorgente
+        # v1092.0 (R6.1 fase 3.d): label localizzate, valori invariati
+        from services.i18n import t as _t
         lines = [
-            f"Titolo: {title}",
-            f"Artisti Partecipanti: {artist}",
+            f"{_t('cache_tab.detail_label_title')}: {title}",
+            f"{_t('cache_tab.detail_label_artists')}: {artist}",
             "",
-            f"Album: {album}",
-            f"Anno: {year}",
-            f"Genere: {genre}",
-            f"BPM: {bpm}",
-            f"Durata: {dur_str}",
-            f"Qualità: {bitrate_kbps_str}",
-            f"Sample rate: {sample_rate_str}",
-            f"Dimensione: {file_size_str}",
-            f"Cartella: {folder_str}",
-            f"Catalogato il: {cat_at_str}",
-            f"Sorgente: {source_str}",
+            f"{_t('cache_tab.detail_label_album')}: {album}",
+            f"{_t('cache_tab.detail_label_year')}: {year}",
+            f"{_t('cache_tab.detail_label_genre')}: {genre}",
+            f"{_t('cache_tab.detail_label_bpm')}: {bpm}",
+            f"{_t('cache_tab.detail_label_duration')}: {dur_str}",
+            f"{_t('cache_tab.detail_label_quality')}: {bitrate_kbps_str}",
+            f"{_t('cache_tab.detail_label_sample_rate')}: {sample_rate_str}",
+            f"{_t('cache_tab.detail_label_size')}: {file_size_str}",
+            f"{_t('cache_tab.detail_label_folder')}: {folder_str}",
+            f"{_t('cache_tab.detail_label_cataloged_at')}: {cat_at_str}",
+            f"{_t('cache_tab.detail_label_source')}: {source_str}",
         ]
         self._cache_detail_var.set("\n".join(lines))
 
@@ -6356,12 +6366,9 @@ class TrackLabGUI:
         record + lookup_by_query). Non tocca i record file della library
         (genere/bpm assegnati dal cataloger). Rimuove anche i record
         orfani (entries cache senza file)."""
-        if not messagebox.askyesno("Conferma",
-                "Svuotare la cache API esterne?\n\n"
-                "I metadati grezzi recuperati da MusicBrainz/iTunes/ecc.\n"
-                "verranno rimossi. La library file→genere NON viene\n"
-                "modificata.\n\n"
-                "Le prossime catalogazioni saranno più lente."):
+        from services.i18n import t as _t
+        if not messagebox.askyesno(_t("common.btn_confirm"),
+                _t("cache_tab.confirm_clear_body")):
             return
         try:
             sd = _get_data_dir()
@@ -6388,9 +6395,11 @@ class TrackLabGUI:
             if hasattr(self, "_cache_info_var"):
                 self._refresh_cache_info()
             self._cache_reload()
-            messagebox.showinfo("Cache", "Cache svuotata con successo.")
+            messagebox.showinfo(_t("cache_tab.msg_cache_title"),
+                                _t("cache_tab.msg_cache_cleared"))
         except Exception as e:
-            messagebox.showerror("Errore", f"Impossibile svuotare la cache:\n{e}")
+            messagebox.showerror(_t("cache_tab.err_clear_title"),
+                                 _t("cache_tab.err_clear_body", detail=str(e)))
 
     def _build_stat_cards(self, parent):
         # v1092.0 (R6.1 fase 3.b): label i18n

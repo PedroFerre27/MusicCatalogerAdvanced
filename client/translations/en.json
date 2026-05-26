@@ -215,6 +215,37 @@
     "btn_next":        "Next ▶"
   },
 
+  "cache_tab": {
+    "tip_reload":      "Refresh",
+    "search_placeholder": "🔍  Search artist, title...",
+    "count_entries":   "{count} entries",
+    "count_with_pages":"{count} entries  •  page {page}/{pages}  ({start}-{end})",
+    "err_read":        "Cache read error: {detail}",
+    "btn_clear":       "🗑 Clear",
+    "confirm_clear_body": "Clear the external API cache?\n\nRaw metadata fetched from MusicBrainz/iTunes/etc.\nwill be removed. The file→genre library is NOT\naffected.\n\nFuture catalogings will be slower.",
+    "col_artist_title": "Artist / Title",
+    "col_genre":        "Genre",
+    "col_source":       "Source",
+    "detail_placeholder": "Select a track from the list",
+    "msg_cache_title":   "Cache",
+    "msg_cache_cleared": "Cache cleared successfully.",
+    "err_clear_title":   "Error",
+    "err_clear_body":    "Could not clear cache:\n{detail}",
+    "detail_label_title":          "Title",
+    "detail_label_artists":        "Featuring artists",
+    "detail_label_album":          "Album",
+    "detail_label_year":           "Year",
+    "detail_label_genre":          "Genre",
+    "detail_label_bpm":            "BPM",
+    "detail_label_duration":       "Duration",
+    "detail_label_quality":        "Quality",
+    "detail_label_sample_rate":    "Sample rate",
+    "detail_label_size":           "Size",
+    "detail_label_folder":         "Folder",
+    "detail_label_cataloged_at":   "Cataloged on",
+    "detail_label_source":         "Source"
+  },
+
   "genres_tab": {
     "intro":            "Select the genres active in your collection.",
     "btn_save":         "💾  Save",
