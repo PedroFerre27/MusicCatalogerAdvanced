@@ -1098,12 +1098,25 @@ class TrackLabGUI:
                                  text_color="#ffffff"
                                  ).pack(side="right", padx=10)
 
-                # Bind click solo se enabled e non gia' attiva
+                # Bind click + hover effect solo se enabled e non gia' attiva.
+                # v1091.1: hover effect mancante in v1091.0 — la voce
+                # "English" non dava feedback visivo al passaggio del mouse,
+                # rendendo poco evidente che fosse cliccabile.
                 if enabled and not is_active:
                     def _on_click(_e, c=code):
                         _select_lang(c)
+                    hover_bg = PALETTE.get("primary_hover", "#2d5ab8")
+                    default_bg = row_bg
+                    def _on_enter(_e, frame=r, hb=hover_bg):
+                        try: frame.configure(fg_color=hb)
+                        except Exception: pass
+                    def _on_leave(_e, frame=r, db=default_bg):
+                        try: frame.configure(fg_color=db)
+                        except Exception: pass
                     for w in (r, lbl):
                         w.bind("<Button-1>", _on_click)
+                        w.bind("<Enter>", _on_enter)
+                        w.bind("<Leave>", _on_leave)
                         w.configure(cursor="hand2")
 
         def _fill_plans(parent):
