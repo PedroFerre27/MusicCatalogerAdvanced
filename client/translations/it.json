@@ -134,6 +134,66 @@
     "advanced":  "  Avanzate"
   },
 
+  "log_tab": {
+    "filter_label": "Filtra:"
+  },
+
+  "stat_cards": {
+    "processed": "Processati",
+    "moved":     "Spostati",
+    "updated":   "Aggiornati",
+    "covers":    "Cover",
+    "uncatalog": "Non Cat."
+  },
+
+  "advanced_tab": {
+    "section_classify":   "  Classificazione",
+    "section_sources":    "  Sorgenti Metadati  (ordine = priorità)",
+    "section_cover":      "  Cover Album — Impostazioni Avanzate",
+    "section_library":    "  Libreria Locale",
+    "section_rename":     "  Rinomina File Automatico",
+    "section_maintenance":"  Manutenzione",
+
+    "opt_dry_run":  "🧪  Modalità Simulazione (dry-run) — non sposta file",
+    "opt_verbose":  "📋  Output Dettagliato (DEBUG nel log)",
+    "opt_classify": "💃  Classifica Salsa per BPM (Easy/Medium/Hard...)",
+    "opt_correct":  "🔧  Correggi Metadati Cartelle Esistenti",
+
+    "sources_intro": "  Trascina con ↑↓ per cambiare la priorità della cascata.\n  La prima fonte con genere utile viene usata; le successive saltate.\n  Le sorgenti con token API (verdi) richiedono configurazione in secrets.py.",
+    "sources_token_hint": "  Token API:  discogs.com/settings/developers  •  acoustid.org/api-key",
+
+    "cover_overwrite":     "Sovrascrivi cover esistente",
+    "cover_strategy_label": "Strategia:",
+    "cover_strat_largest": "Usa la più grande in risoluzione",
+    "cover_strat_first":   "Usa la prima disponibile",
+    "cover_sources_label": "Sorgenti:",
+
+    "library_opt":  "Aggiorna DB locale Generi dopo catalogazione",
+    "library_hint": "  Salva mappatura file→genere in data/local_db.json.\n  Permette di rilevare spostamenti manuali al prossimo avvio.",
+
+    "rename_intro": "Rinomina i file MP3 durante la catalogazione in base al pattern scelto. Default: disabilitato.",
+    "rename_opt":   "Abilita rinomina automatica dei file durante la catalogazione",
+    "rename_pattern_label": "Pattern:",
+    "rename_pat_artist_title": "artista - titolo",
+    "rename_pat_title_artist": "titolo - artista",
+
+    "maint_intro": "  Strumenti per la gestione e pulizia della collezione musicale.",
+    "maint_btn_csv":          "Esporta CSV",
+    "maint_btn_find_dups":    "Trova Duplicati",
+    "maint_btn_clear_cache":  "Svuota Cache",
+    "maint_btn_open_data":    "Apri Cartella Dati",
+    "maint_btn_m3u":          "Playlist M3U",
+    "maint_btn_batch_rename": "Rinomina Batch",
+    "maint_btn_replaygain":   "Normalizza Volume",
+    "maint_btn_integrity":    "Verifica Integrità",
+    "maint_btn_open_log":     "Apri Cartella Log",
+    "maint_btn_test_config":  "Test Configurazione"
+  },
+
+  "browse_dialog": {
+    "title_select_dir": "Seleziona cartella musicale"
+  },
+
   "plans_sub": {
     "current_plan_label": "Piano corrente: {plan}",
     "btn_request_upgrade": "⬆  Richiedi upgrade del piano",

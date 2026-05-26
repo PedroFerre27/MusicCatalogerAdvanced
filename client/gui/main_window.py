@@ -2919,7 +2919,7 @@ class TrackLabGUI:
         log_toolbar = ctk.CTkFrame(tab_log, fg_color="transparent")
         log_toolbar.grid(row=0, column=0, padx=4, pady=(4, 2), sticky="ew")
 
-        ctk.CTkLabel(log_toolbar, text="Filtra:", font=FONT_SMALL,
+        ctk.CTkLabel(log_toolbar, text=_t("log_tab.filter_label"), font=FONT_SMALL,
                      text_color=PALETTE["text_dim"]).pack(side="left", padx=(4, 6))
 
         self._log_filter = {"INFO": True, "WARNING": True, "ERROR": True}
@@ -5954,6 +5954,8 @@ class TrackLabGUI:
 
     def _build_advanced_tab(self, parent):
         """v1053: tab Avanzate — tutte le impostazioni non essenziali."""
+        # v1092.0 (R6.1 fase 3.b): tab interamente i18n
+        from services.i18n import t as _t
         scroll = ctk.CTkScrollableFrame(parent, fg_color="transparent")
         scroll.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
         scroll.columnconfigure(0, weight=1)
@@ -5983,11 +5985,11 @@ class TrackLabGUI:
             self._build_admin_section(scroll, section)
 
         # Classificazione
-        frm = section("  Classificazione", icon_name="adv_classify")
-        chk(frm, self._opt_dry_run,  "🧪  Modalità Simulazione (dry-run) — non sposta file")
-        chk(frm, self._opt_verbose,  "📋  Output Dettagliato (DEBUG nel log)")
-        chk(frm, self._opt_classify, "💃  Classifica Salsa per BPM (Easy/Medium/Hard...)")
-        chk(frm, self._opt_correct,  "🔧  Correggi Metadati Cartelle Esistenti")
+        frm = section(_t("advanced_tab.section_classify"), icon_name="adv_classify")
+        chk(frm, self._opt_dry_run,  _t("advanced_tab.opt_dry_run"))
+        chk(frm, self._opt_verbose,  _t("advanced_tab.opt_verbose"))
+        chk(frm, self._opt_classify, _t("advanced_tab.opt_classify"))
+        chk(frm, self._opt_correct,  _t("advanced_tab.opt_correct"))
         ctk.CTkFrame(frm, height=4, fg_color="transparent").pack()
 
         # Sorgenti Metadati in ordine di priorità
@@ -5995,12 +5997,10 @@ class TrackLabGUI:
         # Ogni riga ha [↑] [↓] [☑] N. Nome — descrizione. Le frecce muovono
         # la sorgente nella lista self._sources_order, ridisegnando il blocco.
         # I metadati per le label sono in self._SOURCE_META (sotto).
-        frm2 = section("  Sorgenti Metadati  (ordine = priorità)", icon_name="adv_sources")
+        frm2 = section(_t("advanced_tab.section_sources"), icon_name="adv_sources")
         self._sources_adv_frame = frm2  # v1057: riferimento per enable/disable
         ctk.CTkLabel(frm2,
-                     text="  Trascina con ↑↓ per cambiare la priorità della cascata.\n"
-                          "  La prima fonte con genere utile viene usata; le successive saltate.\n"
-                          "  Le sorgenti con token API (verdi) richiedono configurazione in secrets.py.",
+                     text=_t("advanced_tab.sources_intro"),
                      font=(FONT_SMALL[0], FONT_SMALL[1] - 1),
                      text_color=PALETTE["text_dim"], justify="left",
                      ).pack(anchor="w", padx=16, pady=(6, 4))
@@ -6011,54 +6011,61 @@ class TrackLabGUI:
         self._redraw_sources_list()
 
         ctk.CTkLabel(frm2,
-                     text="  Token API:  discogs.com/settings/developers  •  acoustid.org/api-key",
+                     text=_t("advanced_tab.sources_token_hint"),
                      font=(FONT_SMALL[0], FONT_SMALL[1] - 1),
                      text_color=PALETTE["text_dim"], justify="left",
                      ).pack(anchor="w", padx=16, pady=(0, 8))
 
         # Cover Album
-        frm3 = section("  Cover Album — Impostazioni Avanzate", icon_name="adv_cover")
-        chk(frm3, self._cover_overwrite, "Sovrascrivi cover esistente")
-        ctk.CTkLabel(frm3, text="Strategia:", font=FONT_SMALL,
+        frm3 = section(_t("advanced_tab.section_cover"), icon_name="adv_cover")
+        chk(frm3, self._cover_overwrite, _t("advanced_tab.cover_overwrite"))
+        ctk.CTkLabel(frm3, text=_t("advanced_tab.cover_strategy_label"), font=FONT_SMALL,
                      text_color=PALETTE["text_dim"]).pack(anchor="w", padx=16, pady=(4, 2))
-        for val, label in [('largest', "Usa la più grande in risoluzione"),
-                            ('first_available', "Usa la prima disponibile")]:
+        for val, label in [('largest', _t("advanced_tab.cover_strat_largest")),
+                            ('first_available', _t("advanced_tab.cover_strat_first"))]:
             ctk.CTkRadioButton(
                 frm3, text=label, variable=self._cover_strategy, value=val,
                 font=FONT_SMALL, text_color=PALETTE["text"],
                 fg_color=PALETTE["primary"], hover_color=PALETTE["primary_hover"],
             ).pack(anchor="w", padx=24, pady=2)
-        ctk.CTkLabel(frm3, text="Sorgenti:", font=FONT_SMALL,
+        ctk.CTkLabel(frm3, text=_t("advanced_tab.cover_sources_label"), font=FONT_SMALL,
                      text_color=PALETTE["text_dim"]).pack(anchor="w", padx=16, pady=(6, 2))
+        # Sorgenti cover: nomi propri di servizi → non tradotti
         for src, label in [('musicbrainz', "MusicBrainz"), ('lastfm', "Last.fm"),
                             ('deezer', "Deezer"), ('itunes', "iTunes")]:
             chk(frm3, self._cover_sources[src], label)
         ctk.CTkFrame(frm3, height=4, fg_color="transparent").pack()
 
         # Libreria Locale
-        frm4 = section("  Libreria Locale", icon_name="adv_library")
-        chk(frm4, self._opt_local_db, "Aggiorna DB locale Generi dopo catalogazione")
+        frm4 = section(_t("advanced_tab.section_library"), icon_name="adv_library")
+        chk(frm4, self._opt_local_db, _t("advanced_tab.library_opt"))
         ctk.CTkLabel(frm4,
-                     text="  Salva mappatura file→genere in data/local_db.json.\n"
-                          "  Permette di rilevare spostamenti manuali al prossimo avvio.",
+                     text=_t("advanced_tab.library_hint"),
                      font=(FONT_SMALL[0], FONT_SMALL[1] - 1),
                      text_color=PALETTE["text_dim"], justify="left",
                      ).pack(anchor="w", padx=16, pady=(0, 8))
 
         # Rinomina File
-        frm_rename = section("  Rinomina File Automatico", icon_name="rename")
+        frm_rename = section(_t("advanced_tab.section_rename"), icon_name="rename")
         ctk.CTkLabel(frm_rename,
-            text="Rinomina i file MP3 durante la catalogazione in base al pattern scelto. Default: disabilitato.",
+            text=_t("advanced_tab.rename_intro"),
             font=FONT_SMALL, text_color=PALETTE["text_dim"], wraplength=500, justify="left"
         ).pack(padx=12, pady=(8, 4), anchor="w")
 
         self._opt_rename = ctk.BooleanVar(value=False)
-        chk(frm_rename, self._opt_rename, "Abilita rinomina automatica dei file durante la catalogazione")
+        chk(frm_rename, self._opt_rename, _t("advanced_tab.rename_opt"))
 
         rename_pat_frm = ctk.CTkFrame(frm_rename, fg_color="transparent")
         rename_pat_frm.pack(fill="x", padx=12, pady=(4, 12))
-        ctk.CTkLabel(rename_pat_frm, text="Pattern:", font=FONT_SMALL,
+        ctk.CTkLabel(rename_pat_frm, text=_t("advanced_tab.rename_pattern_label"), font=FONT_SMALL,
                      text_color=PALETTE["text_dim"]).pack(side="left", padx=(0, 8))
+        # NOTA: valori del segmented button restano "artista - titolo" /
+        # "titolo - artista" (italiano) perché sono CHIAVI INVARIANTI usate
+        # da _build_command per costruire il pattern --rename-pattern.
+        # Cambiarli romperebbe i preset salvati in data/ui_prefs.json e la
+        # logica di mapping pattern. La traduzione visiva è in R6.1 fase 4
+        # (refactor id_invariant vs display_localized, stesso pattern dei
+        # BPM categories).
         self._rename_pattern = ctk.StringVar(value="artista - titolo")
         ctk.CTkSegmentedButton(
             rename_pat_frm,
@@ -6078,9 +6085,9 @@ class TrackLabGUI:
                      ).pack(side="left", padx=(4, 0))
 
         # Manutenzione
-        frm5 = section("  Manutenzione", icon_name="advanced2")
+        frm5 = section(_t("advanced_tab.section_maintenance"), icon_name="advanced2")
         ctk.CTkLabel(frm5,
-                     text="  Strumenti per la gestione e pulizia della collezione musicale.",
+                     text=_t("advanced_tab.maint_intro"),
                      font=(FONT_SMALL[0], FONT_SMALL[1]-1), text_color=PALETTE["text_dim"]
                      ).pack(anchor="w", padx=16, pady=(4, 6))
         # Layout 2 colonne, 4 righe per i tool di manutenzione
@@ -6088,18 +6095,18 @@ class TrackLabGUI:
                        hover_color=PALETTE["primary"], text_color=PALETTE["text"],
                        anchor="w", width=240, height=32)
         _tools = [
-            ("csv",          "Esporta CSV",         self._maint_export_csv),
-            ("find_dups",    "Trova Duplicati",      self._maint_find_duplicates),
-            ("svuota_cache", "Svuota Cache",         self._clear_cache),
-            ("open_folder",       "Apri Cartella Dati",   lambda: __import__("subprocess").Popen(
-                                                         ["explorer", str(_get_data_dir())])),
-            ("m3u",          "Playlist M3U",         self._maint_export_m3u),
-            ("rinomina_b",   "Rinomina Batch",       self._maint_batch_rename),
-            ("replaygain",   "Normalizza Volume",    self._maint_replaygain),
-            ("integrity",    "Verifica Integrità",   self._maint_check_integrity),
+            ("csv",          _t("advanced_tab.maint_btn_csv"),          self._maint_export_csv),
+            ("find_dups",    _t("advanced_tab.maint_btn_find_dups"),    self._maint_find_duplicates),
+            ("svuota_cache", _t("advanced_tab.maint_btn_clear_cache"),  self._clear_cache),
+            ("open_folder",  _t("advanced_tab.maint_btn_open_data"),    lambda: __import__("subprocess").Popen(
+                                                                        ["explorer", str(_get_data_dir())])),
+            ("m3u",          _t("advanced_tab.maint_btn_m3u"),          self._maint_export_m3u),
+            ("rinomina_b",   _t("advanced_tab.maint_btn_batch_rename"), self._maint_batch_rename),
+            ("replaygain",   _t("advanced_tab.maint_btn_replaygain"),   self._maint_replaygain),
+            ("integrity",    _t("advanced_tab.maint_btn_integrity"),    self._maint_check_integrity),
             # v1077: spostati dal menu Strumenti (Opzione C — menu bar rimossa)
-            ("log",          "Apri Cartella Log",    self._open_log_folder),
-            ("settings",     "Test Configurazione",  self._test_config),
+            ("log",          _t("advanced_tab.maint_btn_open_log"),     self._open_log_folder),
+            ("settings",     _t("advanced_tab.maint_btn_test_config"),  self._test_config),
         ]
         grid_maint = ctk.CTkFrame(frm5, fg_color="transparent")
         grid_maint.pack(fill="x", padx=12, pady=(4, 12))
@@ -6328,16 +6335,18 @@ class TrackLabGUI:
             messagebox.showerror("Errore", f"Impossibile svuotare la cache:\n{e}")
 
     def _build_stat_cards(self, parent):
+        # v1092.0 (R6.1 fase 3.b): label i18n
+        from services.i18n import t as _t
         frm = ctk.CTkFrame(parent, fg_color="transparent")
         frm.grid(row=0, column=0, padx=20, pady=(20, 12), sticky="ew")
         for i in range(5):
             frm.columnconfigure(i, weight=1)
 
-        self._card_processed = StatCard(frm, "🎵", "Processati",  icon_name="processati")
-        self._card_moved      = StatCard(frm, "📂", "Spostati",    icon_name="spostati")
-        self._card_updated    = StatCard(frm, "✏️", "Aggiornati",  icon_name="aggiornati")
-        self._card_covers     = StatCard(frm, "🖼️", "Cover",       icon_name="cover_stat")
-        self._card_uncatalog  = StatCard(frm, "⚠️", "Non Cat.",    icon_name="non_cat")
+        self._card_processed = StatCard(frm, "🎵", _t("stat_cards.processed"), icon_name="processati")
+        self._card_moved      = StatCard(frm, "📂", _t("stat_cards.moved"),     icon_name="spostati")
+        self._card_updated    = StatCard(frm, "✏️", _t("stat_cards.updated"),   icon_name="aggiornati")
+        self._card_covers     = StatCard(frm, "🖼️", _t("stat_cards.covers"),    icon_name="cover_stat")
+        self._card_uncatalog  = StatCard(frm, "⚠️", _t("stat_cards.uncatalog"), icon_name="non_cat")
 
         for col, card in enumerate([
             self._card_processed, self._card_moved,
@@ -6348,7 +6357,8 @@ class TrackLabGUI:
     # ─── LOGICA ──────────────────────────────────────────────────────────
 
     def _browse(self):
-        path = filedialog.askdirectory(title="Seleziona cartella musicale")
+        from services.i18n import t as _t
+        path = filedialog.askdirectory(title=_t("browse_dialog.title_select_dir"))
         if path:
             self._select_path(path)
 

@@ -134,6 +134,66 @@
     "advanced":  "  Advanced"
   },
 
+  "log_tab": {
+    "filter_label": "Filter:"
+  },
+
+  "stat_cards": {
+    "processed": "Processed",
+    "moved":     "Moved",
+    "updated":   "Updated",
+    "covers":    "Covers",
+    "uncatalog": "Uncatalog."
+  },
+
+  "advanced_tab": {
+    "section_classify":   "  Classification",
+    "section_sources":    "  Metadata sources  (order = priority)",
+    "section_cover":      "  Album cover — Advanced settings",
+    "section_library":    "  Local library",
+    "section_rename":     "  Automatic file rename",
+    "section_maintenance":"  Maintenance",
+
+    "opt_dry_run":  "🧪  Dry-run (simulation) — does not move files",
+    "opt_verbose":  "📋  Verbose output (DEBUG in log)",
+    "opt_classify": "💃  Classify Salsa by BPM (Easy/Medium/Hard...)",
+    "opt_correct":  "🔧  Fix metadata in existing folders",
+
+    "sources_intro": "  Drag with ↑↓ to change cascade priority.\n  The first source with a useful genre is used; later ones are skipped.\n  Sources with API tokens (green) require setup in secrets.py.",
+    "sources_token_hint": "  API tokens:  discogs.com/settings/developers  •  acoustid.org/api-key",
+
+    "cover_overwrite":     "Overwrite existing cover",
+    "cover_strategy_label": "Strategy:",
+    "cover_strat_largest": "Use the largest resolution",
+    "cover_strat_first":   "Use the first available",
+    "cover_sources_label": "Sources:",
+
+    "library_opt":  "Update local Genres DB after cataloging",
+    "library_hint": "  Saves the file→genre mapping in data/local_db.json.\n  Allows detection of manual moves at the next launch.",
+
+    "rename_intro": "Renames MP3 files during cataloging based on the chosen pattern. Default: disabled.",
+    "rename_opt":   "Enable automatic file renaming during cataloging",
+    "rename_pattern_label": "Pattern:",
+    "rename_pat_artist_title": "artist - title",
+    "rename_pat_title_artist": "title - artist",
+
+    "maint_intro": "  Tools for managing and cleaning the music collection.",
+    "maint_btn_csv":          "Export CSV",
+    "maint_btn_find_dups":    "Find duplicates",
+    "maint_btn_clear_cache":  "Clear cache",
+    "maint_btn_open_data":    "Open data folder",
+    "maint_btn_m3u":          "M3U playlist",
+    "maint_btn_batch_rename": "Batch rename",
+    "maint_btn_replaygain":   "Normalize volume",
+    "maint_btn_integrity":    "Integrity check",
+    "maint_btn_open_log":     "Open log folder",
+    "maint_btn_test_config":  "Test configuration"
+  },
+
+  "browse_dialog": {
+    "title_select_dir": "Select music folder"
+  },
+
   "plans_sub": {
     "current_plan_label": "Current plan: {plan}",
     "btn_request_upgrade": "⬆  Request a plan upgrade",
