@@ -4357,9 +4357,37 @@ class TrackLabGUI:
 
         self._genre_vars: dict = {}   # key: (macro, sub) → BooleanVar
 
+        # v1092.0 (R6.1 fase 3.c hotfix): mappe display ↔ chiave i18n.
+        # _GENRE_TREE resta source-of-truth con nomi italiani (anche per
+        # macro_key e sub usati come chiavi invarianti di genre_prefs.json
+        # → cambiarli romperebbe le preferenze salvate degli utenti).
+        # Solo la VISUALIZZAZIONE passa per i18n.
+        _MACRO_I18N_MAP = {
+            "🎵  Latin":                "latin",
+            "🎬  Soundtrack":           "soundtrack",
+            "🎸  Rock & Alternative":    "rock",
+            "🎹  Classical & Jazz":      "classical",
+            "🎧  Electronic":           "electronic",
+            "🎤  Pop & R&B":             "pop",
+            "🌍  World & Other":         "world",
+            "🗂️  Altro":                "other",
+        }
+        _SUB_HINT_OVERRIDES = {"R&B": "rnb"}
+        def _sub_to_hint_key(sub: str) -> str:
+            if sub in _SUB_HINT_OVERRIDES:
+                return _SUB_HINT_OVERRIDES[sub]
+            return (sub.lower()
+                    .replace(" ", "_")
+                    .replace("-", "_")
+                    .replace("/", "_"))
+
         for macro, data in self._GENRE_TREE.items():
             # Header macrogenere con checkbox "abilita tutto il gruppo"
             macro_key = macro.split("  ", 1)[-1].strip()
+            # Display localizzato del macrogenere
+            macro_display = _t(
+                f"genres_macro.{_MACRO_I18N_MAP.get(macro, macro_key.lower())}"
+            )
             all_on = all(
                 self._genre_prefs.get(f"{macro_key}::{sub}", True)
                 for sub, _ in data["subgenres"]
@@ -4371,7 +4399,7 @@ class TrackLabGUI:
             hdr.columnconfigure(1, weight=1)
 
             ctk.CTkCheckBox(
-                hdr, variable=macro_var, text=macro,
+                hdr, variable=macro_var, text=macro_display,
                 font=("Segoe UI", 12, "bold"), text_color=PALETTE["text"],
                 fg_color=PALETTE["primary"], hover_color=PALETTE["primary_hover"],
                 checkmark_color=PALETTE["bg"],
@@ -4395,6 +4423,16 @@ class TrackLabGUI:
                 cell = ctk.CTkFrame(sub_frm, fg_color="transparent")
                 cell.grid(row=row, column=col, padx=8, pady=3, sticky="w")
 
+                # Hint localizzata: fallback al testo IT (`desc`) se la
+                # chiave i18n non esiste in EN (e fallback al testo IT in
+                # IT). i18n.t() ritorna la chiave stessa se mancante:
+                # in quel caso usiamo `desc` come fallback robusto.
+                hint_key = _sub_to_hint_key(sub)
+                hint_lookup = f"genres_hints.{hint_key}"
+                hint_text = _t(hint_lookup)
+                if hint_text == hint_lookup:
+                    hint_text = desc   # fallback finale al testo IT
+
                 ctk.CTkCheckBox(
                     cell, variable=var, text=sub,
                     font=FONT_SMALL, text_color=PALETTE["text"],
@@ -4402,7 +4440,7 @@ class TrackLabGUI:
                     checkmark_color=PALETTE["bg"],
                 ).pack(side="left")
                 ctk.CTkLabel(
-                    cell, text=f"  {desc}",
+                    cell, text=f"  {hint_text}",
                     font=(FONT_SMALL[0], FONT_SMALL[1] - 1),
                     text_color=PALETTE["text_dim"],
                 ).pack(side="left")
