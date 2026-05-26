@@ -167,20 +167,30 @@
 
   "login": {
     "title_window": "TrackLab — Sign in",
-    "header": "Sign in to TrackLab",
+    "header": "Sign in to continue",
     "field_email": "Email",
     "field_password": "Password",
-    "field_server": "Server URL",
+    "field_server": "Server",
     "chk_remember_email": "Remember email",
     "btn_login": "Sign in",
+    "btn_login_loading": "Signing in...",
+    "no_account_prompt": "Don't have an account?",
+    "btn_register": "Register",
     "btn_register_link": "Don't have an account? Register",
     "btn_offline": "Continue offline",
-    "err_invalid_credentials": "Wrong email or password.",
-    "err_server_unreachable": "Server unreachable: {url}",
+    "err_invalid_credentials": "Wrong email or password. Try again.",
+    "err_server_unreachable_short": "Server unreachable: {url}",
+    "err_server_unreachable_long": "Server unreachable: {url}\nCheck URL or connection.",
     "err_invalid_url": "Invalid server URL",
     "err_invalid_url_body": "Please configure the server URL in the field below first.",
+    "err_invalid_url_format": "Server URL must start with http:// or https://",
+    "err_fill_required": "Email and password are required",
+    "err_server_http": "Server error (HTTP {status})",
+    "err_unexpected": "Unexpected error",
     "status_login_in_progress": "Signing in…",
-    "status_logged_in": "Sign-in successful"
+    "status_connecting": "Connecting to server...",
+    "status_logged_in": "Sign-in successful ✓",
+    "registration_disabled_notice": "ℹ  Self-service registration disabled\nContact the administrator to obtain an account."
   },
 
   "register": {

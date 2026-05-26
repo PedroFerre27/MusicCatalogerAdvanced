@@ -22,6 +22,8 @@ from config.app_config import config as client_config, save as save_client_confi
 from services.api_client import (
     ApiClient, AuthError, ServerUnreachableError, ApiError,
 )
+# v1092.0 (R6.1 fase 2): i18n
+from services.i18n import t
 
 
 # Colori — allineati alla palette dell'app
@@ -50,7 +52,7 @@ class LoginWindow:
         self.api_client: Optional[ApiClient] = None
 
         self.root = ctk.CTk()
-        self.root.title("TrackLab — Login")
+        self.root.title(t("login.title_window"))
         self.root.geometry("440x520")
         self.root.resizable(False, False)
         self.root.configure(fg_color=PALETTE["bg"])
@@ -94,10 +96,10 @@ class LoginWindow:
                          font=("Segoe UI", 44),
                          text_color=PALETTE["primary"]).pack()
 
-        ctk.CTkLabel(header, text="TrackLab",
+        ctk.CTkLabel(header, text=t("app.name"),
                      font=("Segoe UI", 18, "bold"),
                      text_color=PALETTE["text"]).pack(pady=(6, 0))
-        ctk.CTkLabel(header, text="Accedi per continuare",
+        ctk.CTkLabel(header, text=t("login.header"),
                      font=("Segoe UI", 11),
                      text_color=PALETTE["text_dim"]).pack()
 
@@ -106,7 +108,7 @@ class LoginWindow:
                             corner_radius=12)
         form.pack(fill="x", padx=28, pady=(18, 8))
 
-        ctk.CTkLabel(form, text="Email", anchor="w",
+        ctk.CTkLabel(form, text=t("login.field_email"), anchor="w",
                      font=("Segoe UI", 11, "bold"),
                      text_color=PALETTE["text"]
                      ).pack(fill="x", padx=18, pady=(14, 2))
@@ -138,7 +140,7 @@ class LoginWindow:
         )
         self.email_entry.pack(fill="x", padx=18, pady=(0, 10))
 
-        ctk.CTkLabel(form, text="Password", anchor="w",
+        ctk.CTkLabel(form, text=t("login.field_password"), anchor="w",
                      font=("Segoe UI", 11, "bold"),
                      text_color=PALETTE["text"]
                      ).pack(fill="x", padx=18, pady=(4, 2))
@@ -152,7 +154,7 @@ class LoginWindow:
 
         # Remember me
         self.remember_var = ctk.BooleanVar(value=client_config.remember_email)
-        ctk.CTkCheckBox(form, text="Ricorda email",
+        ctk.CTkCheckBox(form, text=t("login.chk_remember_email"),
                         variable=self.remember_var,
                         font=("Segoe UI", 10),
                         text_color=PALETTE["text_dim"],
@@ -163,7 +165,7 @@ class LoginWindow:
 
         # Bottone Login
         self.login_btn = ctk.CTkButton(
-            form, text="Accedi",
+            form, text=t("login.btn_login"),
             font=("Segoe UI", 12, "bold"),
             fg_color=PALETTE["primary"], hover_color=PALETTE["primary_hover"],
             text_color="#ffffff", height=40, corner_radius=8,
@@ -175,11 +177,11 @@ class LoginWindow:
         # v0.0.2.3: Link registrazione (nascosto se admin ha disabilitato)
         self._signup_row = ctk.CTkFrame(form, fg_color="transparent")
         self._signup_row.pack(fill="x", padx=18, pady=(0, 14))
-        ctk.CTkLabel(self._signup_row, text="Non hai un account?",
+        ctk.CTkLabel(self._signup_row, text=t("login.no_account_prompt"),
                      font=("Segoe UI", 10),
                      text_color=PALETTE["text_dim"]).pack(side="left")
         signup_lbl = ctk.CTkLabel(
-            self._signup_row, text="Registrati",
+            self._signup_row, text=t("login.btn_register"),
             font=("Segoe UI", 10, "bold"),
             text_color=PALETTE["primary"], cursor="hand2")
         signup_lbl.pack(side="left", padx=(4, 0))
@@ -203,7 +205,7 @@ class LoginWindow:
         # Sezione "avanzate" — URL server
         adv = ctk.CTkFrame(self.root, fg_color="transparent")
         adv.pack(fill="x", padx=28, pady=(6, 16))
-        ctk.CTkLabel(adv, text="Server",
+        ctk.CTkLabel(adv, text=t("login.field_server"),
                      font=("Segoe UI", 9),
                      text_color=PALETTE["text_dim"]).pack(anchor="w")
         self.server_var = ctk.StringVar(value=client_config.server_url)
@@ -228,9 +230,9 @@ class LoginWindow:
 
     def _set_loading(self, is_loading: bool):
         if is_loading:
-            self.login_btn.configure(text="Accesso in corso...", state="disabled")
+            self.login_btn.configure(text=t("login.btn_login_loading"), state="disabled")
         else:
-            self.login_btn.configure(text="Accedi", state="normal")
+            self.login_btn.configure(text=t("login.btn_login"), state="normal")
 
     def _do_login(self):
         # v1086.3 round 4: email forzata a lowercase prima del confronto.
@@ -245,10 +247,10 @@ class LoginWindow:
         server   = self.server_var.get().strip()
 
         if not email or not password:
-            self._set_status("Email e password obbligatori", "error")
+            self._set_status(t("login.err_fill_required"), "error")
             return
         if not server.startswith(("http://", "https://")):
-            self._set_status("URL server deve iniziare con http:// o https://", "error")
+            self._set_status(t("login.err_invalid_url_format"), "error")
             return
 
         # Salva preferenze client
@@ -259,7 +261,7 @@ class LoginWindow:
 
         # Esegui login in thread per non bloccare UI
         self._set_loading(True)
-        self._set_status("Connessione al server...", "text_dim")
+        self._set_status(t("login.status_connecting"), "text_dim")
         threading.Thread(target=self._login_worker,
                          args=(server, email, password),
                          daemon=True).start()
@@ -275,20 +277,21 @@ class LoginWindow:
         except AuthError as e:
             err_str = str(e)
             self.root.after(0, lambda: self._on_error(
-                "Email o password errate. Riprova.", detail=err_str))
+                t("login.err_invalid_credentials"), detail=err_str))
         except ServerUnreachableError:
             self.root.after(0, lambda: self._on_error(
-                f"Server irraggiungibile: {server}\nVerifica URL o connessione.",
+                t("login.err_server_unreachable_long", url=server),
                 detail=""))
         except ApiError as e:
             err_status = e.status
             err_detail = str(e.detail)
             self.root.after(0, lambda: self._on_error(
-                f"Errore del server (HTTP {err_status})", detail=err_detail))
+                t("login.err_server_http", status=err_status),
+                detail=err_detail))
         except Exception as e:
             err_str = str(e)
             self.root.after(0, lambda: self._on_error(
-                "Errore imprevisto", detail=err_str))
+                t("login.err_unexpected"), detail=err_str))
 
     def _check_registration_enabled(self):
         """v1085g: chiede al server se la registrazione self-service è
@@ -315,8 +318,7 @@ class LoginWindow:
                             w.destroy()
                         ctk.CTkLabel(
                             self._signup_row,
-                            text="ℹ  Registrazione self-service disabilitata\n"
-                                 "Contatta l'amministratore per ottenere un account.",
+                            text=t("login.registration_disabled_notice"),
                             font=("Segoe UI", 9),
                             text_color=PALETTE["text_dim"],
                             justify="center"
@@ -333,7 +335,7 @@ class LoginWindow:
 
     def _on_success(self):
         self._set_loading(False)
-        self._set_status("Accesso effettuato ✓", "success")
+        self._set_status(t("login.status_logged_in"), "success")
         # v1085c: cancella tutte le after callback pending (es. DPI
         # scaling di customtkinter) prima di destroy. Senza questo, in
         # CMD compaiono messaggi 'invalid command name "...update"'.
@@ -392,8 +394,8 @@ class LoginWindow:
 
         server = self.server_var.get().strip()
         if not server.startswith(("http://", "https://")):
-            messagebox.showerror("URL server non valido",
-                                 "Configura prima l'URL del server nel campo in fondo.")
+            messagebox.showerror(t("login.err_invalid_url"),
+                                 t("login.err_invalid_url_body"))
             return
 
         # DLG_H 560: sweet spot empirico osservato sul rendering
@@ -404,7 +406,7 @@ class LoginWindow:
         DLG_W, DLG_H = 460, 560
 
         win = ctk.CTkToplevel(self.root)
-        win.title("Registrazione nuovo account")
+        win.title(t("register.title_window"))
         win.geometry(f"{DLG_W}x{DLG_H}")
         win.resizable(False, False)
         win.configure(fg_color=PALETTE["bg"])
@@ -476,12 +478,12 @@ class LoginWindow:
         body = ctk.CTkFrame(win, fg_color="transparent")
         body.pack(side="top", fill="both", expand=True, padx=0, pady=0)
 
-        ctk.CTkLabel(body, text="Crea un nuovo account",
+        ctk.CTkLabel(body, text=t("register.header"),
                      font=("Segoe UI", 14, "bold"),
                      text_color=PALETTE["text"]
                      ).pack(pady=(16, 2))
         ctk.CTkLabel(body,
-                     text="Partirai con il piano Base.\nPotrai richiedere un upgrade dopo il login.",
+                     text=t("register.subtitle"),
                      font=("Segoe UI", 10),
                      text_color=PALETTE["text_dim"],
                      justify="center"
@@ -504,10 +506,10 @@ class LoginWindow:
                          ).pack(fill="x", padx=14, pady=(0, 4))
             return var
 
-        email_var    = _field("Email")
-        username_var = _field("Nome utente")
-        pwd_var      = _field("Password (minimo 8 caratteri)", show="•")
-        cnf_var      = _field("Conferma password", show="•")
+        email_var    = _field(t("register.field_email"))
+        username_var = _field(t("register.field_username"))
+        pwd_var      = _field(t("register.field_password"), show="•")
+        cnf_var      = _field(t("register.field_confirm_password"), show="•")
         # Padding finale del form
         ctk.CTkFrame(form, fg_color="transparent", height=8).pack()
 
@@ -517,17 +519,17 @@ class LoginWindow:
             pwd   = pwd_var.get()
             cnf   = cnf_var.get()
             if not email or not uname or not pwd:
-                _set_status("Compila tutti i campi", "error"); return
+                _set_status(t("register.err_fill_all"), "error"); return
             if "@" not in email or "." not in email.split("@")[-1]:
-                _set_status("Email non valida", "error"); return
+                _set_status(t("register.err_invalid_email"), "error"); return
             if len(pwd) < 8:
-                _set_status("Password di almeno 8 caratteri", "error"); return
+                _set_status(t("register.err_password_short"), "error"); return
             if pwd != cnf:
-                _set_status("Le password non coincidono", "error"); return
+                _set_status(t("register.err_password_mismatch"), "error"); return
 
-            btn_ok.configure(text="Registrazione…", state="disabled")
+            btn_ok.configure(text=t("register.btn_submitting"), state="disabled")
             btn_cancel.configure(state="disabled")
-            _set_status("Invio al server…", "text_dim")
+            _set_status(t("register.status_sending"), "text_dim")
 
             def _worker():
                 try:
@@ -538,46 +540,44 @@ class LoginWindow:
                         self.email_var.set(user["email"]),
                         self.password_var.set(""),
                         self.password_entry.focus(),
-                        self._set_status(
-                            f"Account creato ✓  Accedi con email e password.",
-                            "success"),
+                        self._set_status(t("register.status_success"), "success"),
                     ))
                 except ApiError as e:
                     if e.status == 409:
-                        msg = "Email già registrata."
+                        msg = t("register.err_email_taken")
                     elif e.status == 422:
-                        msg = "Dati non validi — controlla email e password."
+                        msg = t("register.err_invalid_data")
                     else:
-                        msg = f"Errore server (HTTP {e.status})"
+                        msg = t("register.err_server_generic", status=e.status)
                     self.root.after(0, lambda: (
                         _set_status(msg, "error"),
-                        btn_ok.configure(text="Registrati", state="normal"),
+                        btn_ok.configure(text=t("register.btn_submit"), state="normal"),
                         btn_cancel.configure(state="normal"),
                     ))
                 except ServerUnreachableError:
                     self.root.after(0, lambda: (
-                        _set_status(f"Server irraggiungibile: {server}", "error"),
-                        btn_ok.configure(text="Registrati", state="normal"),
+                        _set_status(t("login.err_server_unreachable_short", url=server), "error"),
+                        btn_ok.configure(text=t("register.btn_submit"), state="normal"),
                         btn_cancel.configure(state="normal"),
                     ))
                 except Exception as e:
                     err_str = str(e)
                     self.root.after(0, lambda: (
-                        _set_status(f"Errore: {err_str}", "error"),
-                        btn_ok.configure(text="Registrati", state="normal"),
+                        _set_status(t("register.err_unknown", detail=err_str), "error"),
+                        btn_ok.configure(text=t("register.btn_submit"), state="normal"),
                         btn_cancel.configure(state="normal"),
                     ))
             threading.Thread(target=_worker, daemon=True).start()
 
         btn_cancel = ctk.CTkButton(
-            btn_row, text="Annulla", width=110, height=38,
+            btn_row, text=t("common.btn_cancel"), width=110, height=38,
             fg_color="transparent", hover_color=PALETTE["surface"],
             text_color=PALETTE["text_dim"],
             font=("Segoe UI", 10), command=win.destroy,
         )
         btn_cancel.pack(side="right", padx=(4, 0), pady=14)
         btn_ok = ctk.CTkButton(
-            btn_row, text="✓  Registrati", width=170, height=38,
+            btn_row, text=t("register.btn_submit"), width=170, height=38,
             fg_color=PALETTE["primary"], hover_color=PALETTE["primary_hover"],
             text_color="#ffffff",
             font=("Segoe UI", 11, "bold"), command=_submit,
