@@ -611,6 +611,12 @@ class TrackLabGUI:
         # v1085d: chiudi anche quando il mouse esce dall'area dei flyout
         # (non solo al click esterno). Implementato con polling 200ms
         # sulla posizione del puntatore.
+        # v1092.0 (R6.1 polish): considera anche il pulsante profilo
+        # (_profile_btn) come "area sicura". Bug segnalato durante test
+        # R6.1: aprendo il flyout e rimanendo fermi col mouse sul
+        # pulsante (senza spostarsi nel flyout sottostante), il polling
+        # vedeva il puntatore "fuori dai flyout" e chiudeva tutto entro
+        # 500ms+250ms.
         def _is_mouse_inside_flyouts() -> bool:
             try:
                 px = self.root.winfo_pointerx()
@@ -622,6 +628,15 @@ class TrackLabGUI:
                         # Tolleranza 8px per evitare flicker ai bordi
                         if (wx-8) <= px <= (wx+ww+8) and (wy-8) <= py <= (wy+wh+8):
                             return True
+                # Trigger button = area sicura (mouse fermo sul pulsante)
+                btn = getattr(self, "_profile_btn", None)
+                if btn is not None and btn.winfo_exists():
+                    bx = btn.winfo_rootx()
+                    by = btn.winfo_rooty()
+                    bw = btn.winfo_width()
+                    bh = btn.winfo_height()
+                    if bx <= px <= (bx + bw) and by <= py <= (by + bh):
+                        return True
             except Exception:
                 return True   # in caso di errore non chiudere
             return False
@@ -1306,8 +1321,10 @@ class TrackLabGUI:
         FEATURE_COL_W = 260
         PLAN_COL_W    = 200
         BTN_BAR_H     = 80
-        TITLEBAR_H    = 44
         HEADER_H      = 90
+        # v1092.0 (R6.1 polish): rimossa titlebar custom (44px) — usiamo
+        # solo la titlebar nativa Windows che ha gia' titolo e X. Pedro
+        # ha segnalato il "doppio pulsante di chiusura" durante test R6.1.
         win_w = FEATURE_COL_W + n_plans * PLAN_COL_W + 32
         sw = self.root.winfo_screenwidth()
         sh = self.root.winfo_screenheight()
@@ -1316,8 +1333,11 @@ class TrackLabGUI:
 
         win = ctk.CTkToplevel(self.root)
         # v1085o: finestra Windows standalone (era overrideredirect+transient)
-        _setup_standalone_dialog(win, self.root, "Upgrade Plan",
-                                  win_w, win_h, center_on_root=False)
+        # v1092.0: titolo nativo = "Confronto piani disponibili" (era
+        # "Upgrade Plan" generico + titlebar custom interna duplicata).
+        _setup_standalone_dialog(win, self.root,
+                                 _t("upgrade_dialog.header"),
+                                 win_w, win_h, center_on_root=False)
         # Centro su schermo (override del centering del helper, perché qui
         # è un dialog grande, vogliamo centrato sullo schermo, non sulla main)
         win.geometry(f"{win_w}x{win_h}+{(sw-win_w)//2}+{(sh-win_h)//2}")
@@ -1326,41 +1346,9 @@ class TrackLabGUI:
         except Exception:
             pass
 
-        # ── 1. Titlebar (TOP) ────────────────────────────────────────
-        titlebar = ctk.CTkFrame(win, fg_color=PALETTE["surface2"],
-                                corner_radius=0, height=TITLEBAR_H)
-        titlebar.pack(side="top", fill="x")
-        titlebar.pack_propagate(False)
-        ctk.CTkLabel(titlebar, text=_t("upgrade_dialog.header"),
-                     font=("Segoe UI", 14, "bold"),
-                     text_color=PALETTE["text"]
-                     ).pack(side="left", padx=18, pady=10)
-        close_btn = ctk.CTkButton(titlebar, text="✕", width=32, height=28,
-                      fg_color="transparent", hover_color="#d84545",
-                      text_color=PALETTE["text_dim"],
-                      font=("Segoe UI", 13, "bold"),
-                      command=win.destroy)
-        close_btn.pack(side="right", padx=8, pady=8)
-
-        # Drag dalla titlebar
-        def _start_drag(e):
-            win._drag_x = e.x_root - win.winfo_x()
-            win._drag_y = e.y_root - win.winfo_y()
-        def _do_drag(e):
-            try:
-                win.geometry(f"+{e.x_root - win._drag_x}+{e.y_root - win._drag_y}")
-            except Exception:
-                pass
-        # Non bindare il drag sul bottone close
-        for w in titlebar.winfo_children():
-            if w is close_btn: continue
-            try:
-                w.bind("<Button-1>", _start_drag)
-                w.bind("<B1-Motion>", _do_drag)
-            except Exception:
-                pass
-        titlebar.bind("<Button-1>", _start_drag)
-        titlebar.bind("<B1-Motion>", _do_drag)
+        # v1092.0: titlebar custom + drag handlers RIMOSSI. La titlebar
+        # nativa Windows (titolo + ✕ + drag + minimize) sostituisce
+        # tutto. Niente piu' doppio pulsante di chiusura.
 
         # ── 2. Btn bar (BOTTOM) — pinnato PRIMA del body ─────────────
         btn_bar = ctk.CTkFrame(win, fg_color=PALETTE["surface"],
