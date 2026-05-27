@@ -4697,26 +4697,18 @@ class TrackLabGUI:
                 "3 - Media": (95, 99), "4 - Veloce": (100, 119), "5 - Crazy": (120, 999),
             }
 
-        # v1092.0 (R6.1 fase 3.f): mappa display ↔ chiave i18n per BPM levels.
-        # I level ID restano invarianti (italiani: "1 - Romantica", "2 - Lenta",
-        # ecc.) perché sono usati come chiavi in config/settings.py
-        # difficulty_ranges → cambiarli romperebbe la classificazione esistente.
-        # Solo il DISPLAY passa per i18n. Refactor strutturale (id puro
-        # vs display localizzato) pianificato in fase 4.1.
-        _BPM_LEVEL_I18N = {
-            "1 - Romantica": "level_1",
-            "2 - Lenta":     "level_2",
-            "3 - Media":     "level_3",
-            "4 - Veloce":    "level_4",
-            "5 - Crazy":     "level_5",
-        }
+        # v1092.0 (R6.1 fase 3.f): display BPM level localizzato.
+        # v1093.0 (R6.1 fase 4.1): mapping spostato in services/i18n.py
+        # come helper `bpm_level_display()` per riuso fuori da questo
+        # tab. Le chiavi di difficulty_ranges restano italiane perche'
+        # sono ANCHE nome cartella filesystem (vedi docstring in
+        # config/settings.py).
+        from services.i18n import bpm_level_display
         self._carib_diff_vars = {}
         for level, (bmin, bmax) in diff_ranges.items():
             row_d = ctk.CTkFrame(frm_sal_diff, fg_color="transparent")
             row_d.pack(fill="x", padx=12, pady=3)
-            # Display localizzato; fallback al level ID se sconosciuto
-            level_key = _BPM_LEVEL_I18N.get(level)
-            level_display = (_t(f"bpm_levels.{level_key}") if level_key else level)
+            level_display = bpm_level_display(level)
             ctk.CTkLabel(row_d, text=f"{level_display}:", font=FONT_SMALL,
                          text_color=PALETTE["text"], width=120, anchor="w"
                          ).pack(side="left")

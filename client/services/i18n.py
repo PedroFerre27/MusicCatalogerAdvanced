@@ -206,3 +206,56 @@ def current_lang() -> str:
 def supported_langs() -> tuple[str, ...]:
     """Lingue supportate per la UI selettore."""
     return SUPPORTED_LANGS
+
+
+# ── Helper i18n per identificatori invarianti ───────────────────────
+#
+# Pattern architetturale ricorrente in TrackLab: alcuni identificatori
+# sono usati SIA come ID interno SIA come path filesystem (es. chiavi di
+# `settings.bpm.difficulty_ranges` che diventano nomi cartella
+# `Salsa/1 - Romantica/`). Quegli ID NON possono essere tradotti per
+# non rompere i cataloghi esistenti sul disco utente. Il display UI
+# pero' deve essere localizzato.
+#
+# Helper qui sotto centralizza il mapping ID → chiave i18n con
+# fallback robusto: se la chiave i18n manca, ritorna l'ID stesso
+# (mai mostra `bpm_levels.level_1` letterale).
+
+
+# Mapping ID legacy (chiavi italiane in settings.bpm.difficulty_ranges)
+# → chiave i18n in translations/<lang>.json :: bpm_levels.*
+_BPM_LEVEL_LEGACY_TO_KEY = {
+    "1 - Romantica": "level_1",
+    "2 - Lenta":     "level_2",
+    "3 - Media":     "level_3",
+    "4 - Veloce":    "level_4",
+    "5 - Crazy":     "level_5",
+}
+
+
+def bpm_level_display(level_id: str) -> str:
+    """
+    Ritorna il display localizzato per un livello BPM Salsa.
+
+    Args:
+        level_id: ID storico (es. "1 - Romantica"). Coincide con la
+                  chiave in `settings.bpm.difficulty_ranges` E col nome
+                  cartella `Salsa/<level_id>/` sul filesystem.
+
+    Returns:
+        Display localizzato (es. "1 - Romantica" in IT,
+        "1 - Romantic" in EN). Se l'ID non e' nel mapping
+        (utente ha aggiunto livelli custom), ritorna l'ID stesso.
+
+    Esempio uso (in main_window):
+        for level_id, range_data in difficulty_ranges.items():
+            label = bpm_level_display(level_id)   # display localizzato
+            # ... usa label per UI; level_id resta per filesystem
+    """
+    key = _BPM_LEVEL_LEGACY_TO_KEY.get(level_id)
+    if key is None:
+        return level_id   # ID custom non mappato, ritorna invariato
+    lookup = f"bpm_levels.{key}"
+    val = t(lookup)
+    # t() ritorna la chiave stessa se mancante in entrambe le lingue
+    return level_id if val == lookup else val

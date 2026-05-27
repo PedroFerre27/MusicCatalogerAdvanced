@@ -71,6 +71,16 @@ class BPMSettings:
     valid_range_min: int = 60
     valid_range_max: int = 200
 
+    # NOTA INVARIANTE (R6.1 Fase 4.1):
+    # Le CHIAVI di questo dict (es. "1 - Romantica") hanno DOPPIO RUOLO:
+    #   - ID logico interno (referenziate da `core/cataloger.py` e UI)
+    #   - Nome cartella filesystem dell'output catalogato
+    #     (`<music_root>/Salsa/1 - Romantica/`)
+    # Per questo NON sono state tradotte in EN: cambiarle romperebbe i
+    # cataloghi esistenti sul disco utente (cartelle che esistono gia').
+    # Il DISPLAY localizzato per la UI passa per `services/i18n.py::
+    # bpm_level_display()` che mappa l'ID alla chiave i18n
+    # `bpm_levels.level_N`. Vedi quel helper per dettagli.
     difficulty_ranges: Dict[str, Dict] = field(default_factory=lambda: {
         '1 - Romantica': {'min_bpm': 0,   'max_bpm': 79,  'description': 'sotto 80 BPM'},
         '2 - Lenta':     {'min_bpm': 80,  'max_bpm': 94,  'description': '80-94 BPM'},

@@ -1,25 +1,25 @@
 # UTF-8
-# v1092.1: hotfix R6.1 — i18n dialog duplicates resolve + test config.
+# v1093.0: R6.1 fase 4.1 — refactor BPM categories display helper.
 # IMPORTANTE: filevers/prodvers DEVONO essere tuple a 4 interi.
 # Windows mostra questa tupla in "Proprietà → Dettagli → Versione file".
-# Mapping: v1092.1 → (1, 0, 92, 1).
+# Mapping: v1093.0 → (1, 0, 93, 0).
 # In assenza di lettera (v1085) la quarta cifra è 0.
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 0, 92, 1),
-    prodvers=(1, 0, 92, 1),
+    filevers=(1, 0, 93, 0),
+    prodvers=(1, 0, 93, 0),
     mask=0x3f, flags=0x0, OS=0x40004, fileType=0x1, subtype=0x0, date=(0, 0)
   ),
   kids=[
     StringFileInfo([StringTable(u'040904B0', [
         StringStruct(u'CompanyName', u'Pedro Marques'),
         StringStruct(u'FileDescription', u'TrackLab'),
-        StringStruct(u'FileVersion', u'1.0.92.1'),
+        StringStruct(u'FileVersion', u'1.0.93.0'),
         StringStruct(u'InternalName', u'TrackLab'),
         StringStruct(u'LegalCopyright', u'\xa9 2026 Pedro Marques'),
         StringStruct(u'OriginalFilename', u'TrackLab.exe'),
         StringStruct(u'ProductName', u'TrackLab'),
-        StringStruct(u'ProductVersion', u'1.0.92.1')])
+        StringStruct(u'ProductVersion', u'1.0.93.0')])
     ]),
     VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
   ]
