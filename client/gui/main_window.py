@@ -6240,12 +6240,15 @@ class TrackLabGUI:
 
     def _maint_export_m3u(self):
         """Esporta playlist M3U per ogni genere trovato nella directory musicale."""
+        # v1092.0 (R6.1 fase 3.g): i18n
+        from services.i18n import t as _t
         from tkinter import filedialog
         path = self._selected_path.get().strip()
         if not path or not Path(path).is_dir():
-            messagebox.showwarning("Attenzione", "Seleziona prima una directory musicale.")
+            messagebox.showwarning(_t("maint_dialogs.warn_select_dir_title"),
+                                   _t("maint_dialogs.warn_select_dir_body"))
             return
-        out_dir = filedialog.askdirectory(title="Cartella dove salvare le playlist M3U")
+        out_dir = filedialog.askdirectory(title=_t("maint_dialogs.m3u_dialog_title"))
         if not out_dir:
             return
         base = Path(path)
@@ -6261,22 +6264,31 @@ class TrackLabGUI:
             lines = ["#EXTM3U"] + files
             m3u_path.write_text("\n".join(lines), encoding="utf-8")
             created += 1
-        messagebox.showinfo("M3U", f"Create {created} playlist in:\n{out_dir}")
+        messagebox.showinfo(_t("maint_dialogs.m3u_done_title"),
+                            _t("maint_dialogs.m3u_done_body",
+                               count=created, dir=out_dir))
 
     def _maint_batch_rename(self):
         """Rinomina batch con pattern personalizzato."""
+        # v1092.0 (R6.1 fase 3.g): i18n
+        from services.i18n import t as _t
         path = self._selected_path.get().strip()
         if not path or not Path(path).is_dir():
-            messagebox.showwarning("Attenzione", "Seleziona prima una directory musicale.")
+            messagebox.showwarning(_t("maint_dialogs.warn_select_dir_title"),
+                                   _t("maint_dialogs.warn_select_dir_body"))
             return
         win = ctk.CTkToplevel(self.root)
-        win.title("Rinomina Batch")
+        win.title(_t("maint_dialogs.batch_rename_title"))
         self._set_win_icon(win)
         self._center_win(win, 500, 300)
         win.grab_set()
-        ctk.CTkLabel(win, text="Pattern di rinomina:",
+        ctk.CTkLabel(win, text=_t("maint_dialogs.batch_rename_pattern_label"),
                      font=FONT_SMALL).pack(pady=(16,4))
-        ctk.CTkLabel(win, text="Variabili: {title} {artist} {album} {year} {bpm}",
+        # NOTE: il `Variabili: {title} {artist}...` ha LITERAL braces nel
+        # display (placeholders del pattern, non del format). t() non
+        # interpola perche' non passiamo kwargs; il str.format del JSON
+        # non viene chiamato. Funziona correttamente.
+        ctk.CTkLabel(win, text=_t("maint_dialogs.batch_rename_vars_hint"),
                      font=(FONT_SMALL[0], FONT_SMALL[1]-1),
                      text_color=PALETTE["text_dim"]).pack()
         pat_var = ctk.StringVar(value="{artist} - {title}")
@@ -6326,9 +6338,11 @@ class TrackLabGUI:
 
     def _maint_replaygain(self):
         """Applica ReplayGain ai file MP3 usando mutagen."""
+        from services.i18n import t as _t
         path = self._selected_path.get().strip()
         if not path:
-            messagebox.showwarning("Attenzione", "Seleziona prima una directory musicale.")
+            messagebox.showwarning(_t("maint_dialogs.warn_select_dir_title"),
+                                   _t("maint_dialogs.warn_select_dir_body"))
             return
         if not messagebox.askyesno("ReplayGain",
                 "Analizza e applica ReplayGain a tutti i file MP3?\n"
@@ -6359,9 +6373,11 @@ class TrackLabGUI:
 
     def _maint_check_integrity(self):
         """Verifica integrità dei file MP3 cercando frame corrotti."""
+        from services.i18n import t as _t
         path = self._selected_path.get().strip()
         if not path or not Path(path).is_dir():
-            messagebox.showwarning("Attenzione", "Seleziona prima una directory musicale.")
+            messagebox.showwarning(_t("maint_dialogs.warn_select_dir_title"),
+                                   _t("maint_dialogs.warn_select_dir_body"))
             return
         import threading
         def _check_thread():
@@ -7270,12 +7286,19 @@ class TrackLabGUI:
 
     def _redraw_sources_list(self):
         """v1086.1: ridisegna la lista sorgenti in self._sources_list_container.
-        Chiamato all'init e dopo ogni move ↑/↓."""
+        Chiamato all'init e dopo ogni move ↑/↓.
+
+        v1092.0 (R6.1 fase 3.g): descrizione sorgente localizzata via
+        sources_meta.<key>. Il nome (MusicBrainz, Deezer, ecc.) e' nome
+        proprio di servizio e resta invariato.
+        """
         if not hasattr(self, "_sources_list_container"):
             return
         # Pulisco i widget vecchi
         for w in self._sources_list_container.winfo_children():
             w.destroy()
+
+        from services.i18n import t as _t
 
         # Ridisegno ogni sorgente in ordine.
         # v1086.1 rev3: la numerazione visibile (1, 2, 3...) e' separata
@@ -7286,7 +7309,12 @@ class TrackLabGUI:
                          if self._SOURCE_META.get(k) is not None
                          and self._meta_sources.get(k) is not None]
         for visible_idx, key in enumerate(visible_keys):
-            name, desc, requires_token = self._SOURCE_META[key]
+            name, desc_it, requires_token = self._SOURCE_META[key]
+            # Descrizione localizzata; fallback al testo IT del _SOURCE_META
+            desc_lookup = f"sources_meta.{key}"
+            desc = _t(desc_lookup)
+            if desc == desc_lookup:
+                desc = desc_it
             var = self._meta_sources[key]
 
             row = ctk.CTkFrame(self._sources_list_container, fg_color="transparent")
@@ -7413,16 +7441,20 @@ class TrackLabGUI:
         record file contiene gia' artist/title/album/genre/bpm. Non
         serve piu' la lookup ridondante in metadata_cache (che non
         esiste piu' come sezione separata)."""
+        # v1092.0 (R6.1 fase 3.g): i18n
+        from services.i18n import t as _t
         import json as _json, csv as _csv
         from tkinter import filedialog
         db_path = _get_data_dir() / "local_db.json"
         if not db_path.exists():
-            messagebox.showwarning("Attenzione", "Il DB locale non esiste ancora.\nAvvia prima una catalogazione.")
+            messagebox.showwarning(_t("maint_dialogs.warn_no_db_title"),
+                                   _t("maint_dialogs.warn_no_db_no_catalog"))
             return
         out = filedialog.asksaveasfilename(
-            title="Salva CSV", defaultextension=".csv",
-            filetypes=[("CSV", "*.csv"), ("Tutti", "*.*")],
-            initialfile="music_library.csv"
+            title=_t("maint_dialogs.csv_dialog_title"), defaultextension=".csv",
+            filetypes=[(_t("maint_dialogs.csv_filetype_csv"), "*.csv"),
+                       (_t("maint_dialogs.csv_filetype_all"), "*.*")],
+            initialfile=_t("maint_dialogs.csv_default_filename")
         )
         if not out:
             return
@@ -7434,9 +7466,16 @@ class TrackLabGUI:
 
             with open(out, "w", newline="", encoding="utf-8-sig") as f:
                 w = _csv.writer(f, delimiter=";")
-                w.writerow(["File", "Titolo", "Artista", "Album",
-                            "Genere", "Sottogenere", "BPM",
-                            "Qualità (kbps)", "Sorgente cache", "Catalogato il"])
+                w.writerow([_t("maint_dialogs.csv_col_file"),
+                            _t("maint_dialogs.csv_col_title"),
+                            _t("maint_dialogs.csv_col_artist"),
+                            _t("maint_dialogs.csv_col_album"),
+                            _t("maint_dialogs.csv_col_genre"),
+                            _t("maint_dialogs.csv_col_subgenre"),
+                            _t("maint_dialogs.csv_col_bpm"),
+                            _t("maint_dialogs.csv_col_quality"),
+                            _t("maint_dialogs.csv_col_source"),
+                            _t("maint_dialogs.csv_col_cataloged_at")])
                 for rel, info in sorted(files.items()):
                     from pathlib import Path as _P
                     fname = _P(rel).name
@@ -7463,16 +7502,22 @@ class TrackLabGUI:
                         source_label,
                         info.get("cataloged_at", ""),
                     ])
-            messagebox.showinfo("Esportazione completata", f"Esportati {len(files)} file in:\n{out}")
+            messagebox.showinfo(_t("maint_dialogs.csv_done_title"),
+                                _t("maint_dialogs.csv_done_body",
+                                   count=len(files), path=out))
         except Exception as e:
-            messagebox.showerror("Errore", str(e))
+            messagebox.showerror(_t("maint_dialogs.csv_err_title"),
+                                 _t("maint_dialogs.csv_err_body", detail=str(e)))
 
     def _maint_find_duplicates(self):
         """v1057: trova file con nome identico in cartelle diverse."""
+        # v1092.0 (R6.1 fase 3.g): i18n
+        from services.i18n import t as _t
         import json as _json
         db_path = _get_data_dir() / "local_db.json"
         if not db_path.exists():
-            messagebox.showwarning("Attenzione", "Il DB locale non esiste ancora.")
+            messagebox.showwarning(_t("maint_dialogs.warn_no_db_title"),
+                                   _t("maint_dialogs.warn_no_db_body"))
             return
         try:
             raw = _json.loads(db_path.read_text(encoding="utf-8"))
@@ -7486,7 +7531,8 @@ class TrackLabGUI:
                 by_name.setdefault(fname, []).append(rel)
             dups = {k: v for k, v in by_name.items() if len(v) > 1}
             if not dups:
-                messagebox.showinfo("Nessun duplicato", "Nessun file duplicato trovato nel DB locale.")
+                messagebox.showinfo(_t("maint_dialogs.dups_none_title"),
+                                    _t("maint_dialogs.dups_none_body"))
                 return
             # v1077: Radio + Conferma batch — sostituisce i bottoni per-riga.
             # Con 85+ duplicati i click singoli diventavano insostenibili.
@@ -7496,7 +7542,7 @@ class TrackLabGUI:
             import tkinter as _tk
 
             win = ctk.CTkToplevel(self.root)
-            win.title(f"Duplicati trovati — {len(dups)} nomi")
+            win.title(_t("maint_dialogs.dups_found_title_fmt", count=len(dups)))
             self._set_win_icon(win)
             self._center_win(win, 720, 560)
             win.grab_set()
@@ -7504,11 +7550,12 @@ class TrackLabGUI:
             # Header fisso
             hdr = ctk.CTkFrame(win, fg_color=PALETTE["surface2"], corner_radius=0)
             hdr.pack(fill="x")
-            ctk.CTkLabel(hdr, text=f"⚠️  {len(dups)} file con nome duplicato",
+            ctk.CTkLabel(hdr,
+                         text=_t("maint_dialogs.dups_found_header", count=len(dups)),
                          font=(FONT_SMALL[0], 13, "bold"), text_color=PALETTE["text"]
                          ).pack(pady=(14, 4), padx=14, anchor="w")
             ctk.CTkLabel(hdr,
-                         text="Seleziona per ciascun gruppo il file da mantenere (gli altri verranno eliminati).",
+                         text=_t("maint_dialogs.dups_found_intro"),
                          font=FONT_SMALL, text_color=PALETTE["text_dim"]
                          ).pack(pady=(0, 10), padx=14, anchor="w")
 
