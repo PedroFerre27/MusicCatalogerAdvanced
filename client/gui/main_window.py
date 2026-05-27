@@ -163,9 +163,12 @@ BTN_H = 36
 class LabeledProgressBar(ctk.CTkFrame):
     def __init__(self, parent, **kwargs):
         super().__init__(parent, fg_color="transparent", **kwargs)
+        # v1092.0 (R6.1 fase 3): stringhe i18n (init_i18n e' gia' stato
+        # chiamato in run_gui.py PRIMA della costruzione della GUI).
+        from services.i18n import t as _t
 
         self._pct_var   = ctk.StringVar(value="0%")
-        self._file_var  = ctk.StringVar(value="In attesa...")
+        self._file_var  = ctk.StringVar(value=_t("progress_bar.waiting"))
         self._phase_var = ctk.StringVar(value="")
         self._eta_var   = ctk.StringVar(value="")  # v1045: ETA dedicata
 
@@ -226,23 +229,27 @@ class LabeledProgressBar(ctk.CTkFrame):
             short = filename if len(filename) <= 50 else "..." + filename[-47:]
             self._file_var.set(short)
         if phase:
+            # v1092.0: phase id (chiave invariante) -> label i18n
+            from services.i18n import t as _t
             labels = {
-                'catalogazione': 'Fase 1/2 — Catalogazione',
-                'classifica_salsa': 'Fase 2/2 — Classifica Salsa',
+                'catalogazione':    _t("progress_bar.phase_cataloging"),
+                'classifica_salsa': _t("progress_bar.phase_classify_salsa"),
             }
             self._phase_var.set(labels.get(phase, phase))
 
     def reset(self):
+        from services.i18n import t as _t
         self._bar.set(0)
         self._pct_var.set("0%")
-        self._file_var.set("In attesa...")
+        self._file_var.set(_t("progress_bar.waiting"))
         self._phase_var.set("")
         self._eta_var.set("")
 
     def complete(self):
+        from services.i18n import t as _t
         self._bar.set(1.0)
         self._pct_var.set("100%")
-        self._file_var.set("Completato ✓")
+        self._file_var.set(_t("progress_bar.completed"))
         self._phase_var.set("")
         self._eta_var.set("")
 
@@ -611,6 +618,12 @@ class TrackLabGUI:
         # v1085d: chiudi anche quando il mouse esce dall'area dei flyout
         # (non solo al click esterno). Implementato con polling 200ms
         # sulla posizione del puntatore.
+        # v1092.0 (R6.1 polish): considera anche il pulsante profilo
+        # (_profile_btn) come "area sicura". Bug segnalato durante test
+        # R6.1: aprendo il flyout e rimanendo fermi col mouse sul
+        # pulsante (senza spostarsi nel flyout sottostante), il polling
+        # vedeva il puntatore "fuori dai flyout" e chiudeva tutto entro
+        # 500ms+250ms.
         def _is_mouse_inside_flyouts() -> bool:
             try:
                 px = self.root.winfo_pointerx()
@@ -622,6 +635,15 @@ class TrackLabGUI:
                         # Tolleranza 8px per evitare flicker ai bordi
                         if (wx-8) <= px <= (wx+ww+8) and (wy-8) <= py <= (wy+wh+8):
                             return True
+                # Trigger button = area sicura (mouse fermo sul pulsante)
+                btn = getattr(self, "_profile_btn", None)
+                if btn is not None and btn.winfo_exists():
+                    bx = btn.winfo_rootx()
+                    by = btn.winfo_rooty()
+                    bw = btn.winfo_width()
+                    bh = btn.winfo_height()
+                    if bx <= px <= (bx + bw) and by <= py <= (by + bh):
+                        return True
             except Exception:
                 return True   # in caso di errore non chiudere
             return False
@@ -835,12 +857,14 @@ class TrackLabGUI:
             - Mostra messaggio di conferma
             L'utente dovrà rilanciare l'app (o in futuro possiamo
             riaprire automaticamente la login window).
+
+            v1092.0 (R6.1): messagebox localizzate.
             """
+            from services.i18n import t as _t
             self._close_profile_flyout()
             if not messagebox.askyesno(
-                "Conferma logout",
-                "Vuoi disconnetterti?\n\n"
-                "Al prossimo avvio dovrai inserire nuovamente email e password."
+                _t("logout_dialog.confirm_title"),
+                _t("logout_dialog.confirm_body")
             ):
                 return
             # Clear JWT locale — funziona anche in modalità offline
@@ -856,9 +880,8 @@ class TrackLabGUI:
             except Exception:
                 pass
             messagebox.showinfo(
-                "Logout effettuato",
-                "Sessione chiusa. Rilancia il programma per accedere\n"
-                "con un altro account."
+                _t("logout_dialog.done_title"),
+                _t("logout_dialog.done_body")
             )
             # Chiudi la main window (l'utente rilancerà manualmente)
             try:
@@ -1127,25 +1150,34 @@ class TrackLabGUI:
             #     upgrade disponibile. Il server decide, non il client.
             #   - Locale mode (retrocompat): mantiene i 3 bottoni di switch
             #     diretto come in v1080. Utile per sviluppo standalone.
+            # v1092.0 (R6.1): stringhe localizzate i18n
+            from services.i18n import t as _t
+
             body = ctk.CTkScrollableFrame(parent, fg_color="transparent")
             body.pack(fill="both", expand=True, padx=10, pady=(8, 4))
             body.columnconfigure(0, weight=1)
-            ctk.CTkLabel(body, text=f"Piano corrente: {plan.display_name}",
+            ctk.CTkLabel(body,
+                         text=_t("plans_sub.current_plan_label",
+                                 plan=plan.display_name),
                          font=(FONT_SMALL[0], FONT_SMALL[1], "bold"),
                          text_color=PALETTE["text"]
                          ).pack(anchor="w", pady=(4, 6), padx=4)
+            # v1092.0: feature labels via i18n. Le chiavi tecniche
+            # (catalog_external_db, ecc.) restano invariate; cambia solo
+            # la stringa visualizzata. Variante "_short" per il
+            # sub-flyout compatto, "_long" per il dialog comparativo.
             feature_labels = {
-                "catalog_external_db": "DB online",
-                "catalog_cover":        "Cover album",
-                "catalog_bpm":          "Analisi BPM",
-                "tab_cache":            "Tab Cache",
-                "tab_quality":          "Tab Qualità",
-                "tab_advanced":         "Tab Avanzate",
-                "tab_caribbean":        "Tab Caraibica",
-                "export_m3u":           "Playlist M3U",
-                "maint_replaygain":     "ReplayGain",
-                "maint_batch_rename":   "Rinomina Batch",
-                "maint_integrity":      "Verifica MP3",
+                "catalog_external_db": _t("features.catalog_external_db_short"),
+                "catalog_cover":        _t("features.catalog_cover_short"),
+                "catalog_bpm":          _t("features.catalog_bpm_short"),
+                "tab_cache":            _t("features.tab_cache_short"),
+                "tab_quality":          _t("features.tab_quality"),
+                "tab_advanced":         _t("features.tab_advanced"),
+                "tab_caribbean":        _t("features.tab_caribbean"),
+                "export_m3u":           _t("features.export_m3u_short"),
+                "maint_replaygain":     _t("features.maint_replaygain"),
+                "maint_batch_rename":   _t("features.maint_batch_rename_short"),
+                "maint_integrity":      _t("features.maint_integrity_short"),
             }
             # Leggi features dall'utente server se disponibile, altrimenti da PLAN_FEATURES
             if self.api_client is not None and self.user_info.get("features"):
@@ -1181,7 +1213,7 @@ class TrackLabGUI:
 
                 if upgrades:
                     ctk.CTkButton(
-                        body, text="⬆  Richiedi upgrade del piano",
+                        body, text=_t("plans_sub.btn_request_upgrade"),
                         font=(FONT_SMALL[0], FONT_SMALL[1], "bold"),
                         fg_color=PALETTE.get("primary", "#3b6fd4"),
                         hover_color=PALETTE.get("primary_hover", "#2d5ab8"),
@@ -1198,20 +1230,22 @@ class TrackLabGUI:
                     ).pack(fill="x", padx=4, pady=(0, 4))
                 else:
                     ctk.CTkLabel(body,
-                                 text="Hai già il piano più alto disponibile ✨",
+                                 text=_t("plans_sub.msg_max_plan"),
                                  font=FONT_SMALL,
                                  text_color=PALETTE["text_dim"]
                                  ).pack(pady=(4, 8))
                 return
 
             # ── Sezione azione — LOCALE MODE (retrocompat) ──────────
-            ctk.CTkLabel(body, text="Cambia piano (modalità sviluppo):",
+            ctk.CTkLabel(body, text=_t("plans_sub.dev_section_label"),
                          font=FONT_SMALL,
                          text_color=PALETTE["text_dim"]
                          ).pack(anchor="w", padx=4, pady=(0, 4))
             plan_row = ctk.CTkFrame(body, fg_color="transparent")
             plan_row.pack(fill="x", pady=(0, 8))
-            for p, badge in [("base", "🆓 Base"), ("pro", "⭐ Pro"), ("advanced", "💎 Adv")]:
+            for p, badge in [("base",     _t("plan_display.base_short")),
+                             ("pro",      _t("plan_display.pro_short")),
+                             ("advanced", _t("plan_display.advanced_short"))]:
                 is_active = plan.plan == p
                 def _switch(np=p, _plan=plan):
                     _plan.plan = np
@@ -1249,35 +1283,42 @@ class TrackLabGUI:
         import customtkinter as ctk
         from tkinter import messagebox
         import threading
+        # v1092.0 (R6.1): stringhe i18n
+        from services.i18n import t as _t
 
         if self.api_client is None:
-            messagebox.showerror("Non disponibile",
-                "L'upgrade richiede la modalità connessa al server.")
+            messagebox.showerror(_t("upgrade_dialog.err_not_available_title"),
+                _t("upgrade_dialog.err_not_available_body"))
             return
         try:
             from config.user_plans import PLAN_FEATURES
         except Exception:
-            messagebox.showerror("Errore", "Impossibile caricare i dati dei piani")
+            messagebox.showerror(_t("upgrade_dialog.err_load_title"),
+                                 _t("upgrade_dialog.err_load_body"))
             return
 
         feature_labels = [
-            ("catalog_external_db",  "DB online (MusicBrainz, Deezer)"),
-            ("catalog_cover",        "Cover album automatica"),
-            ("catalog_bpm",          "Analisi BPM"),
-            ("tab_caribbean",        "Tab Caraibica"),
-            ("tab_cache",            "Tab Cache metadati"),
-            ("maint_duplicates",     "Trova duplicati"),
-            ("export_m3u",           "Export playlist M3U"),
-            ("export_csv",           "Export CSV"),
-            ("tab_advanced",         "Tab Avanzate"),
-            ("maint_replaygain",     "ReplayGain"),
-            ("maint_batch_rename",   "Rinomina batch"),
-            ("maint_integrity",      "Verifica integrità MP3"),
+            ("catalog_external_db",  _t("features.catalog_external_db_long")),
+            ("catalog_cover",        _t("features.catalog_cover_long")),
+            ("catalog_bpm",          _t("features.catalog_bpm_long")),
+            ("tab_caribbean",        _t("features.tab_caribbean")),
+            ("tab_cache",            _t("features.tab_cache_long")),
+            ("maint_duplicates",     _t("features.maint_duplicates")),
+            ("export_m3u",           _t("features.export_m3u_long")),
+            ("export_csv",           _t("features.export_csv")),
+            ("tab_advanced",         _t("features.tab_advanced")),
+            ("maint_replaygain",     _t("features.maint_replaygain")),
+            ("maint_batch_rename",   _t("features.maint_batch_rename_long")),
+            ("maint_integrity",      _t("features.maint_integrity_long")),
         ]
-        display_names = {"base": "🆓 Base", "pro": "⭐ Pro", "advanced": "💎 Advanced"}
+        display_names = {
+            "base":     _t("plan_display.base"),
+            "pro":      _t("plan_display.pro"),
+            "advanced": _t("plan_display.advanced"),
+        }
         limits_labels = {
-            "max_files_per_run": "File per run",
-            "max_runs_per_day":  "Run per giorno",
+            "max_files_per_run": _t("limits.max_files_per_run"),
+            "max_runs_per_day":  _t("limits.max_runs_per_day"),
         }
 
         plans_to_show = [current_plan] + available_upgrades
@@ -1287,8 +1328,10 @@ class TrackLabGUI:
         FEATURE_COL_W = 260
         PLAN_COL_W    = 200
         BTN_BAR_H     = 80
-        TITLEBAR_H    = 44
         HEADER_H      = 90
+        # v1092.0 (R6.1 polish): rimossa titlebar custom (44px) — usiamo
+        # solo la titlebar nativa Windows che ha gia' titolo e X. Pedro
+        # ha segnalato il "doppio pulsante di chiusura" durante test R6.1.
         win_w = FEATURE_COL_W + n_plans * PLAN_COL_W + 32
         sw = self.root.winfo_screenwidth()
         sh = self.root.winfo_screenheight()
@@ -1297,8 +1340,11 @@ class TrackLabGUI:
 
         win = ctk.CTkToplevel(self.root)
         # v1085o: finestra Windows standalone (era overrideredirect+transient)
-        _setup_standalone_dialog(win, self.root, "Upgrade Plan",
-                                  win_w, win_h, center_on_root=False)
+        # v1092.0: titolo nativo = "Confronto piani disponibili" (era
+        # "Upgrade Plan" generico + titlebar custom interna duplicata).
+        _setup_standalone_dialog(win, self.root,
+                                 _t("upgrade_dialog.header"),
+                                 win_w, win_h, center_on_root=False)
         # Centro su schermo (override del centering del helper, perché qui
         # è un dialog grande, vogliamo centrato sullo schermo, non sulla main)
         win.geometry(f"{win_w}x{win_h}+{(sw-win_w)//2}+{(sh-win_h)//2}")
@@ -1307,41 +1353,9 @@ class TrackLabGUI:
         except Exception:
             pass
 
-        # ── 1. Titlebar (TOP) ────────────────────────────────────────
-        titlebar = ctk.CTkFrame(win, fg_color=PALETTE["surface2"],
-                                corner_radius=0, height=TITLEBAR_H)
-        titlebar.pack(side="top", fill="x")
-        titlebar.pack_propagate(False)
-        ctk.CTkLabel(titlebar, text="Confronto piani disponibili",
-                     font=("Segoe UI", 14, "bold"),
-                     text_color=PALETTE["text"]
-                     ).pack(side="left", padx=18, pady=10)
-        close_btn = ctk.CTkButton(titlebar, text="✕", width=32, height=28,
-                      fg_color="transparent", hover_color="#d84545",
-                      text_color=PALETTE["text_dim"],
-                      font=("Segoe UI", 13, "bold"),
-                      command=win.destroy)
-        close_btn.pack(side="right", padx=8, pady=8)
-
-        # Drag dalla titlebar
-        def _start_drag(e):
-            win._drag_x = e.x_root - win.winfo_x()
-            win._drag_y = e.y_root - win.winfo_y()
-        def _do_drag(e):
-            try:
-                win.geometry(f"+{e.x_root - win._drag_x}+{e.y_root - win._drag_y}")
-            except Exception:
-                pass
-        # Non bindare il drag sul bottone close
-        for w in titlebar.winfo_children():
-            if w is close_btn: continue
-            try:
-                w.bind("<Button-1>", _start_drag)
-                w.bind("<B1-Motion>", _do_drag)
-            except Exception:
-                pass
-        titlebar.bind("<Button-1>", _start_drag)
-        titlebar.bind("<B1-Motion>", _do_drag)
+        # v1092.0: titlebar custom + drag handlers RIMOSSI. La titlebar
+        # nativa Windows (titolo + ✕ + drag + minimize) sostituisce
+        # tutto. Niente piu' doppio pulsante di chiusura.
 
         # ── 2. Btn bar (BOTTOM) — pinnato PRIMA del body ─────────────
         btn_bar = ctk.CTkFrame(win, fg_color=PALETTE["surface"],
@@ -1353,7 +1367,7 @@ class TrackLabGUI:
             btn_bar.columnconfigure(i, weight=1, minsize=PLAN_COL_W,
                                      uniform="cols")
         ctk.CTkLabel(btn_bar, text="").grid(row=0, column=0)
-        ctk.CTkLabel(btn_bar, text="(piano attuale)",
+        ctk.CTkLabel(btn_bar, text=_t("upgrade_dialog.current_plan_caption"),
                      font=("Segoe UI", 10, "italic"),
                      text_color=PALETTE["text_dim"]
                      ).grid(row=0, column=1, sticky="nsew")
@@ -1385,7 +1399,9 @@ class TrackLabGUI:
                 # Mini titlebar
                 mtb = ctk.CTkFrame(msg_win, fg_color=PALETTE["surface2"], height=36)
                 mtb.pack(side="top", fill="x"); mtb.pack_propagate(False)
-                ctk.CTkLabel(mtb, text=f"Richiedi → {display_names.get(target_plan)}",
+                ctk.CTkLabel(mtb,
+                             text=_t("request_upgrade.title",
+                                     plan=display_names.get(target_plan)),
                              font=("Segoe UI", 11, "bold"),
                              text_color=PALETTE["text"]).pack(side="left", padx=14, pady=8)
                 ctk.CTkButton(mtb, text="✕", width=28, height=24,
@@ -1404,7 +1420,7 @@ class TrackLabGUI:
                 body_msg = ctk.CTkFrame(msg_win, fg_color="transparent")
                 body_msg.pack(side="top", fill="both", expand=True, padx=20, pady=(8, 4))
                 ctk.CTkLabel(body_msg,
-                             text="Messaggio per l'amministratore (opzionale)",
+                             text=_t("request_upgrade.msg_label"),
                              font=("Segoe UI", 10, "bold"),
                              text_color=PALETTE["text"]).pack(anchor="w", pady=(4, 4))
                 msg_text = ctk.CTkTextbox(
@@ -1416,7 +1432,8 @@ class TrackLabGUI:
 
                 def _do_send():
                     text = msg_text.get("1.0", "end").strip()
-                    btn_send.configure(state="disabled", text="Invio…")
+                    btn_send.configure(state="disabled",
+                                       text=_t("request_upgrade.btn_sending"))
                     btn_cancel.configure(state="disabled")
                     def _w():
                         try:
@@ -1424,29 +1441,32 @@ class TrackLabGUI:
                             self.root.after(0, lambda: (
                                 msg_win.destroy(),
                                 win.destroy(),
-                                messagebox.showinfo("Richiesta inviata",
-                                    f"Richiesta di upgrade a "
-                                    f"{display_names.get(target_plan)} inviata.\n"
-                                    f"Riceverai notifica quando l'amministratore avrà risposto."),
+                                messagebox.showinfo(
+                                    _t("request_upgrade.msg_sent_title"),
+                                    _t("request_upgrade.msg_sent_body",
+                                       plan=display_names.get(target_plan))),
                             ))
                         except Exception as e:
                             err_str = str(e)
                             self.root.after(0, lambda: (
-                                btn_send.configure(state="normal", text="Invia richiesta"),
+                                btn_send.configure(state="normal",
+                                    text=_t("request_upgrade.btn_send")),
                                 btn_cancel.configure(state="normal"),
-                                messagebox.showerror("Errore",
-                                    f"Invio fallito:\n{err_str}"),
+                                messagebox.showerror(
+                                    _t("request_upgrade.err_title"),
+                                    _t("request_upgrade.err_body",
+                                       detail=err_str)),
                             ))
                     threading.Thread(target=_w, daemon=True).start()
 
                 btn_cancel = ctk.CTkButton(
-                    br, text="Annulla", width=110, height=34,
+                    br, text=_t("common.btn_cancel"), width=110, height=34,
                     fg_color="transparent", hover_color=PALETTE["surface"],
                     text_color=PALETTE["text_dim"],
                     font=("Segoe UI", 10), command=msg_win.destroy)
                 btn_cancel.pack(side="right", padx=(4, 0))
                 btn_send = ctk.CTkButton(
-                    br, text="Invia richiesta", width=150, height=34,
+                    br, text=_t("request_upgrade.btn_send"), width=150, height=34,
                     fg_color=PALETTE.get("primary", "#3b6fd4"),
                     hover_color=PALETTE.get("primary_hover", "#2d5ab8"),
                     text_color="#ffffff",
@@ -1459,7 +1479,9 @@ class TrackLabGUI:
             cell = ctk.CTkFrame(btn_bar, fg_color="transparent")
             cell.grid(row=0, column=ci, padx=8, pady=12, sticky="nsew")
             ctk.CTkButton(
-                cell, text=f"⬆  Richiedi  {display_names.get(p)}",
+                cell,
+                text=_t("upgrade_dialog.btn_request_target",
+                        plan=display_names.get(p)),
                 font=("Segoe UI", 10, "bold"),
                 fg_color=PALETTE.get("primary", "#3b6fd4"),
                 hover_color=PALETTE.get("primary_hover", "#2d5ab8"),
@@ -1490,7 +1512,9 @@ class TrackLabGUI:
                          text_color=PALETTE["text"] if is_current else "#ffffff"
                          ).pack(pady=(14, 2))
             ctk.CTkLabel(cell,
-                         text="(piano attuale)" if is_current else "disponibile",
+                         text=(_t("upgrade_dialog.current_plan_caption")
+                               if is_current
+                               else _t("upgrade_dialog.available_caption")),
                          font=("Segoe UI", 9),
                          text_color=PALETTE["text_dim"] if is_current else "#cfdaff"
                          ).pack()
@@ -1950,15 +1974,17 @@ class TrackLabGUI:
 
 
     def _apply_tab_icons(self):
-        """v1073: applica icone ai pulsanti del CTkTabview dopo la renderizzazione."""
+        """v1073: applica icone ai pulsanti del CTkTabview dopo la renderizzazione.
+        v1092.0 (R6.1 fase 3): chiavi del dict allineate ai nomi i18n dei tab."""
+        from services.i18n import t as _t
         tab_icon_map = {
-            "  Log":        ("log",      18),
-            "  DB Locale":  ("db_locale",18),
-            "  Generi":     ("generi",   18),
-            "  Cache":      ("cache",    18),
-            "  Qualità":    ("qualita",  18),
-            "  Caraibica":  ("caraibica",18),
-            "  Avanzate":   ("avanzate", 18),
+            _t("tabs.log"):       ("log",      18),
+            _t("tabs.db_local"):  ("db_locale",18),
+            _t("tabs.genres"):    ("generi",   18),
+            _t("tabs.cache"):     ("cache",    18),
+            _t("tabs.quality"):   ("qualita",  18),
+            _t("tabs.caribbean"): ("caraibica",18),
+            _t("tabs.advanced"):  ("avanzate", 18),
         }
         try:
             # CTkTabview espone i bottoni via _segmented_button._buttons_dict
@@ -2004,11 +2030,13 @@ class TrackLabGUI:
             return
 
         # Mappa tab_name → feature_key
+        # v1092.0 (R6.1 fase 3): tab_name i18n
+        from services.i18n import t as _t
         tab_feature_map = {
-            "  Cache":    "tab_cache",
-            "  Qualità":  "tab_quality",
-            "  Caraibica": "tab_caribbean",
-            "  Avanzate":  "tab_advanced",
+            _t("tabs.cache"):     "tab_cache",
+            _t("tabs.quality"):   "tab_quality",
+            _t("tabs.caribbean"): "tab_caribbean",
+            _t("tabs.advanced"):  "tab_advanced",
         }
 
         # Trova i nomi reali dei tab (variano con icone/spazi)
@@ -2494,18 +2522,23 @@ class TrackLabGUI:
         self._left_dup_frame     = self._build_duplicate_section(_middle)
         self._left_cover_frame   = self._build_cover_section_slim(_middle)
 
-        self._status_var = ctk.StringVar(value="✓  Pronto")
+        # v1092.0 (R6.1 fase 3): status bar i18n
+        from services.i18n import t as _t
+        self._status_var = ctk.StringVar(value=_t("left_panel.status_ready"))
         ctk.CTkLabel(left, textvariable=self._status_var,
                      font=FONT_SMALL, text_color=PALETTE["text_dim"], anchor="w"
                      ).pack(padx=20, pady=(8, 20), fill="x")
 
     def _build_dir_section(self, parent):
+        # v1092.0 (R6.1 fase 3): i18n
+        from services.i18n import t as _t
+
         frm = ctk.CTkFrame(parent, fg_color=PALETTE["bg"], corner_radius=10)
         frm.pack(fill="x", padx=16, pady=(0, 10))
         frm.columnconfigure(0, weight=1)
 
         _ic_dir = _get_icon("directory", 22) if _ICONS_AVAILABLE else None
-        ctk.CTkLabel(frm, text="  Directory Musicale", font=FONT_HEAD,
+        ctk.CTkLabel(frm, text=_t("dir_section.header"), font=FONT_HEAD,
                      image=_ic_dir, compound="left"
                      ).grid(row=0, column=0, columnspan=3, padx=14, pady=(12, 6), sticky="w")
 
@@ -2518,7 +2551,7 @@ class TrackLabGUI:
         self._breadcrumb_frame.columnconfigure(0, weight=1)
         self._breadcrumb_lbl = ctk.CTkLabel(
             self._breadcrumb_frame,
-            text="  Seleziona una cartella...",
+            text=_t("dir_section.breadcrumb_empty"),
             font=FONT_SMALL, text_color=PALETTE["text_dim"], anchor="w",
         )
         self._breadcrumb_lbl.grid(row=0, column=0, padx=4, sticky="ew")
@@ -2531,7 +2564,7 @@ class TrackLabGUI:
 
         # Bottone Sfoglia principale
         _sfoglia_icon = _get_icon("folder_32", 20) if _ICONS_AVAILABLE else None
-        ctk.CTkButton(frm, text="  Sfoglia", command=self._browse,
+        ctk.CTkButton(frm, text=_t("dir_section.btn_browse"), command=self._browse,
                       height=BTN_H, width=95, font=FONT_BODY,
                       image=_sfoglia_icon, compound="left",
                       fg_color=PALETTE["primary"], hover_color=PALETTE["primary_hover"],
@@ -2575,7 +2608,10 @@ class TrackLabGUI:
             label = d if len(d) <= 55 else "…" + d[-52:]
             menu.add_command(label=label, command=lambda p=d: self._select_path(p))
         menu.add_separator()
-        menu.add_command(label="Cancella storico", command=self._clear_recent)
+        # v1092.0 (R6.1 fase 3): i18n
+        from services.i18n import t as _t
+        menu.add_command(label=_t("dir_section.menu_clear_recent"),
+                         command=self._clear_recent)
         try:
             x = self._btn_recent.winfo_rootx()
             y = self._btn_recent.winfo_rooty() + self._btn_recent.winfo_height()
@@ -2584,12 +2620,15 @@ class TrackLabGUI:
             menu.grab_release()
 
     def _build_options_section(self, parent):
+        # v1092.0 (R6.1 fase 3): i18n
+        from services.i18n import t as _t
+
         frm = ctk.CTkFrame(parent, fg_color=PALETTE["bg"], corner_radius=10)
         frm.pack(fill="x", padx=16, pady=(0, 10))
         frm.columnconfigure(0, weight=1)
 
         _ic_opt = _get_icon("opzioni", 20) if _ICONS_AVAILABLE else None
-        ctk.CTkLabel(frm, text="  Opzioni Catalogazione",
+        ctk.CTkLabel(frm, text=_t("options_section.header"),
                      image=_ic_opt, compound="left", font=FONT_HEAD
                      ).grid(row=0, column=0, padx=14, pady=(12, 6), sticky="w")
 
@@ -2600,38 +2639,33 @@ class TrackLabGUI:
             self._add_tooltip(widget, tip_text)
 
         checks = [
-            (self._opt_analyze, "Solo Analisi",
-             "Analizza la collezione senza spostare file — modalità di sola lettura"),
-            (self._opt_cleanup, "Rimuovi Cartelle Vuote",
-             "Elimina le cartelle vuote dopo lo spostamento dei file"),
+            (self._opt_analyze, _t("options_section.opt_analyze"),
+             _t("options_section.tip_analyze")),
+            (self._opt_cleanup, _t("options_section.opt_cleanup"),
+             _t("options_section.tip_cleanup")),
         ]
         for i, (var, label, tooltip) in enumerate(checks):
-            cb = ctk.CTkCheckBox(frm, variable=var, text=f"  {label}", font=FONT_SMALL,
+            cb = ctk.CTkCheckBox(frm, variable=var, text=label, font=FONT_SMALL,
                                  text_color=PALETTE["text"], fg_color=PALETTE["primary"],
                                  hover_color=PALETTE["primary_hover"],
                                  checkmark_color=PALETTE["bg"])
             cb.grid(row=i + 1, column=0, padx=20, pady=3, sticky="w")
             _bind_tooltip(cb, tooltip)
 
-        # v1079: rimosso il separatore orizzontale interno — tutte e 3 le
-        # checkbox sono "Opzioni Catalogazione", non c'era un gruppo semantico
-        # diverso da dividere. Ora tutte e 3 hanno lo stesso pady=3 e l'aspetto
-        # è coeso senza buco visibile tra la 2ª e la 3ª voce.
-
         # Checkbox sorgenti DB con tooltip
         cb_db = ctk.CTkCheckBox(
             frm, variable=self._opt_use_ext_db,
             command=self._on_ext_db_toggle,
-            text="  Abilita Sorgenti DB Online",
+            text=_t("options_section.opt_use_ext_db"),
             font=FONT_SMALL, text_color=PALETTE["text"],
             fg_color=PALETTE["primary"], hover_color=PALETTE["primary_hover"],
             checkmark_color=PALETTE["bg"],
         )
         cb_db.grid(row=3, column=0, padx=20, pady=3, sticky="w")
-        _bind_tooltip(cb_db, "Interroga MusicBrainz, Deezer, iTunes per arricchire i metadati")
+        _bind_tooltip(cb_db, _t("options_section.tip_use_ext_db"))
 
         ctk.CTkLabel(frm,
-                     text="  Altre opzioni (dry-run, verbose, BPM...) → tab  ⚙️  Avanzate",
+                     text=_t("options_section.footer_hint"),
                      font=(FONT_SMALL[0], FONT_SMALL[1] - 1),
                      text_color=PALETTE["text_dim"]
                      ).grid(row=4, column=0, padx=20, pady=(6, 10), sticky="w")
@@ -2640,24 +2674,27 @@ class TrackLabGUI:
 
     def _build_cover_section_slim(self, parent):
         """v1053: solo checkbox 'Recupera cover mancanti' — resto nel tab Avanzate."""
+        # v1092.0 (R6.1 fase 3): i18n
+        from services.i18n import t as _t
+
         frm = ctk.CTkFrame(parent, fg_color=PALETTE["bg"], corner_radius=10)
         frm.pack(fill="x", padx=16, pady=(0, 10))
         frm.columnconfigure(0, weight=1)
 
         _ic_cov = _get_icon("cover_album", 20) if _ICONS_AVAILABLE else None
-        ctk.CTkLabel(frm, text="  Cover Album",
+        ctk.CTkLabel(frm, text=_t("cover_slim.header"),
                      image=_ic_cov, compound="left", font=FONT_HEAD
                      ).grid(row=0, column=0, padx=14, pady=(12, 6), sticky="w")
 
         ctk.CTkCheckBox(frm, variable=self._cover_enabled, font=FONT_SMALL,
-                        text="Recupera cover mancanti automaticamente",
+                        text=_t("cover_slim.opt_enabled"),
                         text_color=PALETTE["text"], fg_color=PALETTE["primary"],
                         hover_color=PALETTE["primary_hover"],
                         checkmark_color=PALETTE["bg"],
                         ).grid(row=1, column=0, padx=20, pady=(0, 4), sticky="w")
 
         ctk.CTkLabel(frm,
-                     text="  Strategia, sorgenti, sovrascrittura → tab  ⚙️  Avanzate",
+                     text=_t("cover_slim.footer_hint"),
                      font=(FONT_SMALL[0], FONT_SMALL[1] - 1),
                      text_color=PALETTE["text_dim"]
                      ).grid(row=2, column=0, padx=20, pady=(0, 10), sticky="w")
@@ -2665,22 +2702,25 @@ class TrackLabGUI:
 
 
     def _build_duplicate_section(self, parent):
+        # v1092.0 (R6.1 fase 3): i18n
+        from services.i18n import t as _t
+
         frm = ctk.CTkFrame(parent, fg_color=PALETTE["bg"], corner_radius=10)
         frm.pack(fill="x", padx=16, pady=(0, 10))
         frm.columnconfigure(0, weight=1)
 
         _ic_dup = _get_icon("gestione_dup", 20) if _ICONS_AVAILABLE else None
-        ctk.CTkLabel(frm, text="  Gestione Duplicati",
+        ctk.CTkLabel(frm, text=_t("duplicate_section.header"),
                      image=_ic_dup, compound="left", font=FONT_HEAD
                      ).grid(row=0, column=0, padx=14, pady=(12, 6), sticky="w")
-        ctk.CTkLabel(frm, text="Quando un file esiste già nella cartella di destinazione:",
+        ctk.CTkLabel(frm, text=_t("duplicate_section.intro"),
                      font=FONT_SMALL, text_color=PALETTE["text_dim"]
                      ).grid(row=1, column=0, padx=14, pady=(0, 4), sticky="w")
 
         options = [
-            ('keep_both',  "Mantieni entrambi (rinomina il nuovo)"),
-            ('skip',       "Salta (mantieni il file esistente)"),
-            ('overwrite',  "Sovrascrivi (sostituisce l'esistente)"),
+            ('keep_both',  _t("duplicate_section.opt_keep_both")),
+            ('skip',       _t("duplicate_section.opt_skip")),
+            ('overwrite',  _t("duplicate_section.opt_overwrite")),
         ]
         for i, (val, label) in enumerate(options):
             ctk.CTkRadioButton(
@@ -2818,27 +2858,31 @@ class TrackLabGUI:
         ctk.CTkFrame(frm, height=4, fg_color="transparent").grid(row=3, column=0)
 
     def _build_action_buttons(self, parent):
+        # v1092.0 (R6.1 fase 3): i18n
+        from services.i18n import t as _t
+
         frm = ctk.CTkFrame(parent, fg_color="transparent")
         frm.pack(fill="x", padx=16, pady=(0, 4))
         frm.columnconfigure(0, weight=1)
         frm.columnconfigure(1, weight=1)
 
         self._btn_run = ctk.CTkButton(
-            frm, text="▶  Avvia", command=self._run,
+            frm, text=_t("action_buttons.btn_run"), command=self._run,
             height=BTN_H, font=FONT_BODY,
             fg_color=PALETTE["success"], hover_color="#27ae60", text_color="#ffffff",
         )
         self._btn_run.grid(row=0, column=0, padx=(0, 4), pady=4, sticky="ew")
 
         self._btn_stop = ctk.CTkButton(
-            frm, text="■  Ferma", command=self._stop,
+            frm, text=_t("action_buttons.btn_stop"), command=self._stop,
             height=BTN_H, font=FONT_BODY,
             fg_color=PALETTE["error"], hover_color="#c0392b", text_color="#ffffff",
             state="disabled",
         )
         self._btn_stop.grid(row=0, column=1, padx=(4, 0), pady=4, sticky="ew")
 
-        ctk.CTkButton(frm, text="🗑  Pulisci Log", command=self._clear_log,
+        ctk.CTkButton(frm, text=_t("action_buttons.btn_clear_log"),
+                      command=self._clear_log,
                       height=BTN_H, font=FONT_BODY,
                       fg_color=PALETTE["surface2"], hover_color=PALETTE["border"],
                       ).grid(row=1, column=0, columnspan=2, pady=4, sticky="ew")
@@ -2872,7 +2916,9 @@ class TrackLabGUI:
         # v1081: placeholder v1080 rimosso — non serve più, resize gestito via minsize/maxsize
 
         # ── Tab 1: Log ───────────────────────────────────────────────────
-        tab_log = self._tabview.add("  Log")
+        # v1092.0 (R6.1 fase 3): tab labels i18n
+        from services.i18n import t as _t
+        tab_log = self._tabview.add(_t("tabs.log"))
         tab_log.columnconfigure(0, weight=1)
         tab_log.rowconfigure(1, weight=1)
 
@@ -2880,7 +2926,7 @@ class TrackLabGUI:
         log_toolbar = ctk.CTkFrame(tab_log, fg_color="transparent")
         log_toolbar.grid(row=0, column=0, padx=4, pady=(4, 2), sticky="ew")
 
-        ctk.CTkLabel(log_toolbar, text="Filtra:", font=FONT_SMALL,
+        ctk.CTkLabel(log_toolbar, text=_t("log_tab.filter_label"), font=FONT_SMALL,
                      text_color=PALETTE["text_dim"]).pack(side="left", padx=(4, 6))
 
         self._log_filter = {"INFO": True, "WARNING": True, "ERROR": True}
@@ -2943,38 +2989,38 @@ class TrackLabGUI:
         self._log.append = _wrapped_append
 
         # ── Tab 2: DB Locale ─────────────────────────────────────────────
-        tab_db = self._tabview.add("  DB Locale")
+        tab_db = self._tabview.add(_t("tabs.db_local"))
         tab_db.columnconfigure(0, weight=1)
         tab_db.rowconfigure(1, weight=1)
         self._build_db_tab(tab_db)
 
         # ── Tab 3: Generi ────────────────────────────────────────────────
-        tab_genres = self._tabview.add("  Generi")
+        tab_genres = self._tabview.add(_t("tabs.genres"))
         tab_genres.columnconfigure(0, weight=1)
         tab_genres.rowconfigure(0, weight=1)
         self._build_genres_tab(tab_genres)
 
         # ── Tab 4: Cache Metadati ────────────────────────────────────────────
-        tab_cache = self._tabview.add("  Cache")
+        tab_cache = self._tabview.add(_t("tabs.cache"))
         tab_cache.columnconfigure(0, weight=1)
         tab_cache.rowconfigure(0, weight=0)  # toolbar compatta
         tab_cache.rowconfigure(1, weight=1)  # contenuto
         self._build_cache_tab(tab_cache)
 
         # ── Tab 5: Qualità Bassa ──────────────────────────────────────────
-        tab_quality = self._tabview.add("  Qualità")
+        tab_quality = self._tabview.add(_t("tabs.quality"))
         tab_quality.columnconfigure(0, weight=1)
         tab_quality.rowconfigure(1, weight=1)
         self._build_quality_tab(tab_quality)
 
         # ── Tab 6: Classificazione Caraibica ─────────────────────────────
-        tab_carib = self._tabview.add("  Caraibica")
+        tab_carib = self._tabview.add(_t("tabs.caribbean"))
         tab_carib.columnconfigure(0, weight=1)
         tab_carib.rowconfigure(0, weight=1)
         self._build_caribbean_tab(tab_carib)
 
         # ── Tab 7: Impostazioni Avanzate ─────────────────────────────────
-        tab_adv = self._tabview.add("  Avanzate")
+        tab_adv = self._tabview.add(_t("tabs.advanced"))
         tab_adv.columnconfigure(0, weight=1)
         tab_adv.rowconfigure(0, weight=1)
         self._build_advanced_tab(tab_adv)
@@ -3006,6 +3052,8 @@ class TrackLabGUI:
 
     def _build_db_tab(self, parent):
         """v1068: toolbar compatta su singola riga, header integrato."""
+        # v1092.0 (R6.1 fase 3.c): tab interamente i18n
+        from services.i18n import t as _t
         parent.rowconfigure(1, weight=1)
 
         # ── Riga unica: Ricarica | Cerca | Contatore ─────────────────────────
@@ -3020,7 +3068,7 @@ class TrackLabGUI:
             font=FONT_SMALL, image=_ic_rel, command=self._db_reload,
         )
         _btn_db_reload.grid(row=0, column=0, padx=(4, 2), pady=3)
-        self._add_tooltip(_btn_db_reload, "Aggiorna")
+        self._add_tooltip(_btn_db_reload, _t("db_tab.tip_reload"))
 
         self._db_search_var = ctk.StringVar()
         self._db_search_after = None
@@ -3031,12 +3079,12 @@ class TrackLabGUI:
         self._db_search_var.trace_add("write", _db_search_debounced)
         ctk.CTkEntry(
             toolbar, textvariable=self._db_search_var, height=28,
-            placeholder_text="🔍  Cerca nome file, genere, sottogenere...",
+            placeholder_text=_t("db_tab.search_placeholder"),
             font=FONT_SMALL, fg_color=PALETTE["bg"],
             border_width=0,
         ).grid(row=0, column=1, sticky="ew", padx=(2, 6), pady=3)
 
-        self._db_count_var = ctk.StringVar(value="0 record")
+        self._db_count_var = ctk.StringVar(value=_t("db_tab.count_records", count=0))
         ctk.CTkLabel(toolbar, textvariable=self._db_count_var,
                      font=FONT_SMALL, text_color=PALETTE["text_dim"]
                      ).grid(row=0, column=2, padx=(0, 8))
@@ -3047,7 +3095,10 @@ class TrackLabGUI:
         db_hdr.grid_propagate(False)
         db_hdr.columnconfigure(0, weight=1)
         for _hc, (_hl, _hw) in enumerate([
-            ("File", 0), ("Genere", 120), ("Subgenere", 110), ("Catalogato", 130)
+            (_t("db_tab.col_file"), 0),
+            (_t("db_tab.col_genre"), 120),
+            (_t("db_tab.col_subgenre"), 110),
+            (_t("db_tab.col_cataloged"), 130),
         ]):
             ctk.CTkLabel(db_hdr, text=_hl,
                          font=(FONT_SMALL[0], FONT_SMALL[1], "bold"),
@@ -3088,7 +3139,8 @@ class TrackLabGUI:
                     if not p.startswith("__orphan__:")
                 }
             except Exception as e:
-                self._db_count_var.set(f"Errore lettura: {e}")
+                from services.i18n import t as _t
+                self._db_count_var.set(_t("db_tab.err_read", detail=str(e)))
         self._db_filter()
 
     def _db_filter(self, page: int = 0):
@@ -3117,12 +3169,14 @@ class TrackLabGUI:
         page_items = items[start:end]
 
         # Contatore con info pagina
+        from services.i18n import t as _t
         if total > PAGE_SIZE:
             self._db_count_var.set(
-                f"{total} record  •  pag. {page+1}/{pages}  ({start+1}-{end})"
+                _t("db_tab.count_with_pages", count=total,
+                   page=page+1, pages=pages, start=start+1, end=end)
             )
         else:
-            self._db_count_var.set(f"{total} record")
+            self._db_count_var.set(_t("db_tab.count_records", count=total))
 
         row_offset = 0  # header ora è fisso fuori dallo scrollframe
 
@@ -3156,7 +3210,7 @@ class TrackLabGUI:
             nav = ctk.CTkFrame(self._db_list_frame, fg_color="transparent")
             nav.grid(row=len(page_items) + row_offset, column=0, pady=6)
             if page > 0:
-                ctk.CTkButton(nav, text="◀ Prec", width=80, font=FONT_SMALL,
+                ctk.CTkButton(nav, text=_t("db_tab.btn_prev"), width=80, font=FONT_SMALL,
                               fg_color=PALETTE["surface2"],
                               command=lambda: self._db_filter(page - 1)
                               ).pack(side="left", padx=4)
@@ -3164,7 +3218,7 @@ class TrackLabGUI:
                          font=FONT_SMALL, text_color=PALETTE["text_dim"]
                          ).pack(side="left", padx=8)
             if page < pages - 1:
-                ctk.CTkButton(nav, text="Succ ▶", width=80, font=FONT_SMALL,
+                ctk.CTkButton(nav, text=_t("db_tab.btn_next"), width=80, font=FONT_SMALL,
                               fg_color=PALETTE["surface2"],
                               command=lambda: self._db_filter(page + 1)
                               ).pack(side="left", padx=4)
@@ -3181,6 +3235,8 @@ class TrackLabGUI:
 
     def _build_quality_tab(self, parent):
         """v1065: tab Qualità — toolbar compatta, Treeview con intestazioni integrate."""
+        # v1092.0 (R6.1 fase 3.d): tab interamente i18n
+        from services.i18n import t as _t
         parent.rowconfigure(0, weight=0)  # toolbar
         parent.rowconfigure(1, weight=0)  # header fisso
         parent.rowconfigure(2, weight=1)  # lista scrollabile
@@ -3194,7 +3250,7 @@ class TrackLabGUI:
         toolbar.columnconfigure(2, weight=1)
 
         self._quality_scan_btn = ctk.CTkButton(
-            toolbar, text="🔍  Analizza", width=110,
+            toolbar, text=_t("quality_tab.btn_analyze"), width=110,
             fg_color=PALETTE["primary"], hover_color=PALETTE["primary_hover"],
             font=FONT_SMALL, command=self._quality_scan,
         )
@@ -3203,7 +3259,7 @@ class TrackLabGUI:
         # Riscansiona — a sinistra, vicino ad Analizza, nascosto finché non c'è cache
         _ic_reload2 = _get_icon("reload2", 20) if _ICONS_AVAILABLE else None
         self._quality_rescan_btn = ctk.CTkButton(
-            toolbar, text="  Riscansiona", width=120,
+            toolbar, text=_t("quality_tab.btn_rescan"), width=120,
             fg_color=PALETTE["surface2"], hover_color=PALETTE["primary"],
             font=FONT_SMALL, image=_ic_reload2, compound="left",
             command=self._quality_rescan,
@@ -3213,7 +3269,7 @@ class TrackLabGUI:
 
         # Col 2 = spacer elastico con contatore + ⚡ in una sola StringVar
         self._quality_count_var = ctk.StringVar(
-            value="Clicca Analizza — usa DB locale o legge i file MP3"
+            value=_t("quality_tab.intro_hint")
         )
         ctk.CTkLabel(toolbar, textvariable=self._quality_count_var,
                      font=FONT_SMALL, text_color=PALETTE["text_dim"]
@@ -3225,7 +3281,7 @@ class TrackLabGUI:
         )
         self._quality_cache_lbl.grid(row=0, column=2, padx=(10, 0), sticky="e")
 
-        ctk.CTkLabel(toolbar, text="Soglia:", font=FONT_SMALL,
+        ctk.CTkLabel(toolbar, text=_t("quality_tab.threshold_label"), font=FONT_SMALL,
                      text_color=PALETTE["text_dim"]).grid(row=0, column=4, padx=(0, 6))
         self._quality_threshold_var = ctk.StringVar(value="320")
         self._quality_built = False
@@ -3261,8 +3317,12 @@ class TrackLabGUI:
 
         self._quality_hdr_labels = []   # tenuti per poter aggiornare le frecce
         _hdr_defs = [
-            ("File", 0),  ("kbps", 60),        ("Qualità", 140),
-            ("Sample Rate", 90), ("RG", 30),   ("Cartella", 180),
+            (_t("quality_tab.col_file"), 0),
+            (_t("quality_tab.col_kbps"), 60),
+            (_t("quality_tab.col_quality"), 140),
+            (_t("quality_tab.col_sample_rate"), 90),
+            (_t("quality_tab.col_rg"), 30),
+            (_t("quality_tab.col_folder"), 180),
         ]
         for _c, (_l, _w) in enumerate(_hdr_defs):
             lbl = ctk.CTkLabel(
@@ -3309,10 +3369,13 @@ class TrackLabGUI:
 
     def _quality_scan(self, force: bool = False):
         """v1063: avvia analisi qualità — riusa data/quality_analysis.json se disponibile."""
+        # v1092.0 (R6.1 fase 3.d): i18n
+        from services.i18n import t as _t
         import threading, json as _json
         path = self._selected_path.get().strip()
         if not path or not Path(path).is_dir():
-            messagebox.showwarning("Attenzione", "Seleziona prima una directory musicale valida.")
+            messagebox.showwarning(_t("quality_tab.warn_select_dir_title"),
+                                   _t("quality_tab.warn_select_dir_body"))
             return
 
         for w in self._quality_list.winfo_children():
@@ -3331,7 +3394,7 @@ class TrackLabGUI:
                         # Mostra ⚡ etichetta e pulsante Riscansiona
                         self._quality_rescan_btn.grid()
                         self._quality_count_var.set(
-                            f"⚡  Risultati da cache — {total} file analizzati"
+                            _t("quality_tab.cache_results", total=total)
                         )
                         self._quality_cache_lbl.configure(text="")
                         self._quality_filter()
@@ -3343,7 +3406,7 @@ class TrackLabGUI:
         # Usiamo topmost + pulsante disabilitato per evitare doppi click
         self._quality_scan_btn.configure(state="disabled")
         prog_win = ctk.CTkToplevel(self.root)
-        prog_win.title("Analisi qualità in corso...")
+        prog_win.title(_t("quality_tab.prog_title"))
         self._set_win_icon(prog_win)          # v1074: icona uniforme su tutte le finestre
         prog_win.resizable(False, False)
         prog_win.attributes("-topmost", True)
@@ -3354,16 +3417,17 @@ class TrackLabGUI:
                 self._quality_prog_bar.stop()
                 prog_win.destroy()
                 self._quality_scan_btn.configure(state="normal")
-                self._quality_count_var.set("Analisi interrotta")
+                self._quality_count_var.set(_t("quality_tab.prog_interrupted"))
             except Exception:
                 pass
         prog_win.protocol("WM_DELETE_WINDOW", _force_close)
         prog_win.lift()
 
-        ctk.CTkLabel(prog_win, text="🔍  Analisi bitrate in corso...",
+        ctk.CTkLabel(prog_win, text=_t("quality_tab.prog_header"),
                      font=(FONT_SMALL[0], 13, "bold")).pack(pady=(20, 8))
         self._quality_prog_label = ctk.CTkLabel(prog_win,
-            text="Lettura DB locale...", font=FONT_SMALL, text_color=PALETTE["text_dim"])
+            text=_t("quality_tab.prog_reading_db"),
+            font=FONT_SMALL, text_color=PALETTE["text_dim"])
         self._quality_prog_label.pack()
         prog_bar = ctk.CTkProgressBar(prog_win, width=340, mode="indeterminate")
         prog_bar.pack(pady=(8, 16))
@@ -3371,7 +3435,7 @@ class TrackLabGUI:
 
         self._quality_prog_win = prog_win
         self._quality_prog_bar = prog_bar
-        self._quality_count_var.set("⏳  Analisi in corso...")
+        self._quality_count_var.set(_t("quality_tab.prog_running"))
 
         threading.Thread(target=self._quality_scan_thread, args=(path,), daemon=True).start()
 
@@ -3401,8 +3465,9 @@ class TrackLabGUI:
             except Exception:
                 pass
 
+        from services.i18n import t as _t
         self.root.after(0, lambda: self._quality_prog_label.configure(
-            text=f"DB locale: {len(db_kbps)} voci. Scansione file..."))
+            text=_t("quality_tab.prog_db_done", n=len(db_kbps))))
 
         # Fase 2: scansiona i file fisici, mutagen come fallback
         try:
@@ -3444,7 +3509,8 @@ class TrackLabGUI:
                 results.append((fname, kbps, folder, sr_khz, rg))
 
             if i % 30 == 0:
-                msg = f"File {i}/{total}  (mutagen: {mutagen_count})"
+                msg = _t("quality_tab.prog_file_count",
+                         i=i, total=total, n=mutagen_count)
                 self.root.after(0, lambda m=msg: self._quality_prog_label.configure(text=m))
 
         results.sort(key=lambda x: x[1])
@@ -3465,7 +3531,8 @@ class TrackLabGUI:
         except Exception:
             pass
 
-        db_note = f" — DB: {len(db_kbps)}, mutagen: {mutagen_count}"
+        db_note = _t("quality_tab.note_db_mutagen",
+                     db=len(db_kbps), mu=mutagen_count)
         self.root.after(0, lambda: self._quality_done(total, db_note))
 
     def _quality_done(self, total: int, note: str):
@@ -3571,19 +3638,22 @@ class TrackLabGUI:
         items  = filtered[start:end]
 
         # Contatore
+        from services.i18n import t as _t
         if total > PAGE_SIZE:
             self._quality_count_var.set(
-                f"{total} file ≤ {threshold} kbps  (su {n_tot} totali)"
-                f"  •  pag. {page+1}/{pages}  ({start+1}-{end})"
+                _t("quality_tab.count_with_pages", count=total,
+                   threshold=threshold, total_all=n_tot,
+                   page=page+1, pages=pages, start=start+1, end=end)
             )
         else:
             self._quality_count_var.set(
-                f"{total} file ≤ {threshold} kbps  (su {n_tot} totali)"
+                _t("quality_tab.count_results", count=total,
+                   threshold=threshold, total_all=n_tot)
             )
 
         if not filtered:
             ctk.CTkLabel(self._quality_list,
-                         text="Nessun file sotto questa soglia.",
+                         text=_t("quality_tab.empty_under_threshold"),
                          font=FONT_SMALL, text_color=PALETTE["text_dim"]
                          ).pack(pady=20)
             return
@@ -3597,10 +3667,10 @@ class TrackLabGUI:
 
         # Righe come CTkFrame (stesso stile DB Locale — collaudato)
         def _sem(kbps):
-            if kbps < 160: return "🔴 Scarsa", PALETTE.get("error",   "#cc4444")
-            if kbps < 256: return "🟡 Media",  PALETTE.get("warning", "#e0a030")
-            if kbps < 320: return "🟢 Buona",  "#50aa70"
-            return             "💎 Alta",   "#4db8ff"
+            if kbps < 160: return _t("quality_tab.sem_poor"),   PALETTE.get("error",   "#cc4444")
+            if kbps < 256: return _t("quality_tab.sem_medium"), PALETTE.get("warning", "#e0a030")
+            if kbps < 320: return _t("quality_tab.sem_good"),   "#50aa70"
+            return             _t("quality_tab.sem_high"),   "#4db8ff"
 
         for idx, item in enumerate(items):
             fname, kbps, folder = item[0], item[1], item[2]
@@ -3642,7 +3712,7 @@ class TrackLabGUI:
             nav = ctk.CTkFrame(self._quality_list, fg_color="transparent")
             nav.pack(pady=8)
             if page > 0:
-                ctk.CTkButton(nav, text="◀ Prec", width=80, font=FONT_SMALL,
+                ctk.CTkButton(nav, text=_t("quality_tab.btn_prev"), width=80, font=FONT_SMALL,
                               fg_color=PALETTE["surface2"],
                               command=lambda: self._quality_filter(page - 1)
                               ).pack(side="left", padx=4)
@@ -3650,7 +3720,7 @@ class TrackLabGUI:
                          font=FONT_SMALL, text_color=PALETTE["text_dim"]
                          ).pack(side="left", padx=8)
             if page < pages - 1:
-                ctk.CTkButton(nav, text="Succ ▶", width=80, font=FONT_SMALL,
+                ctk.CTkButton(nav, text=_t("quality_tab.btn_next"), width=80, font=FONT_SMALL,
                               fg_color=PALETTE["surface2"],
                               command=lambda: self._quality_filter(page + 1)
                               ).pack(side="left", padx=4)
@@ -3659,6 +3729,8 @@ class TrackLabGUI:
 
     def _build_cache_tab(self, parent):
         """v1069b: tab Cache — layout a 3 righe: toolbar / header+lista / dettaglio."""
+        # v1092.0 (R6.1 fase 3.d): tab interamente i18n
+        from services.i18n import t as _t
         import json as _json
         import tkinter as _tk
 
@@ -3681,7 +3753,7 @@ class TrackLabGUI:
                       fg_color="transparent", hover_color=PALETTE["primary"],
                       font=FONT_SMALL, image=_ic_rel2, command=self._cache_reload)
         _btn_cache_reload.grid(row=0, column=0, padx=(4, 2), pady=3)
-        self._add_tooltip(_btn_cache_reload, "Aggiorna")
+        self._add_tooltip(_btn_cache_reload, _t("cache_tab.tip_reload"))
 
         self._cache_search_var = ctk.StringVar()
         self._cache_search_after = None
@@ -3693,16 +3765,17 @@ class TrackLabGUI:
             self._cache_search_after = self.root.after(600, self._cache_filter)
         self._cache_search_var.trace_add("write", _cache_search_debounced)
         ctk.CTkEntry(toolbar, textvariable=self._cache_search_var, height=28,
-                     placeholder_text="🔍  Cerca artista, titolo...",
+                     placeholder_text=_t("cache_tab.search_placeholder"),
                      font=FONT_SMALL, fg_color=PALETTE["bg"], border_width=0,
                      ).grid(row=0, column=1, sticky="ew", padx=(2, 6), pady=3)
 
-        self._cache_count_var = ctk.StringVar(value="0 voci")
+        self._cache_count_var = ctk.StringVar(
+            value=_t("cache_tab.count_entries", count=0))
         ctk.CTkLabel(toolbar, textvariable=self._cache_count_var,
                      font=FONT_SMALL, text_color=PALETTE["text_dim"]
                      ).grid(row=0, column=2, padx=(0, 6))
 
-        ctk.CTkButton(toolbar, text="🗑 Svuota", width=90, height=28,
+        ctk.CTkButton(toolbar, text=_t("cache_tab.btn_clear"), width=90, height=28,
                       fg_color=PALETTE["accent"], hover_color="#802020",
                       font=FONT_SMALL, command=self._clear_cache,
                       ).grid(row=0, column=3, padx=(0, 4), pady=3)
@@ -3718,7 +3791,9 @@ class TrackLabGUI:
         hdr.grid(row=0, column=0, sticky="ew", pady=(0, 1))
         hdr.columnconfigure(0, weight=1)
         for col, (lbl, w) in enumerate([
-            ("Artista / Titolo", 0), ("Genere", 100), ("Sorgente", 90)
+            (_t("cache_tab.col_artist_title"), 0),
+            (_t("cache_tab.col_genre"), 100),
+            (_t("cache_tab.col_source"), 90)
         ]):
             ctk.CTkLabel(hdr, text=lbl,
                          font=(FONT_SMALL[0], FONT_SMALL[1], "bold"),
@@ -3759,7 +3834,7 @@ class TrackLabGUI:
         # NON e' risolvibile in modo pulito con un singolo Label di testo
         # → come concordato con Pedro lo lasciamo cosi' per ora.
         self._cache_detail_var = ctk.StringVar(
-            value="Seleziona un brano dalla lista")
+            value=_t("cache_tab.detail_placeholder"))
         ctk.CTkLabel(detail, textvariable=self._cache_detail_var,
                      font=FONT_SMALL, text_color=PALETTE["text"],
                      wraplength=220, justify="left",
@@ -3832,7 +3907,8 @@ class TrackLabGUI:
                     }
                 self._cache_data = cache_view
             except Exception as e:
-                self._cache_count_var.set(f"Errore lettura cache: {e}")
+                from services.i18n import t as _t
+                self._cache_count_var.set(_t("cache_tab.err_read", detail=str(e)))
         self._cache_search_var.set("")
         self._cache_filter()
         if hasattr(self, '_cache_info_var'):
@@ -3894,12 +3970,14 @@ class TrackLabGUI:
         start = page * PAGE_SIZE
         end   = min(start + PAGE_SIZE, total)
 
+        from services.i18n import t as _t
         if total > PAGE_SIZE:
             self._cache_count_var.set(
-                f"{total} voci  •  pag. {page+1}/{pages}  ({start+1}-{end})"
+                _t("cache_tab.count_with_pages", count=total,
+                   page=page+1, pages=pages, start=start+1, end=end)
             )
         else:
-            self._cache_count_var.set(f"{total} voci")
+            self._cache_count_var.set(_t("cache_tab.count_entries", count=total))
 
         for idx, (key, meta) in enumerate(items[start:end]):
             bg = PALETTE["surface2"] if idx % 2 == 0 else PALETTE["surface"]
@@ -4063,21 +4141,23 @@ class TrackLabGUI:
         #   Titolo, Artisti Partecipanti  (header — primi due)
         #   Album, Anno, Genere, BPM, Durata, Qualità,
         #   Sample rate, Dimensione, Cartella, Catalogato il, Sorgente
+        # v1092.0 (R6.1 fase 3.d): label localizzate, valori invariati
+        from services.i18n import t as _t
         lines = [
-            f"Titolo: {title}",
-            f"Artisti Partecipanti: {artist}",
+            f"{_t('cache_tab.detail_label_title')}: {title}",
+            f"{_t('cache_tab.detail_label_artists')}: {artist}",
             "",
-            f"Album: {album}",
-            f"Anno: {year}",
-            f"Genere: {genre}",
-            f"BPM: {bpm}",
-            f"Durata: {dur_str}",
-            f"Qualità: {bitrate_kbps_str}",
-            f"Sample rate: {sample_rate_str}",
-            f"Dimensione: {file_size_str}",
-            f"Cartella: {folder_str}",
-            f"Catalogato il: {cat_at_str}",
-            f"Sorgente: {source_str}",
+            f"{_t('cache_tab.detail_label_album')}: {album}",
+            f"{_t('cache_tab.detail_label_year')}: {year}",
+            f"{_t('cache_tab.detail_label_genre')}: {genre}",
+            f"{_t('cache_tab.detail_label_bpm')}: {bpm}",
+            f"{_t('cache_tab.detail_label_duration')}: {dur_str}",
+            f"{_t('cache_tab.detail_label_quality')}: {bitrate_kbps_str}",
+            f"{_t('cache_tab.detail_label_sample_rate')}: {sample_rate_str}",
+            f"{_t('cache_tab.detail_label_size')}: {file_size_str}",
+            f"{_t('cache_tab.detail_label_folder')}: {folder_str}",
+            f"{_t('cache_tab.detail_label_cataloged_at')}: {cat_at_str}",
+            f"{_t('cache_tab.detail_label_source')}: {source_str}",
         ]
         self._cache_detail_var.set("\n".join(lines))
 
@@ -4259,6 +4339,8 @@ class TrackLabGUI:
 
     def _build_genres_tab(self, parent):
         """v1049: tab Generi Preferiti — l'utente personalizza macro e subgeneri attivi."""
+        # v1092.0 (R6.1 fase 3.c): i18n
+        from services.i18n import t as _t
         import json as _json
 
         # Carica preferenze salvate
@@ -4274,22 +4356,22 @@ class TrackLabGUI:
         toolbar = ctk.CTkFrame(parent, fg_color="transparent")
         toolbar.pack(fill="x", padx=8, pady=(8, 4))
         ctk.CTkLabel(toolbar,
-                     text="Seleziona i generi attivi nella tua collezione.",
+                     text=_t("genres_tab.intro"),
                      font=FONT_SMALL, text_color=PALETTE["text_dim"]
                      ).pack(side="left", padx=(4, 12))
-        ctk.CTkButton(toolbar, text="💾  Salva", width=90,
+        ctk.CTkButton(toolbar, text=_t("genres_tab.btn_save"), width=90,
                       fg_color=PALETTE["primary"], hover_color=PALETTE["primary_hover"],
                       font=FONT_SMALL, command=self._save_genre_prefs,
                       ).pack(side="right", padx=(4, 0))
         ctk.CTkLabel(toolbar,
-                     text="💡 Deseleziona i generi da escludere dalla catalogazione, poi clicca Salva",
+                     text=_t("genres_tab.tip_hint"),
                      font=(FONT_SMALL[0], FONT_SMALL[1]-1), text_color=PALETTE["text_dim"]
                      ).pack(side="left", padx=(8, 0))
-        ctk.CTkButton(toolbar, text="✓ Tutto", width=80,
+        ctk.CTkButton(toolbar, text=_t("genres_tab.btn_select_all"), width=80,
                       fg_color=PALETTE["surface2"], hover_color=PALETTE["primary"],
                       font=FONT_SMALL, command=lambda: self._set_all_genres(True),
                       ).pack(side="right", padx=4)
-        ctk.CTkButton(toolbar, text="✗ Nessuno", width=90,
+        ctk.CTkButton(toolbar, text=_t("genres_tab.btn_select_none"), width=90,
                       fg_color=PALETTE["surface2"], hover_color=PALETTE["accent"],
                       font=FONT_SMALL, command=lambda: self._set_all_genres(False),
                       ).pack(side="right", padx=4)
@@ -4301,9 +4383,37 @@ class TrackLabGUI:
 
         self._genre_vars: dict = {}   # key: (macro, sub) → BooleanVar
 
+        # v1092.0 (R6.1 fase 3.c hotfix): mappe display ↔ chiave i18n.
+        # _GENRE_TREE resta source-of-truth con nomi italiani (anche per
+        # macro_key e sub usati come chiavi invarianti di genre_prefs.json
+        # → cambiarli romperebbe le preferenze salvate degli utenti).
+        # Solo la VISUALIZZAZIONE passa per i18n.
+        _MACRO_I18N_MAP = {
+            "🎵  Latin":                "latin",
+            "🎬  Soundtrack":           "soundtrack",
+            "🎸  Rock & Alternative":    "rock",
+            "🎹  Classical & Jazz":      "classical",
+            "🎧  Electronic":           "electronic",
+            "🎤  Pop & R&B":             "pop",
+            "🌍  World & Other":         "world",
+            "🗂️  Altro":                "other",
+        }
+        _SUB_HINT_OVERRIDES = {"R&B": "rnb"}
+        def _sub_to_hint_key(sub: str) -> str:
+            if sub in _SUB_HINT_OVERRIDES:
+                return _SUB_HINT_OVERRIDES[sub]
+            return (sub.lower()
+                    .replace(" ", "_")
+                    .replace("-", "_")
+                    .replace("/", "_"))
+
         for macro, data in self._GENRE_TREE.items():
             # Header macrogenere con checkbox "abilita tutto il gruppo"
             macro_key = macro.split("  ", 1)[-1].strip()
+            # Display localizzato del macrogenere
+            macro_display = _t(
+                f"genres_macro.{_MACRO_I18N_MAP.get(macro, macro_key.lower())}"
+            )
             all_on = all(
                 self._genre_prefs.get(f"{macro_key}::{sub}", True)
                 for sub, _ in data["subgenres"]
@@ -4315,7 +4425,7 @@ class TrackLabGUI:
             hdr.columnconfigure(1, weight=1)
 
             ctk.CTkCheckBox(
-                hdr, variable=macro_var, text=macro,
+                hdr, variable=macro_var, text=macro_display,
                 font=("Segoe UI", 12, "bold"), text_color=PALETTE["text"],
                 fg_color=PALETTE["primary"], hover_color=PALETTE["primary_hover"],
                 checkmark_color=PALETTE["bg"],
@@ -4339,6 +4449,16 @@ class TrackLabGUI:
                 cell = ctk.CTkFrame(sub_frm, fg_color="transparent")
                 cell.grid(row=row, column=col, padx=8, pady=3, sticky="w")
 
+                # Hint localizzata: fallback al testo IT (`desc`) se la
+                # chiave i18n non esiste in EN (e fallback al testo IT in
+                # IT). i18n.t() ritorna la chiave stessa se mancante:
+                # in quel caso usiamo `desc` come fallback robusto.
+                hint_key = _sub_to_hint_key(sub)
+                hint_lookup = f"genres_hints.{hint_key}"
+                hint_text = _t(hint_lookup)
+                if hint_text == hint_lookup:
+                    hint_text = desc   # fallback finale al testo IT
+
                 ctk.CTkCheckBox(
                     cell, variable=var, text=sub,
                     font=FONT_SMALL, text_color=PALETTE["text"],
@@ -4346,7 +4466,7 @@ class TrackLabGUI:
                     checkmark_color=PALETTE["bg"],
                 ).pack(side="left")
                 ctk.CTkLabel(
-                    cell, text=f"  {desc}",
+                    cell, text=f"  {hint_text}",
                     font=(FONT_SMALL[0], FONT_SMALL[1] - 1),
                     text_color=PALETTE["text_dim"],
                 ).pack(side="left")
@@ -4375,20 +4495,25 @@ class TrackLabGUI:
             f"{mk}::{sub}": var.get()
             for (mk, sub), var in self._genre_vars.items()
         }
+        from services.i18n import t as _t
         try:
             self._genre_prefs_file.write_text(
                 _json.dumps(prefs, indent=2, ensure_ascii=False), encoding="utf-8"
             )
             # Feedback visivo breve
-            self._status_var.set("✓  Preferenze generi salvate")
-            self.root.after(2500, lambda: self._status_var.set("✓  Pronto"))
+            self._status_var.set(_t("genres_tab.status_saved"))
+            self.root.after(2500,
+                            lambda: self._status_var.set(_t("left_panel.status_ready")))
         except Exception as e:
-            messagebox.showerror("Errore", f"Impossibile salvare le preferenze:\n{e}")
+            messagebox.showerror(_t("genres_tab.err_save_title"),
+                                 _t("genres_tab.err_save_body", detail=str(e)))
 
     # ─── TAB: IMPOSTAZIONI AVANZATE ───────────────────────────────────────────
 
     def _build_caribbean_tab(self, parent):
         """v1071b: Tab Classificazione Caraibica — gestione artisti noti, BPM, priorità."""
+        # v1092.0 (R6.1 fase 3.f): tab interamente i18n
+        from services.i18n import t as _t
         import json as _json
 
         def _load_carib_settings():
@@ -4420,16 +4545,18 @@ class TrackLabGUI:
             return frm
 
         # ── Priorità classificazione — DRAG & DROP con Listbox ──────────
-        frm_prio = csection("  Priorità Classificazione", "Trascina le voci per riordinare la priorità. La prima ha la precedenza massima.", icon_name="classify")
+        frm_prio = csection(_t("caribbean_tab.section_priority"),
+                            _t("caribbean_tab.section_priority_desc"),
+                            icon_name="classify")
 
         import tkinter as _tk_prio
 
         self._prio_items = [
-            "Nome file (parola 'Salsa'/'Bachata'…)",
-            "Artisti noti (lista configurata sotto)",
-            "DB online (MusicBrainz, Deezer, iTunes)",
-            "Detection BPM + indicatori testuali",
-            "Metadati ID3 già presenti nel file",
+            _t("caribbean_tab.prio_filename"),
+            _t("caribbean_tab.prio_artists"),
+            _t("caribbean_tab.prio_online_db"),
+            _t("caribbean_tab.prio_bpm_detect"),
+            _t("caribbean_tab.prio_id3"),
         ]
 
         prio_frame = ctk.CTkFrame(frm_prio, fg_color=PALETTE["bg"], corner_radius=6)
@@ -4447,7 +4574,7 @@ class TrackLabGUI:
             self._prio_listbox.insert("end", f"  {i+1}°  {item}")
 
         hint_prio = ctk.CTkLabel(prio_frame,
-            text="⬆ Su / ⬇ Giù  — seleziona e clicca per spostare",
+            text=_t("caribbean_tab.prio_hint"),
             font=(FONT_SMALL[0], FONT_SMALL[1]-1), text_color=PALETTE["text_dim"])
         hint_prio.pack(pady=(0, 4))
 
@@ -4493,7 +4620,7 @@ class TrackLabGUI:
                       fg_color=PALETTE["surface2"], hover_color=PALETTE["primary"],
                       command=lambda: _prio_move(-1))
         btn_su.pack(side="left", padx=4)
-        _tooltip_carib(btn_su, "Sposta su — aumenta priorità")
+        _tooltip_carib(btn_su, _t("caribbean_tab.tip_move_up"))
 
         btn_giu = ctk.CTkButton(btn_prio_frm,
                        text="" if _ic_down else "⬇", image=_ic_down,
@@ -4501,10 +4628,12 @@ class TrackLabGUI:
                        fg_color=PALETTE["surface2"], hover_color=PALETTE["primary"],
                        command=lambda: _prio_move(1))
         btn_giu.pack(side="left", padx=4)
-        _tooltip_carib(btn_giu, "Sposta giù — diminuisce priorità")
+        _tooltip_carib(btn_giu, _t("caribbean_tab.tip_move_down"))
 
         # ── Range BPM ────────────────────────────────────────────────────
-        frm_bpm = csection("  Range BPM", "I range BPM usati per supportare la classificazione Salsa/Bachata.", icon_name="bpm_range")
+        frm_bpm = csection(_t("caribbean_tab.section_bpm_range"),
+                           _t("caribbean_tab.section_bpm_range_desc"),
+                           icon_name="bpm_range")
 
         try:
             from config.settings import settings as _s
@@ -4520,8 +4649,12 @@ class TrackLabGUI:
         self._carib_s_max = ctk.StringVar(value=str(s_max))
 
         for label, vmin, vmax, hint in [
-            ("Bachata BPM:", self._carib_b_min, self._carib_b_max, "tipico: 90–130"),
-            ("Salsa BPM:",   self._carib_s_min, self._carib_s_max, "tipico: 70–200"),
+            (_t("caribbean_tab.label_bachata_bpm"),
+             self._carib_b_min, self._carib_b_max,
+             _t("caribbean_tab.hint_bachata_typical")),
+            (_t("caribbean_tab.label_salsa_bpm"),
+             self._carib_s_min, self._carib_s_max,
+             _t("caribbean_tab.hint_salsa_typical")),
         ]:
             row_bpm = ctk.CTkFrame(frm_bpm, fg_color="transparent")
             row_bpm.pack(fill="x", padx=12, pady=4)
@@ -4541,7 +4674,9 @@ class TrackLabGUI:
         ctk.CTkLabel(frm_bpm, text="", font=FONT_SMALL).pack(pady=2)
 
         # ── Difficoltà Salsa (range BPM per classificazione velocità) ────
-        frm_sal_diff = csection("  Velocità Salsa per BPM", "Range BPM usati per classificare la difficoltà della Salsa in fase di catalogazione.", icon_name="velocita_bpm")
+        frm_sal_diff = csection(_t("caribbean_tab.section_salsa_speed"),
+                                _t("caribbean_tab.section_salsa_speed_desc"),
+                                icon_name="velocita_bpm")
 
         # difficulty_ranges: struttura {level: {min_bpm, max_bpm, description}} o {level: (min, max)}
         try:
@@ -4562,11 +4697,27 @@ class TrackLabGUI:
                 "3 - Media": (95, 99), "4 - Veloce": (100, 119), "5 - Crazy": (120, 999),
             }
 
+        # v1092.0 (R6.1 fase 3.f): mappa display ↔ chiave i18n per BPM levels.
+        # I level ID restano invarianti (italiani: "1 - Romantica", "2 - Lenta",
+        # ecc.) perché sono usati come chiavi in config/settings.py
+        # difficulty_ranges → cambiarli romperebbe la classificazione esistente.
+        # Solo il DISPLAY passa per i18n. Refactor strutturale (id puro
+        # vs display localizzato) pianificato in fase 4.1.
+        _BPM_LEVEL_I18N = {
+            "1 - Romantica": "level_1",
+            "2 - Lenta":     "level_2",
+            "3 - Media":     "level_3",
+            "4 - Veloce":    "level_4",
+            "5 - Crazy":     "level_5",
+        }
         self._carib_diff_vars = {}
         for level, (bmin, bmax) in diff_ranges.items():
             row_d = ctk.CTkFrame(frm_sal_diff, fg_color="transparent")
             row_d.pack(fill="x", padx=12, pady=3)
-            ctk.CTkLabel(row_d, text=f"{level}:", font=FONT_SMALL,
+            # Display localizzato; fallback al level ID se sconosciuto
+            level_key = _BPM_LEVEL_I18N.get(level)
+            level_display = (_t(f"bpm_levels.{level_key}") if level_key else level)
+            ctk.CTkLabel(row_d, text=f"{level_display}:", font=FONT_SMALL,
                          text_color=PALETTE["text"], width=120, anchor="w"
                          ).pack(side="left")
             vmin_d = ctk.StringVar(value=str(bmin))
@@ -4583,7 +4734,9 @@ class TrackLabGUI:
         ctk.CTkLabel(frm_sal_diff, text="", font=FONT_SMALL).pack(pady=2)
 
         # ── Artisti Salsa ────────────────────────────────────────────────
-        frm_salsa = csection("  Artisti Salsa Noti", "Uno per riga. Corrispondenza parziale sul nome artista (case-insensitive).", icon_name="artisti_noti")
+        frm_salsa = csection(_t("caribbean_tab.section_salsa_artists"),
+                             _t("caribbean_tab.section_salsa_artists_desc"),
+                             icon_name="artisti_noti")
         try:
             from config.settings import settings as _s
             salsa_artists = [x for x in _s.genre.salsa_indicators
@@ -4599,7 +4752,9 @@ class TrackLabGUI:
         self._carib_salsa_txt.insert("end", "\n".join(salsa_artists))
 
         # ── Artisti Bachata ──────────────────────────────────────────────
-        frm_bach = csection("  Artisti Bachata Noti", "Uno per riga. Corrispondenza parziale sul nome artista (case-insensitive).", icon_name="artisti_noti")
+        frm_bach = csection(_t("caribbean_tab.section_bachata_artists"),
+                            _t("caribbean_tab.section_bachata_artists_desc"),
+                            icon_name="artisti_noti")
         try:
             from config.settings import settings as _s
             bach_artists = [x for x in _s.genre.bachata_indicators
@@ -4615,7 +4770,9 @@ class TrackLabGUI:
         self._carib_bach_txt.insert("end", "\n".join(bach_artists))
 
         # ── Indicatori testuali ──────────────────────────────────────────
-        frm_ind = csection("  Indicatori Testuali (Salsa)", "Parole chiave cercate nel titolo/artista/filename per identificare la Salsa. Una per riga.", icon_name="indicatori")
+        frm_ind = csection(_t("caribbean_tab.section_salsa_keywords"),
+                           _t("caribbean_tab.section_salsa_keywords_desc"),
+                           icon_name="indicatori")
         try:
             from config.settings import settings as _s
             salsa_kw = [x for x in _s.genre.salsa_indicators
@@ -4631,7 +4788,9 @@ class TrackLabGUI:
         self._carib_salkw_txt.insert("end", "\n".join(salsa_kw))
 
         # ── Indicatori testuali Bachata ──────────────────────────────────
-        frm_ind_bach = csection("  Indicatori Testuali (Bachata)", "Parole chiave per identificare la Bachata nel titolo/artista/filename. Una per riga.", icon_name="indicatori")
+        frm_ind_bach = csection(_t("caribbean_tab.section_bachata_keywords"),
+                                _t("caribbean_tab.section_bachata_keywords_desc"),
+                                icon_name="indicatori")
         try:
             from config.settings import settings as _s
             bach_kw = [x for x in _s.genre.bachata_indicators
@@ -4652,14 +4811,14 @@ class TrackLabGUI:
         btn_row_carib = ctk.CTkFrame(scroll, fg_color="transparent")
         btn_row_carib.pack(pady=(8, 16))
         ctk.CTkButton(
-            btn_row_carib, text="💾  Salva impostazioni",
+            btn_row_carib, text=_t("caribbean_tab.btn_save"),
             fg_color=PALETTE["primary"], hover_color=PALETTE["primary_hover"],
             font=FONT_BODY, command=self._save_caribbean_settings
         ).pack(side="left", padx=4)
         if (self.api_client is not None
                 and self.user_info.get("is_admin", False)):
             ctk.CTkButton(
-                btn_row_carib, text="📤  Pubblica come default per tutti",
+                btn_row_carib, text=_t("caribbean_tab.btn_publish_admin"),
                 fg_color="#50aa70", hover_color="#3d8856",
                 text_color="#ffffff",
                 font=FONT_BODY,
@@ -4674,6 +4833,8 @@ class TrackLabGUI:
         ancora un file locale `caribbean_settings.json` li riceveranno
         al prossimo boot.
         """
+        # v1092.0 (R6.1 fase 3.f): i18n
+        from services.i18n import t as _t
         from tkinter import messagebox
         import threading
 
@@ -4699,22 +4860,18 @@ class TrackLabGUI:
                         self._carib_bachkw_txt.get("1.0", "end").split("\n")
                         if l.strip()] if hasattr(self, "_carib_bachkw_txt") else []
         except Exception as e:
-            messagebox.showerror("Errore", f"Lettura impostazioni fallita:\n{e}")
+            messagebox.showerror(
+                _t("caribbean_tab.err_read_settings_title"),
+                _t("caribbean_tab.err_read_settings_body", detail=str(e)))
             return
 
         if not messagebox.askyesno(
-            "Pubblica default",
-            f"Pubblicare queste impostazioni come DEFAULT per tutti gli "
-            f"utenti?\n\n"
-            f"• Salsa BPM: {s_min}-{s_max}\n"
-            f"• Bachata BPM: {b_min}-{b_max}\n"
-            f"• Artisti salsa: {len(salsa_artists)}\n"
-            f"• Keyword salsa: {len(salsa_kw)}\n"
-            f"• Artisti bachata: {len(bach_artists)}\n"
-            f"• Keyword bachata: {len(bach_kw)}\n\n"
-            f"I clienti senza impostazioni locali le scaricheranno "
-            f"al prossimo avvio.\n"
-            f"Chi ha già una configurazione locale NON verrà sovrascritto."):
+            _t("caribbean_tab.publish_title"),
+            _t("caribbean_tab.publish_body",
+               s_min=s_min, s_max=s_max,
+               b_min=b_min, b_max=b_max,
+               n_sal_a=len(salsa_artists), n_sal_k=len(salsa_kw),
+               n_bac_a=len(bach_artists), n_bac_k=len(bach_kw))):
             return
 
         payload = {
@@ -4730,14 +4887,13 @@ class TrackLabGUI:
             try:
                 self.api_client.set_caribbean_defaults(payload)
                 self._safe_after(0, lambda: messagebox.showinfo(
-                    "Default pubblicati",
-                    "Le impostazioni caraibiche sono ora i default condivisi.\n\n"
-                    "I clienti senza file locale le scaricheranno al "
-                    "prossimo avvio dell'applicazione."))
+                    _t("caribbean_tab.publish_ok_title"),
+                    _t("caribbean_tab.publish_ok_body")))
             except Exception as e:
                 err_str = str(e)
                 self._safe_after(0, lambda: messagebox.showerror(
-                    "Errore", f"Pubblicazione fallita:\n{err_str}"))
+                    _t("caribbean_tab.publish_err_title"),
+                    _t("caribbean_tab.publish_err_body", detail=err_str)))
         threading.Thread(target=_w, daemon=True).start()
 
     @staticmethod
@@ -4793,6 +4949,8 @@ class TrackLabGUI:
 
     def _save_caribbean_settings(self):
         """v1072c: Salva le impostazioni caraibiche nelle settings runtime e su file JSON."""
+        # v1092.0 (R6.1 fase 3.f): i18n
+        from services.i18n import t as _t
         try:
             from config.settings import settings as _s
             import json as _json
@@ -4847,10 +5005,10 @@ class TrackLabGUI:
             )
             # Invalida la cache metadati per i file latini salvando il timestamp
             TrackLabGUI._mark_caribbean_cache_dirty_static()
-            messagebox.showinfo("Salvato",
-                "Impostazioni Caraibica salvate.\nVerranno caricate ad ogni avvio.")
+            messagebox.showinfo(_t("caribbean_tab.msg_saved_title"),
+                                _t("caribbean_tab.msg_saved_body"))
         except Exception as e:
-            messagebox.showerror("Errore", str(e))
+            messagebox.showerror(_t("caribbean_tab.err_save_title"), str(e))
 
     def _load_caribbean_settings(self):
         """Carica le impostazioni caraibiche da file JSON se disponibili.
@@ -5915,6 +6073,8 @@ class TrackLabGUI:
 
     def _build_advanced_tab(self, parent):
         """v1053: tab Avanzate — tutte le impostazioni non essenziali."""
+        # v1092.0 (R6.1 fase 3.b): tab interamente i18n
+        from services.i18n import t as _t
         scroll = ctk.CTkScrollableFrame(parent, fg_color="transparent")
         scroll.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
         scroll.columnconfigure(0, weight=1)
@@ -5944,11 +6104,11 @@ class TrackLabGUI:
             self._build_admin_section(scroll, section)
 
         # Classificazione
-        frm = section("  Classificazione", icon_name="adv_classify")
-        chk(frm, self._opt_dry_run,  "🧪  Modalità Simulazione (dry-run) — non sposta file")
-        chk(frm, self._opt_verbose,  "📋  Output Dettagliato (DEBUG nel log)")
-        chk(frm, self._opt_classify, "💃  Classifica Salsa per BPM (Easy/Medium/Hard...)")
-        chk(frm, self._opt_correct,  "🔧  Correggi Metadati Cartelle Esistenti")
+        frm = section(_t("advanced_tab.section_classify"), icon_name="adv_classify")
+        chk(frm, self._opt_dry_run,  _t("advanced_tab.opt_dry_run"))
+        chk(frm, self._opt_verbose,  _t("advanced_tab.opt_verbose"))
+        chk(frm, self._opt_classify, _t("advanced_tab.opt_classify"))
+        chk(frm, self._opt_correct,  _t("advanced_tab.opt_correct"))
         ctk.CTkFrame(frm, height=4, fg_color="transparent").pack()
 
         # Sorgenti Metadati in ordine di priorità
@@ -5956,12 +6116,10 @@ class TrackLabGUI:
         # Ogni riga ha [↑] [↓] [☑] N. Nome — descrizione. Le frecce muovono
         # la sorgente nella lista self._sources_order, ridisegnando il blocco.
         # I metadati per le label sono in self._SOURCE_META (sotto).
-        frm2 = section("  Sorgenti Metadati  (ordine = priorità)", icon_name="adv_sources")
+        frm2 = section(_t("advanced_tab.section_sources"), icon_name="adv_sources")
         self._sources_adv_frame = frm2  # v1057: riferimento per enable/disable
         ctk.CTkLabel(frm2,
-                     text="  Trascina con ↑↓ per cambiare la priorità della cascata.\n"
-                          "  La prima fonte con genere utile viene usata; le successive saltate.\n"
-                          "  Le sorgenti con token API (verdi) richiedono configurazione in secrets.py.",
+                     text=_t("advanced_tab.sources_intro"),
                      font=(FONT_SMALL[0], FONT_SMALL[1] - 1),
                      text_color=PALETTE["text_dim"], justify="left",
                      ).pack(anchor="w", padx=16, pady=(6, 4))
@@ -5972,54 +6130,61 @@ class TrackLabGUI:
         self._redraw_sources_list()
 
         ctk.CTkLabel(frm2,
-                     text="  Token API:  discogs.com/settings/developers  •  acoustid.org/api-key",
+                     text=_t("advanced_tab.sources_token_hint"),
                      font=(FONT_SMALL[0], FONT_SMALL[1] - 1),
                      text_color=PALETTE["text_dim"], justify="left",
                      ).pack(anchor="w", padx=16, pady=(0, 8))
 
         # Cover Album
-        frm3 = section("  Cover Album — Impostazioni Avanzate", icon_name="adv_cover")
-        chk(frm3, self._cover_overwrite, "Sovrascrivi cover esistente")
-        ctk.CTkLabel(frm3, text="Strategia:", font=FONT_SMALL,
+        frm3 = section(_t("advanced_tab.section_cover"), icon_name="adv_cover")
+        chk(frm3, self._cover_overwrite, _t("advanced_tab.cover_overwrite"))
+        ctk.CTkLabel(frm3, text=_t("advanced_tab.cover_strategy_label"), font=FONT_SMALL,
                      text_color=PALETTE["text_dim"]).pack(anchor="w", padx=16, pady=(4, 2))
-        for val, label in [('largest', "Usa la più grande in risoluzione"),
-                            ('first_available', "Usa la prima disponibile")]:
+        for val, label in [('largest', _t("advanced_tab.cover_strat_largest")),
+                            ('first_available', _t("advanced_tab.cover_strat_first"))]:
             ctk.CTkRadioButton(
                 frm3, text=label, variable=self._cover_strategy, value=val,
                 font=FONT_SMALL, text_color=PALETTE["text"],
                 fg_color=PALETTE["primary"], hover_color=PALETTE["primary_hover"],
             ).pack(anchor="w", padx=24, pady=2)
-        ctk.CTkLabel(frm3, text="Sorgenti:", font=FONT_SMALL,
+        ctk.CTkLabel(frm3, text=_t("advanced_tab.cover_sources_label"), font=FONT_SMALL,
                      text_color=PALETTE["text_dim"]).pack(anchor="w", padx=16, pady=(6, 2))
+        # Sorgenti cover: nomi propri di servizi → non tradotti
         for src, label in [('musicbrainz', "MusicBrainz"), ('lastfm', "Last.fm"),
                             ('deezer', "Deezer"), ('itunes', "iTunes")]:
             chk(frm3, self._cover_sources[src], label)
         ctk.CTkFrame(frm3, height=4, fg_color="transparent").pack()
 
         # Libreria Locale
-        frm4 = section("  Libreria Locale", icon_name="adv_library")
-        chk(frm4, self._opt_local_db, "Aggiorna DB locale Generi dopo catalogazione")
+        frm4 = section(_t("advanced_tab.section_library"), icon_name="adv_library")
+        chk(frm4, self._opt_local_db, _t("advanced_tab.library_opt"))
         ctk.CTkLabel(frm4,
-                     text="  Salva mappatura file→genere in data/local_db.json.\n"
-                          "  Permette di rilevare spostamenti manuali al prossimo avvio.",
+                     text=_t("advanced_tab.library_hint"),
                      font=(FONT_SMALL[0], FONT_SMALL[1] - 1),
                      text_color=PALETTE["text_dim"], justify="left",
                      ).pack(anchor="w", padx=16, pady=(0, 8))
 
         # Rinomina File
-        frm_rename = section("  Rinomina File Automatico", icon_name="rename")
+        frm_rename = section(_t("advanced_tab.section_rename"), icon_name="rename")
         ctk.CTkLabel(frm_rename,
-            text="Rinomina i file MP3 durante la catalogazione in base al pattern scelto. Default: disabilitato.",
+            text=_t("advanced_tab.rename_intro"),
             font=FONT_SMALL, text_color=PALETTE["text_dim"], wraplength=500, justify="left"
         ).pack(padx=12, pady=(8, 4), anchor="w")
 
         self._opt_rename = ctk.BooleanVar(value=False)
-        chk(frm_rename, self._opt_rename, "Abilita rinomina automatica dei file durante la catalogazione")
+        chk(frm_rename, self._opt_rename, _t("advanced_tab.rename_opt"))
 
         rename_pat_frm = ctk.CTkFrame(frm_rename, fg_color="transparent")
         rename_pat_frm.pack(fill="x", padx=12, pady=(4, 12))
-        ctk.CTkLabel(rename_pat_frm, text="Pattern:", font=FONT_SMALL,
+        ctk.CTkLabel(rename_pat_frm, text=_t("advanced_tab.rename_pattern_label"), font=FONT_SMALL,
                      text_color=PALETTE["text_dim"]).pack(side="left", padx=(0, 8))
+        # NOTA: valori del segmented button restano "artista - titolo" /
+        # "titolo - artista" (italiano) perché sono CHIAVI INVARIANTI usate
+        # da _build_command per costruire il pattern --rename-pattern.
+        # Cambiarli romperebbe i preset salvati in data/ui_prefs.json e la
+        # logica di mapping pattern. La traduzione visiva è in R6.1 fase 4
+        # (refactor id_invariant vs display_localized, stesso pattern dei
+        # BPM categories).
         self._rename_pattern = ctk.StringVar(value="artista - titolo")
         ctk.CTkSegmentedButton(
             rename_pat_frm,
@@ -6039,9 +6204,9 @@ class TrackLabGUI:
                      ).pack(side="left", padx=(4, 0))
 
         # Manutenzione
-        frm5 = section("  Manutenzione", icon_name="advanced2")
+        frm5 = section(_t("advanced_tab.section_maintenance"), icon_name="advanced2")
         ctk.CTkLabel(frm5,
-                     text="  Strumenti per la gestione e pulizia della collezione musicale.",
+                     text=_t("advanced_tab.maint_intro"),
                      font=(FONT_SMALL[0], FONT_SMALL[1]-1), text_color=PALETTE["text_dim"]
                      ).pack(anchor="w", padx=16, pady=(4, 6))
         # Layout 2 colonne, 4 righe per i tool di manutenzione
@@ -6049,18 +6214,18 @@ class TrackLabGUI:
                        hover_color=PALETTE["primary"], text_color=PALETTE["text"],
                        anchor="w", width=240, height=32)
         _tools = [
-            ("csv",          "Esporta CSV",         self._maint_export_csv),
-            ("find_dups",    "Trova Duplicati",      self._maint_find_duplicates),
-            ("svuota_cache", "Svuota Cache",         self._clear_cache),
-            ("open_folder",       "Apri Cartella Dati",   lambda: __import__("subprocess").Popen(
-                                                         ["explorer", str(_get_data_dir())])),
-            ("m3u",          "Playlist M3U",         self._maint_export_m3u),
-            ("rinomina_b",   "Rinomina Batch",       self._maint_batch_rename),
-            ("replaygain",   "Normalizza Volume",    self._maint_replaygain),
-            ("integrity",    "Verifica Integrità",   self._maint_check_integrity),
+            ("csv",          _t("advanced_tab.maint_btn_csv"),          self._maint_export_csv),
+            ("find_dups",    _t("advanced_tab.maint_btn_find_dups"),    self._maint_find_duplicates),
+            ("svuota_cache", _t("advanced_tab.maint_btn_clear_cache"),  self._clear_cache),
+            ("open_folder",  _t("advanced_tab.maint_btn_open_data"),    lambda: __import__("subprocess").Popen(
+                                                                        ["explorer", str(_get_data_dir())])),
+            ("m3u",          _t("advanced_tab.maint_btn_m3u"),          self._maint_export_m3u),
+            ("rinomina_b",   _t("advanced_tab.maint_btn_batch_rename"), self._maint_batch_rename),
+            ("replaygain",   _t("advanced_tab.maint_btn_replaygain"),   self._maint_replaygain),
+            ("integrity",    _t("advanced_tab.maint_btn_integrity"),    self._maint_check_integrity),
             # v1077: spostati dal menu Strumenti (Opzione C — menu bar rimossa)
-            ("log",          "Apri Cartella Log",    self._open_log_folder),
-            ("settings",     "Test Configurazione",  self._test_config),
+            ("log",          _t("advanced_tab.maint_btn_open_log"),     self._open_log_folder),
+            ("settings",     _t("advanced_tab.maint_btn_test_config"),  self._test_config),
         ]
         grid_maint = ctk.CTkFrame(frm5, fg_color="transparent")
         grid_maint.pack(fill="x", padx=12, pady=(4, 12))
@@ -6075,12 +6240,15 @@ class TrackLabGUI:
 
     def _maint_export_m3u(self):
         """Esporta playlist M3U per ogni genere trovato nella directory musicale."""
+        # v1092.0 (R6.1 fase 3.g): i18n
+        from services.i18n import t as _t
         from tkinter import filedialog
         path = self._selected_path.get().strip()
         if not path or not Path(path).is_dir():
-            messagebox.showwarning("Attenzione", "Seleziona prima una directory musicale.")
+            messagebox.showwarning(_t("maint_dialogs.warn_select_dir_title"),
+                                   _t("maint_dialogs.warn_select_dir_body"))
             return
-        out_dir = filedialog.askdirectory(title="Cartella dove salvare le playlist M3U")
+        out_dir = filedialog.askdirectory(title=_t("maint_dialogs.m3u_dialog_title"))
         if not out_dir:
             return
         base = Path(path)
@@ -6096,32 +6264,43 @@ class TrackLabGUI:
             lines = ["#EXTM3U"] + files
             m3u_path.write_text("\n".join(lines), encoding="utf-8")
             created += 1
-        messagebox.showinfo("M3U", f"Create {created} playlist in:\n{out_dir}")
+        messagebox.showinfo(_t("maint_dialogs.m3u_done_title"),
+                            _t("maint_dialogs.m3u_done_body",
+                               count=created, dir=out_dir))
 
     def _maint_batch_rename(self):
         """Rinomina batch con pattern personalizzato."""
+        # v1092.0 (R6.1 fase 3.g): i18n
+        from services.i18n import t as _t
         path = self._selected_path.get().strip()
         if not path or not Path(path).is_dir():
-            messagebox.showwarning("Attenzione", "Seleziona prima una directory musicale.")
+            messagebox.showwarning(_t("maint_dialogs.warn_select_dir_title"),
+                                   _t("maint_dialogs.warn_select_dir_body"))
             return
         win = ctk.CTkToplevel(self.root)
-        win.title("Rinomina Batch")
+        win.title(_t("maint_dialogs.batch_rename_title"))
         self._set_win_icon(win)
         self._center_win(win, 500, 300)
         win.grab_set()
-        ctk.CTkLabel(win, text="Pattern di rinomina:",
+        ctk.CTkLabel(win, text=_t("maint_dialogs.batch_rename_pattern_label"),
                      font=FONT_SMALL).pack(pady=(16,4))
-        ctk.CTkLabel(win, text="Variabili: {title} {artist} {album} {year} {bpm}",
+        # NOTE: il `Variabili: {title} {artist}...` ha LITERAL braces nel
+        # display (placeholders del pattern, non del format). t() non
+        # interpola perche' non passiamo kwargs; il str.format del JSON
+        # non viene chiamato. Funziona correttamente.
+        ctk.CTkLabel(win, text=_t("maint_dialogs.batch_rename_vars_hint"),
                      font=(FONT_SMALL[0], FONT_SMALL[1]-1),
                      text_color=PALETTE["text_dim"]).pack()
         pat_var = ctk.StringVar(value="{artist} - {title}")
         ctk.CTkEntry(win, textvariable=pat_var, width=380,
                      font=FONT_SMALL).pack(pady=8)
-        ctk.CTkLabel(win, text="Applica a cartella (vuoto = tutte):",
+        ctk.CTkLabel(win, text=_t("maint_dialogs.batch_rename_folder_label"),
                      font=FONT_SMALL).pack(pady=(8,4))
         folder_var = ctk.StringVar()
         ctk.CTkEntry(win, textvariable=folder_var, width=380,
-                     font=FONT_SMALL, placeholder_text="es. Latin/Salsa").pack()
+                     font=FONT_SMALL,
+                     placeholder_text=_t("maint_dialogs.batch_rename_folder_placeholder")
+                     ).pack()
         def _do_rename():
             import re as _re
             base = Path(path)
@@ -6153,21 +6332,24 @@ class TrackLabGUI:
                 except Exception:
                     errors += 1
             win.destroy()
-            messagebox.showinfo("Rinomina", f"Rinominati {count} file. Errori: {errors}")
-        ctk.CTkButton(win, text="✓  Applica Rinomina",
+            messagebox.showinfo(_t("maint_dialogs.batch_rename_done_title"),
+                                _t("maint_dialogs.batch_rename_done_body",
+                                   count=count, errors=errors))
+        ctk.CTkButton(win, text=_t("maint_dialogs.batch_rename_btn_apply"),
                       fg_color=PALETTE["primary"],
                       hover_color=PALETTE["primary_hover"],
                       font=FONT_SMALL, command=_do_rename).pack(pady=16)
 
     def _maint_replaygain(self):
         """Applica ReplayGain ai file MP3 usando mutagen."""
+        from services.i18n import t as _t
         path = self._selected_path.get().strip()
         if not path:
-            messagebox.showwarning("Attenzione", "Seleziona prima una directory musicale.")
+            messagebox.showwarning(_t("maint_dialogs.warn_select_dir_title"),
+                                   _t("maint_dialogs.warn_select_dir_body"))
             return
-        if not messagebox.askyesno("ReplayGain",
-                "Analizza e applica ReplayGain a tutti i file MP3?\n"
-                "Questa operazione modifica i tag dei file — potrebbe richiedere tempo."):
+        if not messagebox.askyesno(_t("maint_dialogs.rg_title"),
+                                   _t("maint_dialogs.rg_confirm_body")):
             return
         import threading
         def _rg_thread():
@@ -6179,24 +6361,27 @@ class TrackLabGUI:
                     capture_output=True, text=True
                 )
                 if result.returncode == 0:
-                    self.root.after(0, lambda: messagebox.showinfo("ReplayGain",
-                        "ReplayGain applicato con successo."))
+                    self.root.after(0, lambda: messagebox.showinfo(
+                        _t("maint_dialogs.rg_title"),
+                        _t("maint_dialogs.rg_done_body")))
                 else:
                     # Fallback: usa mutagen per scrivere solo il tag RVA2
-                    self.root.after(0, lambda: messagebox.showinfo("ReplayGain",
-                        "mp3gain non trovato. Installa mp3gain per la normalizzazione\n"
-                        "oppure usa: pip install mutagen"))
+                    self.root.after(0, lambda: messagebox.showinfo(
+                        _t("maint_dialogs.rg_title"),
+                        _t("maint_dialogs.rg_no_mp3gain_body")))
             except FileNotFoundError:
-                self.root.after(0, lambda: messagebox.showwarning("ReplayGain",
-                    "mp3gain non trovato nel PATH.\n"
-                    "Scarica da: https://mp3gain.sourceforge.net/"))
+                self.root.after(0, lambda: messagebox.showwarning(
+                    _t("maint_dialogs.rg_title"),
+                    _t("maint_dialogs.rg_not_in_path_body")))
         threading.Thread(target=_rg_thread, daemon=True).start()
 
     def _maint_check_integrity(self):
         """Verifica integrità dei file MP3 cercando frame corrotti."""
+        from services.i18n import t as _t
         path = self._selected_path.get().strip()
         if not path or not Path(path).is_dir():
-            messagebox.showwarning("Attenzione", "Seleziona prima una directory musicale.")
+            messagebox.showwarning(_t("maint_dialogs.warn_select_dir_title"),
+                                   _t("maint_dialogs.warn_select_dir_body"))
             return
         import threading
         def _check_thread():
@@ -6213,19 +6398,24 @@ class TrackLabGUI:
                     except Exception:
                         corrupted.append(fp.name)
             except ImportError:
-                self.root.after(0, lambda: messagebox.showerror("Errore",
-                    "mutagen non installato: pip install mutagen"))
+                self.root.after(0, lambda: messagebox.showerror(
+                    _t("maint_dialogs.integrity_err_title"),
+                    _t("maint_dialogs.integrity_err_no_mutagen")))
                 return
             if corrupted:
-                msg = f"Trovati {len(corrupted)} file corrotti o problematici:\n"
-                msg += "\n".join(f"  \u2022 {f}" for f in corrupted[:20])
+                items = "\n".join(f"  \u2022 {f}" for f in corrupted[:20])
                 if len(corrupted) > 20:
-                    msg += f"\n  ...e altri {len(corrupted)-20}"
+                    items += _t("maint_dialogs.integrity_truncate_more",
+                                n=len(corrupted)-20)
+                msg = _t("maint_dialogs.integrity_corrupted_body",
+                         count=len(corrupted), list=items)
             else:
-                msg = f"✓ Tutti i {len(files)} file MP3 sono integri."
-            self.root.after(0, lambda: messagebox.showinfo("Integrità MP3", msg))
+                msg = _t("maint_dialogs.integrity_ok_body", count=len(files))
+            self.root.after(0, lambda: messagebox.showinfo(
+                _t("maint_dialogs.integrity_title"), msg))
         threading.Thread(target=_check_thread, daemon=True).start()
-        messagebox.showinfo("Verifica", "Analisi avviata in background... attendere.")
+        messagebox.showinfo(_t("maint_dialogs.integrity_starting_title"),
+                            _t("maint_dialogs.integrity_starting_body"))
 
     def _refresh_cache_info(self):
         """Aggiorna le info sulla dimensione della cache (v1086.3 schema)."""
@@ -6252,12 +6442,9 @@ class TrackLabGUI:
         record + lookup_by_query). Non tocca i record file della library
         (genere/bpm assegnati dal cataloger). Rimuove anche i record
         orfani (entries cache senza file)."""
-        if not messagebox.askyesno("Conferma",
-                "Svuotare la cache API esterne?\n\n"
-                "I metadati grezzi recuperati da MusicBrainz/iTunes/ecc.\n"
-                "verranno rimossi. La library file→genere NON viene\n"
-                "modificata.\n\n"
-                "Le prossime catalogazioni saranno più lente."):
+        from services.i18n import t as _t
+        if not messagebox.askyesno(_t("common.btn_confirm"),
+                _t("cache_tab.confirm_clear_body")):
             return
         try:
             sd = _get_data_dir()
@@ -6284,21 +6471,25 @@ class TrackLabGUI:
             if hasattr(self, "_cache_info_var"):
                 self._refresh_cache_info()
             self._cache_reload()
-            messagebox.showinfo("Cache", "Cache svuotata con successo.")
+            messagebox.showinfo(_t("cache_tab.msg_cache_title"),
+                                _t("cache_tab.msg_cache_cleared"))
         except Exception as e:
-            messagebox.showerror("Errore", f"Impossibile svuotare la cache:\n{e}")
+            messagebox.showerror(_t("cache_tab.err_clear_title"),
+                                 _t("cache_tab.err_clear_body", detail=str(e)))
 
     def _build_stat_cards(self, parent):
+        # v1092.0 (R6.1 fase 3.b): label i18n
+        from services.i18n import t as _t
         frm = ctk.CTkFrame(parent, fg_color="transparent")
         frm.grid(row=0, column=0, padx=20, pady=(20, 12), sticky="ew")
         for i in range(5):
             frm.columnconfigure(i, weight=1)
 
-        self._card_processed = StatCard(frm, "🎵", "Processati",  icon_name="processati")
-        self._card_moved      = StatCard(frm, "📂", "Spostati",    icon_name="spostati")
-        self._card_updated    = StatCard(frm, "✏️", "Aggiornati",  icon_name="aggiornati")
-        self._card_covers     = StatCard(frm, "🖼️", "Cover",       icon_name="cover_stat")
-        self._card_uncatalog  = StatCard(frm, "⚠️", "Non Cat.",    icon_name="non_cat")
+        self._card_processed = StatCard(frm, "🎵", _t("stat_cards.processed"), icon_name="processati")
+        self._card_moved      = StatCard(frm, "📂", _t("stat_cards.moved"),     icon_name="spostati")
+        self._card_updated    = StatCard(frm, "✏️", _t("stat_cards.updated"),   icon_name="aggiornati")
+        self._card_covers     = StatCard(frm, "🖼️", _t("stat_cards.covers"),    icon_name="cover_stat")
+        self._card_uncatalog  = StatCard(frm, "⚠️", _t("stat_cards.uncatalog"), icon_name="non_cat")
 
         for col, card in enumerate([
             self._card_processed, self._card_moved,
@@ -6309,7 +6500,8 @@ class TrackLabGUI:
     # ─── LOGICA ──────────────────────────────────────────────────────────
 
     def _browse(self):
-        path = filedialog.askdirectory(title="Seleziona cartella musicale")
+        from services.i18n import t as _t
+        path = filedialog.askdirectory(title=_t("browse_dialog.title_select_dir"))
         if path:
             self._select_path(path)
 
@@ -7103,12 +7295,19 @@ class TrackLabGUI:
 
     def _redraw_sources_list(self):
         """v1086.1: ridisegna la lista sorgenti in self._sources_list_container.
-        Chiamato all'init e dopo ogni move ↑/↓."""
+        Chiamato all'init e dopo ogni move ↑/↓.
+
+        v1092.0 (R6.1 fase 3.g): descrizione sorgente localizzata via
+        sources_meta.<key>. Il nome (MusicBrainz, Deezer, ecc.) e' nome
+        proprio di servizio e resta invariato.
+        """
         if not hasattr(self, "_sources_list_container"):
             return
         # Pulisco i widget vecchi
         for w in self._sources_list_container.winfo_children():
             w.destroy()
+
+        from services.i18n import t as _t
 
         # Ridisegno ogni sorgente in ordine.
         # v1086.1 rev3: la numerazione visibile (1, 2, 3...) e' separata
@@ -7119,7 +7318,12 @@ class TrackLabGUI:
                          if self._SOURCE_META.get(k) is not None
                          and self._meta_sources.get(k) is not None]
         for visible_idx, key in enumerate(visible_keys):
-            name, desc, requires_token = self._SOURCE_META[key]
+            name, desc_it, requires_token = self._SOURCE_META[key]
+            # Descrizione localizzata; fallback al testo IT del _SOURCE_META
+            desc_lookup = f"sources_meta.{key}"
+            desc = _t(desc_lookup)
+            if desc == desc_lookup:
+                desc = desc_it
             var = self._meta_sources[key]
 
             row = ctk.CTkFrame(self._sources_list_container, fg_color="transparent")
@@ -7246,16 +7450,20 @@ class TrackLabGUI:
         record file contiene gia' artist/title/album/genre/bpm. Non
         serve piu' la lookup ridondante in metadata_cache (che non
         esiste piu' come sezione separata)."""
+        # v1092.0 (R6.1 fase 3.g): i18n
+        from services.i18n import t as _t
         import json as _json, csv as _csv
         from tkinter import filedialog
         db_path = _get_data_dir() / "local_db.json"
         if not db_path.exists():
-            messagebox.showwarning("Attenzione", "Il DB locale non esiste ancora.\nAvvia prima una catalogazione.")
+            messagebox.showwarning(_t("maint_dialogs.warn_no_db_title"),
+                                   _t("maint_dialogs.warn_no_db_no_catalog"))
             return
         out = filedialog.asksaveasfilename(
-            title="Salva CSV", defaultextension=".csv",
-            filetypes=[("CSV", "*.csv"), ("Tutti", "*.*")],
-            initialfile="music_library.csv"
+            title=_t("maint_dialogs.csv_dialog_title"), defaultextension=".csv",
+            filetypes=[(_t("maint_dialogs.csv_filetype_csv"), "*.csv"),
+                       (_t("maint_dialogs.csv_filetype_all"), "*.*")],
+            initialfile=_t("maint_dialogs.csv_default_filename")
         )
         if not out:
             return
@@ -7267,9 +7475,16 @@ class TrackLabGUI:
 
             with open(out, "w", newline="", encoding="utf-8-sig") as f:
                 w = _csv.writer(f, delimiter=";")
-                w.writerow(["File", "Titolo", "Artista", "Album",
-                            "Genere", "Sottogenere", "BPM",
-                            "Qualità (kbps)", "Sorgente cache", "Catalogato il"])
+                w.writerow([_t("maint_dialogs.csv_col_file"),
+                            _t("maint_dialogs.csv_col_title"),
+                            _t("maint_dialogs.csv_col_artist"),
+                            _t("maint_dialogs.csv_col_album"),
+                            _t("maint_dialogs.csv_col_genre"),
+                            _t("maint_dialogs.csv_col_subgenre"),
+                            _t("maint_dialogs.csv_col_bpm"),
+                            _t("maint_dialogs.csv_col_quality"),
+                            _t("maint_dialogs.csv_col_source"),
+                            _t("maint_dialogs.csv_col_cataloged_at")])
                 for rel, info in sorted(files.items()):
                     from pathlib import Path as _P
                     fname = _P(rel).name
@@ -7296,16 +7511,22 @@ class TrackLabGUI:
                         source_label,
                         info.get("cataloged_at", ""),
                     ])
-            messagebox.showinfo("Esportazione completata", f"Esportati {len(files)} file in:\n{out}")
+            messagebox.showinfo(_t("maint_dialogs.csv_done_title"),
+                                _t("maint_dialogs.csv_done_body",
+                                   count=len(files), path=out))
         except Exception as e:
-            messagebox.showerror("Errore", str(e))
+            messagebox.showerror(_t("maint_dialogs.csv_err_title"),
+                                 _t("maint_dialogs.csv_err_body", detail=str(e)))
 
     def _maint_find_duplicates(self):
         """v1057: trova file con nome identico in cartelle diverse."""
+        # v1092.0 (R6.1 fase 3.g): i18n
+        from services.i18n import t as _t
         import json as _json
         db_path = _get_data_dir() / "local_db.json"
         if not db_path.exists():
-            messagebox.showwarning("Attenzione", "Il DB locale non esiste ancora.")
+            messagebox.showwarning(_t("maint_dialogs.warn_no_db_title"),
+                                   _t("maint_dialogs.warn_no_db_body"))
             return
         try:
             raw = _json.loads(db_path.read_text(encoding="utf-8"))
@@ -7319,7 +7540,8 @@ class TrackLabGUI:
                 by_name.setdefault(fname, []).append(rel)
             dups = {k: v for k, v in by_name.items() if len(v) > 1}
             if not dups:
-                messagebox.showinfo("Nessun duplicato", "Nessun file duplicato trovato nel DB locale.")
+                messagebox.showinfo(_t("maint_dialogs.dups_none_title"),
+                                    _t("maint_dialogs.dups_none_body"))
                 return
             # v1077: Radio + Conferma batch — sostituisce i bottoni per-riga.
             # Con 85+ duplicati i click singoli diventavano insostenibili.
@@ -7329,7 +7551,7 @@ class TrackLabGUI:
             import tkinter as _tk
 
             win = ctk.CTkToplevel(self.root)
-            win.title(f"Duplicati trovati — {len(dups)} nomi")
+            win.title(_t("maint_dialogs.dups_found_title_fmt", count=len(dups)))
             self._set_win_icon(win)
             self._center_win(win, 720, 560)
             win.grab_set()
@@ -7337,11 +7559,12 @@ class TrackLabGUI:
             # Header fisso
             hdr = ctk.CTkFrame(win, fg_color=PALETTE["surface2"], corner_radius=0)
             hdr.pack(fill="x")
-            ctk.CTkLabel(hdr, text=f"⚠️  {len(dups)} file con nome duplicato",
+            ctk.CTkLabel(hdr,
+                         text=_t("maint_dialogs.dups_found_header", count=len(dups)),
                          font=(FONT_SMALL[0], 13, "bold"), text_color=PALETTE["text"]
                          ).pack(pady=(14, 4), padx=14, anchor="w")
             ctk.CTkLabel(hdr,
-                         text="Seleziona per ciascun gruppo il file da mantenere (gli altri verranno eliminati).",
+                         text=_t("maint_dialogs.dups_found_intro"),
                          font=FONT_SMALL, text_color=PALETTE["text_dim"]
                          ).pack(pady=(0, 10), padx=14, anchor="w")
 

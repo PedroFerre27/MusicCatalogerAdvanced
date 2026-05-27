@@ -78,6 +78,506 @@
     }
   },
 
+  "left_panel": {
+    "status_ready":   "✓  Ready",
+    "status_running": "▶  Cataloging in progress…",
+    "status_done":    "✓  Done",
+    "status_error":   "✗  Error"
+  },
+
+  "dir_section": {
+    "header": "  Music directory",
+    "breadcrumb_empty": "  Select a folder...",
+    "btn_browse": "  Browse",
+    "menu_clear_recent": "Clear history"
+  },
+
+  "options_section": {
+    "header": "  Cataloging options",
+    "opt_analyze":       "  Analysis only",
+    "opt_cleanup":       "  Remove empty folders",
+    "opt_use_ext_db":    "  Enable online DB sources",
+    "footer_hint":       "  Other options (dry-run, verbose, BPM...) → ⚙️  Advanced tab",
+    "tip_analyze":       "Analyze the collection without moving files — read-only mode",
+    "tip_cleanup":       "Delete empty folders after files have been moved",
+    "tip_use_ext_db":    "Query MusicBrainz, Deezer, iTunes to enrich metadata"
+  },
+
+  "cover_slim": {
+    "header":      "  Album cover",
+    "opt_enabled": "Automatically fetch missing covers",
+    "footer_hint": "  Strategy, sources, overwrite → ⚙️  Advanced tab"
+  },
+
+  "duplicate_section": {
+    "header":      "  Duplicate handling",
+    "intro":       "When a file already exists in the destination folder:",
+    "opt_keep_both": "Keep both (rename the new one)",
+    "opt_skip":      "Skip (keep the existing file)",
+    "opt_overwrite": "Overwrite (replace the existing one)"
+  },
+
+  "action_buttons": {
+    "btn_run":       "▶  Start",
+    "btn_running":   "▶  Running…",
+    "btn_stop":      "■  Stop",
+    "btn_clear_log": "🗑  Clear log"
+  },
+
+  "tabs": {
+    "log":       "  Log",
+    "db_local":  "  Local DB",
+    "genres":    "  Genres",
+    "cache":     "  Cache",
+    "quality":   "  Quality",
+    "caribbean": "  Caribbean",
+    "advanced":  "  Advanced"
+  },
+
+  "log_tab": {
+    "filter_label": "Filter:"
+  },
+
+  "stat_cards": {
+    "processed": "Processed",
+    "moved":     "Moved",
+    "updated":   "Updated",
+    "covers":    "Covers",
+    "uncatalog": "Uncatalog."
+  },
+
+  "advanced_tab": {
+    "section_classify":   "  Classification",
+    "section_sources":    "  Metadata sources  (order = priority)",
+    "section_cover":      "  Album cover — Advanced settings",
+    "section_library":    "  Local library",
+    "section_rename":     "  Automatic file rename",
+    "section_maintenance":"  Maintenance",
+
+    "opt_dry_run":  "🧪  Dry-run (simulation) — does not move files",
+    "opt_verbose":  "📋  Verbose output (DEBUG in log)",
+    "opt_classify": "💃  Classify Salsa by BPM (Easy/Medium/Hard...)",
+    "opt_correct":  "🔧  Fix metadata in existing folders",
+
+    "sources_intro": "  Drag with ↑↓ to change cascade priority.\n  The first source with a useful genre is used; later ones are skipped.\n  Sources with API tokens (green) require setup in secrets.py.",
+    "sources_token_hint": "  API tokens:  discogs.com/settings/developers  •  acoustid.org/api-key",
+
+    "cover_overwrite":     "Overwrite existing cover",
+    "cover_strategy_label": "Strategy:",
+    "cover_strat_largest": "Use the largest resolution",
+    "cover_strat_first":   "Use the first available",
+    "cover_sources_label": "Sources:",
+
+    "library_opt":  "Update local Genres DB after cataloging",
+    "library_hint": "  Saves the file→genre mapping in data/local_db.json.\n  Allows detection of manual moves at the next launch.",
+
+    "rename_intro": "Renames MP3 files during cataloging based on the chosen pattern. Default: disabled.",
+    "rename_opt":   "Enable automatic file renaming during cataloging",
+    "rename_pattern_label": "Pattern:",
+    "rename_pat_artist_title": "artist - title",
+    "rename_pat_title_artist": "title - artist",
+
+    "maint_intro": "  Tools for managing and cleaning the music collection.",
+    "maint_btn_csv":          "Export CSV",
+    "maint_btn_find_dups":    "Find duplicates",
+    "maint_btn_clear_cache":  "Clear cache",
+    "maint_btn_open_data":    "Open data folder",
+    "maint_btn_m3u":          "M3U playlist",
+    "maint_btn_batch_rename": "Batch rename",
+    "maint_btn_replaygain":   "Normalize volume",
+    "maint_btn_integrity":    "Integrity check",
+    "maint_btn_open_log":     "Open log folder",
+    "maint_btn_test_config":  "Test configuration"
+  },
+
+  "browse_dialog": {
+    "title_select_dir": "Select music folder"
+  },
+
+  "sources_meta": {
+    "musicbrainz":     "precise genres, jazz, classical, soundtrack",
+    "deezer":          "pop/latin, films, Italian genres (free)",
+    "itunes":          "Anime, TV, Classical (free)",
+    "lastfm":          "electronic, alternative, indie",
+    "beatport":        "BPM, electronic genres",
+    "getsong":         "alternative BPM",
+    "discogs_enabled": "jazz/classical/vinyl (free token)"
+  },
+
+  "maint_dialogs": {
+    "warn_select_dir_title":  "Warning",
+    "warn_select_dir_body":   "Select a music directory first.",
+    "warn_no_db_title":       "Warning",
+    "warn_no_db_no_catalog":  "Local DB doesn't exist yet.\nRun a cataloging first.",
+    "warn_no_db_body":        "Local DB doesn't exist yet.",
+    "m3u_dialog_title":       "Folder to save M3U playlists",
+    "m3u_done_title":          "M3U",
+    "m3u_done_body":           "Created {count} playlists in:\n{dir}",
+    "batch_rename_title":     "Batch rename",
+    "batch_rename_pattern_label": "Rename pattern:",
+    "batch_rename_vars_hint": "Variables: {title} {artist} {album} {year} {bpm}",
+    "csv_dialog_title":       "Save CSV",
+    "csv_default_filename":   "music_library.csv",
+    "csv_filetype_csv":       "CSV",
+    "csv_filetype_all":       "All",
+    "csv_col_file":           "File",
+    "csv_col_title":          "Title",
+    "csv_col_artist":         "Artist",
+    "csv_col_album":          "Album",
+    "csv_col_genre":          "Genre",
+    "csv_col_subgenre":       "Subgenre",
+    "csv_col_bpm":            "BPM",
+    "csv_col_quality":        "Quality (kbps)",
+    "csv_col_source":         "Cache source",
+    "csv_col_cataloged_at":   "Cataloged on",
+    "csv_done_title":         "Export complete",
+    "csv_done_body":          "Exported {count} files to:\n{path}",
+    "csv_err_title":          "Error",
+    "csv_err_body":           "Export failed:\n{detail}",
+    "dups_done_title":        "Duplicates",
+    "dups_none_body":         "No duplicates found in local DB.",
+    "dups_none_title":        "No duplicates",
+    "dups_found_title_fmt":   "Duplicates found — {count} names",
+    "dups_found_header":      "⚠️  {count} files with duplicate name",
+    "dups_found_intro":       "For each group, select the file to keep (the others will be deleted).",
+    "batch_rename_folder_label":   "Apply to folder (empty = all):",
+    "batch_rename_folder_placeholder": "e.g. Latin/Salsa",
+    "batch_rename_btn_apply":      "✓  Apply rename",
+    "batch_rename_done_title":     "Rename",
+    "batch_rename_done_body":      "Renamed {count} files. Errors: {errors}",
+
+    "rg_title":                    "ReplayGain",
+    "rg_confirm_body":             "Analyze and apply ReplayGain to all MP3 files?\nThis modifies the file tags — may take a while.",
+    "rg_done_body":                "ReplayGain applied successfully.",
+    "rg_no_mp3gain_body":          "mp3gain not found. Install mp3gain for normalization\nor use: pip install mutagen",
+    "rg_not_in_path_body":         "mp3gain not in PATH.\nDownload from: https://mp3gain.sourceforge.net/",
+
+    "integrity_title":             "MP3 integrity",
+    "integrity_starting_title":    "Check",
+    "integrity_starting_body":     "Analysis started in background... please wait.",
+    "integrity_err_title":         "Error",
+    "integrity_err_no_mutagen":    "mutagen not installed: pip install mutagen",
+    "integrity_corrupted_body":    "Found {count} corrupted or problematic files:\n{list}",
+    "integrity_truncate_more":     "\n  ...and {n} more",
+    "integrity_ok_body":           "✓ All {count} MP3 files are intact."
+  },
+
+  "progress_bar": {
+    "waiting":   "Waiting...",
+    "completed": "Done ✓",
+    "phase_cataloging":      "Phase 1/2 — Cataloging",
+    "phase_classify_salsa":  "Phase 2/2 — Classify Salsa"
+  },
+
+  "db_tab": {
+    "tip_reload":      "Refresh",
+    "search_placeholder": "🔍  Search file name, genre, subgenre...",
+    "count_records":   "{count} records",
+    "count_with_pages":"{count} records  •  page {page}/{pages}  ({start}-{end})",
+    "err_read":        "Read error: {detail}",
+    "col_file":        "File",
+    "col_genre":       "Genre",
+    "col_subgenre":    "Subgenre",
+    "col_cataloged":   "Cataloged",
+    "btn_prev":        "◀ Prev",
+    "btn_next":        "Next ▶"
+  },
+
+  "caribbean_tab": {
+    "section_priority":          "  Classification priority",
+    "section_priority_desc":     "Drag entries to reorder priority. The first one has top precedence.",
+    "prio_filename":             "File name (word 'Salsa'/'Bachata'…)",
+    "prio_artists":              "Known artists (list configured below)",
+    "prio_online_db":            "Online DB (MusicBrainz, Deezer, iTunes)",
+    "prio_bpm_detect":           "BPM detection + text indicators",
+    "prio_id3":                  "ID3 metadata already in the file",
+    "prio_hint":                 "⬆ Up / ⬇ Down  — select and click to move",
+    "tip_move_up":               "Move up — raise priority",
+    "tip_move_down":             "Move down — lower priority",
+
+    "section_bpm_range":         "  BPM range",
+    "section_bpm_range_desc":    "BPM ranges used to support Salsa/Bachata classification.",
+    "label_bachata_bpm":         "Bachata BPM:",
+    "label_salsa_bpm":           "Salsa BPM:",
+    "hint_bachata_typical":      "typical: 90–130",
+    "hint_salsa_typical":        "typical: 70–200",
+
+    "section_salsa_speed":       "  Salsa speed by BPM",
+    "section_salsa_speed_desc":  "BPM ranges used to classify Salsa difficulty during cataloging.",
+
+    "section_salsa_artists":     "  Known Salsa artists",
+    "section_salsa_artists_desc":"One per line. Partial match on artist name (case-insensitive).",
+    "section_bachata_artists":   "  Known Bachata artists",
+    "section_bachata_artists_desc":"One per line. Partial match on artist name (case-insensitive).",
+
+    "section_salsa_keywords":    "  Text indicators (Salsa)",
+    "section_salsa_keywords_desc":"Keywords searched in title/artist/filename to identify Salsa. One per line.",
+    "section_bachata_keywords":  "  Text indicators (Bachata)",
+    "section_bachata_keywords_desc":"Keywords to identify Bachata in title/artist/filename. One per line.",
+
+    "btn_save":                  "💾  Save settings",
+    "btn_publish_admin":         "📤  Publish as default for all users",
+
+    "msg_saved_title":           "Saved",
+    "msg_saved_body":            "Caribbean settings saved.\nWill be loaded at every launch.",
+    "err_save_title":            "Error",
+
+    "err_read_settings_title":   "Error",
+    "err_read_settings_body":    "Failed to read settings:\n{detail}",
+
+    "publish_title":             "Publish default",
+    "publish_body":               "Publish these settings as DEFAULT for all users?\n\n• Salsa BPM: {s_min}-{s_max}\n• Bachata BPM: {b_min}-{b_max}\n• Salsa artists: {n_sal_a}\n• Salsa keywords: {n_sal_k}\n• Bachata artists: {n_bac_a}\n• Bachata keywords: {n_bac_k}\n\nClients without local settings will download them on next launch.\nThose with a local config will NOT be overwritten.",
+    "publish_ok_title":          "Defaults published",
+    "publish_ok_body":           "Caribbean settings are now the shared defaults.\n\nClients without a local file will download them on the next application start.",
+    "publish_err_title":         "Error",
+    "publish_err_body":          "Publish failed:\n{detail}"
+  },
+
+  "bpm_levels": {
+    "level_1": "1 - Romantic",
+    "level_2": "2 - Slow",
+    "level_3": "3 - Medium",
+    "level_4": "4 - Fast",
+    "level_5": "5 - Crazy"
+  },
+
+  "quality_tab": {
+    "btn_analyze":     "🔍  Analyze",
+    "btn_rescan":      "  Rescan",
+    "btn_prev":        "◀ Prev",
+    "btn_next":        "Next ▶",
+    "intro_hint":      "Click Analyze — uses local DB or reads MP3 files",
+    "threshold_label": "Threshold:",
+    "col_file":        "File",
+    "col_kbps":        "kbps",
+    "col_quality":     "Quality",
+    "col_sample_rate": "Sample Rate",
+    "col_rg":          "RG",
+    "col_folder":      "Folder",
+    "warn_select_dir_title": "Warning",
+    "warn_select_dir_body":  "Select a valid music directory first.",
+    "cache_results":   "⚡  Cached results — {total} files analyzed",
+    "prog_title":      "Quality analysis running...",
+    "prog_header":     "🔍  Bitrate analysis running...",
+    "prog_reading_db": "Reading local DB...",
+    "prog_db_done":    "Local DB: {n} entries. Scanning files...",
+    "prog_running":    "⏳  Analysis running...",
+    "prog_interrupted":"Analysis interrupted",
+    "prog_file_count": "File {i}/{total}  (mutagen: {n})",
+    "note_db_mutagen": " — DB: {db}, mutagen: {mu}",
+    "count_results":   "{count} files ≤ {threshold} kbps  (out of {total_all} total)",
+    "count_with_pages":"{count} files ≤ {threshold} kbps  (out of {total_all} total)  •  page {page}/{pages}  ({start}-{end})",
+    "empty_under_threshold": "No files below this threshold.",
+    "sem_poor":        "🔴 Poor",
+    "sem_medium":      "🟡 Medium",
+    "sem_good":        "🟢 Good",
+    "sem_high":        "💎 High"
+  },
+
+  "cache_tab": {
+    "tip_reload":      "Refresh",
+    "search_placeholder": "🔍  Search artist, title...",
+    "count_entries":   "{count} entries",
+    "count_with_pages":"{count} entries  •  page {page}/{pages}  ({start}-{end})",
+    "err_read":        "Cache read error: {detail}",
+    "btn_clear":       "🗑 Clear",
+    "confirm_clear_body": "Clear the external API cache?\n\nRaw metadata fetched from MusicBrainz/iTunes/etc.\nwill be removed. The file→genre library is NOT\naffected.\n\nFuture catalogings will be slower.",
+    "col_artist_title": "Artist / Title",
+    "col_genre":        "Genre",
+    "col_source":       "Source",
+    "detail_placeholder": "Select a track from the list",
+    "msg_cache_title":   "Cache",
+    "msg_cache_cleared": "Cache cleared successfully.",
+    "err_clear_title":   "Error",
+    "err_clear_body":    "Could not clear cache:\n{detail}",
+    "detail_label_title":          "Title",
+    "detail_label_artists":        "Featuring artists",
+    "detail_label_album":          "Album",
+    "detail_label_year":           "Year",
+    "detail_label_genre":          "Genre",
+    "detail_label_bpm":            "BPM",
+    "detail_label_duration":       "Duration",
+    "detail_label_quality":        "Quality",
+    "detail_label_sample_rate":    "Sample rate",
+    "detail_label_size":           "Size",
+    "detail_label_folder":         "Folder",
+    "detail_label_cataloged_at":   "Cataloged on",
+    "detail_label_source":         "Source"
+  },
+
+  "genres_tab": {
+    "intro":            "Select the genres active in your collection.",
+    "btn_save":         "💾  Save",
+    "tip_hint":         "💡 Uncheck the genres to exclude from cataloging, then click Save",
+    "btn_select_all":   "✓ All",
+    "btn_select_none":  "✗ None",
+    "status_saved":     "✓  Genre preferences saved",
+    "err_save_title":   "Error",
+    "err_save_body":    "Could not save preferences:\n{detail}"
+  },
+
+  "genres_macro": {
+    "latin":       "🎵  Latin",
+    "soundtrack":  "🎬  Soundtrack",
+    "rock":        "🎸  Rock & Alternative",
+    "classical":   "🎹  Classical & Jazz",
+    "electronic":  "🎧  Electronic",
+    "pop":         "🎤  Pop & R&B",
+    "world":       "🌍  World & Other",
+    "other":       "🗂️  Other"
+  },
+
+  "genres_hints": {
+    "salsa":                  "Classic, hard, romantic salsa",
+    "boogaloo":               "60s Latin boogaloo",
+    "pachanga":               "Cuban pachanga",
+    "cha_cha_cha":            "Cuban cha cha cha",
+    "bachata":                "Classic Dominican bachata",
+    "reggaeton":              "Reggaeton / Latin urban",
+    "cumbia":                 "Colombian/Argentine cumbia",
+    "merengue":               "Dominican merengue",
+    "timba":                  "Modern Cuban timba",
+    "latin_jazz":             "Latin American jazz",
+    "soca":                   "Caribbean soca",
+    "dancehall":              "Jamaican dancehall",
+    "soundtrack":             "Film soundtracks",
+    "anime":                  "Japanese anime themes and OSTs",
+    "tv_soundtrack":          "TV series soundtracks",
+    "video_game":             "Video game music",
+    "trailer_music":          "Movie trailer music",
+    "epic_orchestral":        "Epic / orchestral music",
+    "rock":                   "Generic rock",
+    "alternative":            "Alternative / indie rock",
+    "indie":                  "Indie rock / pop",
+    "metal":                  "Heavy / power metal",
+    "death_metal":            "Death / black metal",
+    "punk":                   "Punk and post-punk",
+    "grunge":                 "90s grunge",
+    "hard_rock":              "Classic hard rock",
+    "progressive_rock":       "Progressive rock",
+    "classical":              "Orchestral classical music",
+    "contemporary_classical": "Contemporary classical",
+    "opera":                  "Opera",
+    "piano":                  "Solo piano music",
+    "baroque":                "Baroque music",
+    "jazz":                   "Swing and bebop jazz",
+    "smooth_jazz":            "Modern / lounge jazz",
+    "blues":                  "Blues and classic R&B",
+    "soul":                   "Soul and gospel",
+    "electronic":             "Generic electronic",
+    "house":                  "House / deep house",
+    "techno":                 "Techno / industrial",
+    "trance":                 "Trance / progressive trance",
+    "ambient":                "Ambient / chillout / new age",
+    "drum_and_bass":          "DnB / jungle",
+    "dubstep":                "Dubstep / bass music",
+    "edm":                    "Electronic Dance Music",
+    "synthwave":              "Retrowave / synthwave",
+    "tropical_house":         "Tropical house",
+    "pop":                    "Commercial pop",
+    "dance_pop":              "Dance-floor pop",
+    "rnb":                    "Modern R&B / soul",
+    "hip_hop":                "Hip hop / rap",
+    "trap":                   "Trap / drill",
+    "vocal":                  "Vocal / a cappella",
+    "k_pop":                  "Korean pop",
+    "j_pop":                  "Japanese pop",
+    "country":                "American country",
+    "country_pop":            "Modern country pop",
+    "funk":                   "Funk / soul",
+    "gospel":                 "Gospel / R&B gospel",
+    "world":                  "Generic world music",
+    "flamenco":               "Flamenco / Spanish music",
+    "reggae":                 "Reggae / dancehall",
+    "folk":                   "Folk / traditional",
+    "african":                "African music",
+    "brazilian":              "MPB / samba / bossa nova",
+    "celtic":                 "Celtic / Irish music",
+    "middle_eastern":         "Middle-Eastern music",
+    "afrobeats":              "Afrobeats / afropop",
+    "bossa_nova":             "Brazilian bossa nova",
+    "instrumental":           "Instrumental, no vocals",
+    "spoken_word":            "Spoken word / audiobooks",
+    "comedy":                 "Comedy / parody music",
+    "children":               "Children's music",
+    "holiday":                "Christmas / holiday music"
+  },
+
+  "plans_sub": {
+    "current_plan_label": "Current plan: {plan}",
+    "btn_request_upgrade": "⬆  Request a plan upgrade",
+    "msg_max_plan": "You already have the highest plan available ✨",
+    "dev_section_label": "Change plan (development mode):"
+  },
+
+  "plan_display": {
+    "base":     "🆓 Base",
+    "pro":      "⭐ Pro",
+    "advanced": "💎 Advanced",
+    "base_short":     "🆓 Base",
+    "pro_short":      "⭐ Pro",
+    "advanced_short": "💎 Adv"
+  },
+
+  "features": {
+    "catalog_external_db_short":  "Online DB",
+    "catalog_external_db_long":   "Online DB (MusicBrainz, Deezer)",
+    "catalog_cover_short":         "Album cover",
+    "catalog_cover_long":          "Automatic album cover",
+    "catalog_bpm_short":           "BPM analysis",
+    "catalog_bpm_long":            "BPM analysis",
+    "tab_cache_short":             "Cache tab",
+    "tab_cache_long":              "Metadata cache tab",
+    "tab_quality":                 "Quality tab",
+    "tab_advanced":                "Advanced tab",
+    "tab_caribbean":               "Caribbean tab",
+    "export_m3u_short":            "M3U playlist",
+    "export_m3u_long":             "Export M3U playlist",
+    "export_csv":                  "CSV export",
+    "maint_replaygain":            "ReplayGain",
+    "maint_batch_rename_short":    "Batch rename",
+    "maint_batch_rename_long":     "Batch rename",
+    "maint_integrity_short":       "MP3 integrity",
+    "maint_integrity_long":        "MP3 integrity check",
+    "maint_duplicates":            "Find duplicates"
+  },
+
+  "limits": {
+    "max_files_per_run": "Files per run",
+    "max_runs_per_day":  "Runs per day",
+    "unlimited":         "∞"
+  },
+
+  "upgrade_dialog": {
+    "title": "Upgrade Plan",
+    "header": "Available plans comparison",
+    "current_plan_caption": "(current plan)",
+    "available_caption":    "available",
+    "btn_request_target":   "⬆  Request  {plan}",
+    "err_not_available_title": "Unavailable",
+    "err_not_available_body":  "Upgrade requires server-connected mode.",
+    "err_load_title":          "Error",
+    "err_load_body":           "Could not load plan data"
+  },
+
+  "request_upgrade": {
+    "title": "Request → {plan}",
+    "msg_label": "Message to the administrator (optional)",
+    "btn_send": "Send request",
+    "btn_sending": "Sending…",
+    "msg_sent_title": "Request sent",
+    "msg_sent_body":  "Upgrade request to {plan} sent.\nYou will be notified when the administrator responds.",
+    "err_title":      "Error",
+    "err_body":       "Send failed:\n{detail}"
+  },
+
+  "logout_dialog": {
+    "confirm_title": "Logout confirmation",
+    "confirm_body":  "Do you want to sign out?\n\nOn next launch you will need to enter email and password again.",
+    "done_title":    "Logged out",
+    "done_body":     "Session closed. Relaunch the application to sign in\nwith another account."
+  },
+
   "help": {
     "title_window": "Help — TrackLab",
     "header": "TrackLab",
@@ -92,20 +592,30 @@
 
   "login": {
     "title_window": "TrackLab — Sign in",
-    "header": "Sign in to TrackLab",
+    "header": "Sign in to continue",
     "field_email": "Email",
     "field_password": "Password",
-    "field_server": "Server URL",
+    "field_server": "Server",
     "chk_remember_email": "Remember email",
     "btn_login": "Sign in",
+    "btn_login_loading": "Signing in...",
+    "no_account_prompt": "Don't have an account?",
+    "btn_register": "Register",
     "btn_register_link": "Don't have an account? Register",
     "btn_offline": "Continue offline",
-    "err_invalid_credentials": "Wrong email or password.",
-    "err_server_unreachable": "Server unreachable: {url}",
+    "err_invalid_credentials": "Wrong email or password. Try again.",
+    "err_server_unreachable_short": "Server unreachable: {url}",
+    "err_server_unreachable_long": "Server unreachable: {url}\nCheck URL or connection.",
     "err_invalid_url": "Invalid server URL",
     "err_invalid_url_body": "Please configure the server URL in the field below first.",
+    "err_invalid_url_format": "Server URL must start with http:// or https://",
+    "err_fill_required": "Email and password are required",
+    "err_server_http": "Server error (HTTP {status})",
+    "err_unexpected": "Unexpected error",
     "status_login_in_progress": "Signing in…",
-    "status_logged_in": "Sign-in successful"
+    "status_connecting": "Connecting to server...",
+    "status_logged_in": "Sign-in successful ✓",
+    "registration_disabled_notice": "ℹ  Self-service registration disabled\nContact the administrator to obtain an account."
   },
 
   "register": {
