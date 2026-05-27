@@ -6170,18 +6170,49 @@ class TrackLabGUI:
         rename_pat_frm.pack(fill="x", padx=12, pady=(4, 12))
         ctk.CTkLabel(rename_pat_frm, text=_t("advanced_tab.rename_pattern_label"), font=FONT_SMALL,
                      text_color=PALETTE["text_dim"]).pack(side="left", padx=(0, 8))
-        # NOTA: valori del segmented button restano "artista - titolo" /
-        # "titolo - artista" (italiano) perché sono CHIAVI INVARIANTI usate
-        # da _build_command per costruire il pattern --rename-pattern.
-        # Cambiarli romperebbe i preset salvati in data/ui_prefs.json e la
-        # logica di mapping pattern. La traduzione visiva è in R6.1 fase 4
-        # (refactor id_invariant vs display_localized, stesso pattern dei
-        # BPM categories).
+        # v1094.0 (R6.1 Fase 4.2): refactor rename pattern con ID
+        # invariante + display localizzato (stesso pattern dei BPM
+        # categories in fase 4.1).
+        #
+        # - `_rename_pattern`: StringVar con ID legacy IT
+        #   ("artista - titolo" / "titolo - artista"). Resta INVARIANTE
+        #   perche':
+        #     • _build_command la legge per costruire --rename-pattern
+        #     • _save_ui_prefs/_load_ui_prefs la salvano in
+        #       data/ui_prefs.json (rompere romperebbe preset utenti)
+        # - `_rename_pattern_display`: StringVar bound al widget,
+        #   contiene il display localizzato. Trace bidirezionale per
+        #   sincronia con `_rename_pattern`.
+        from services.i18n import (
+            rename_pattern_display as _rp_disp,
+            rename_pattern_id_from_display as _rp_id,
+        )
+
+        _pattern_ids = ["artista - titolo", "titolo - artista"]
+        _display_values = [_rp_disp(pid) for pid in _pattern_ids]
+
         self._rename_pattern = ctk.StringVar(value="artista - titolo")
+        self._rename_pattern_display = ctk.StringVar(
+            value=_rp_disp(self._rename_pattern.get()))
+
+        # Trace: display → ID (utente clicca segmented button)
+        def _on_rp_display_change(*_):
+            new_id = _rp_id(self._rename_pattern_display.get())
+            if new_id != self._rename_pattern.get():
+                self._rename_pattern.set(new_id)
+        self._rename_pattern_display.trace_add("write", _on_rp_display_change)
+
+        # Trace: ID → display (load da ui_prefs.json o set programmatico)
+        def _on_rp_id_change(*_):
+            new_display = _rp_disp(self._rename_pattern.get())
+            if new_display != self._rename_pattern_display.get():
+                self._rename_pattern_display.set(new_display)
+        self._rename_pattern.trace_add("write", _on_rp_id_change)
+
         ctk.CTkSegmentedButton(
             rename_pat_frm,
-            values=["artista - titolo", "titolo - artista"],
-            variable=self._rename_pattern,
+            values=_display_values,
+            variable=self._rename_pattern_display,
             font=FONT_SMALL,
             fg_color=PALETTE["surface"],
             selected_color=PALETTE["primary"],

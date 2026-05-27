@@ -259,3 +259,70 @@ def bpm_level_display(level_id: str) -> str:
     val = t(lookup)
     # t() ritorna la chiave stessa se mancante in entrambe le lingue
     return level_id if val == lookup else val
+
+
+# Mapping ID legacy del rename pattern (chiavi italiane usate da
+# _build_command per costruire l'arg --rename-pattern) → chiave i18n
+# in translations/<lang>.json :: advanced_tab.rename_pat_*
+_RENAME_PATTERN_LEGACY_TO_KEY = {
+    "artista - titolo": "rename_pat_artist_title",
+    "titolo - artista": "rename_pat_title_artist",
+}
+
+
+def rename_pattern_display(pattern_id: str) -> str:
+    """
+    Ritorna il display localizzato per un rename pattern.
+
+    Args:
+        pattern_id: ID storico ("artista - titolo" / "titolo - artista").
+                    Coincide con la chiave salvata in data/ui_prefs.json
+                    e con il discriminante in _build_command.
+
+    Returns:
+        Display localizzato (es. "artista - titolo" in IT,
+        "artist - title" in EN). ID sconosciuto → ritorna l'ID.
+    """
+    key = _RENAME_PATTERN_LEGACY_TO_KEY.get(pattern_id)
+    if key is None:
+        return pattern_id
+    lookup = f"advanced_tab.{key}"
+    val = t(lookup)
+    return pattern_id if val == lookup else val
+
+
+def rename_pattern_id_from_display(display: str) -> str:
+    """
+    Inverse lookup: display localizzato → ID invariante.
+
+    Necessario perche' il CTkSegmentedButton tiene un riferimento al
+    DISPLAY (quello che vede l'utente). Quando l'utente clicca una
+    voce, dobbiamo risolvere quale ID corrisponde per aggiornare la
+    StringVar invariante (`_rename_pattern`).
+
+    Cerca in TUTTE le lingue supportate (non solo quella attiva): se
+    l'utente cambia lingua a runtime in modo improvviso (caso raro),
+    la lookup funziona comunque finché il display corrisponde a una
+    qualunque traduzione conosciuta.
+
+    Returns:
+        ID legacy ("artista - titolo" / "titolo - artista") se il
+        display matcha una qualunque traduzione conosciuta, altrimenti
+        ritorna il display invariato (fallback robusto).
+    """
+    # 1. Match esatto con un ID legacy (display IT == ID)
+    if display in _RENAME_PATTERN_LEGACY_TO_KEY:
+        return display
+    # 2. Match con la traduzione corrente (lingua attiva)
+    for legacy_id, key in _RENAME_PATTERN_LEGACY_TO_KEY.items():
+        if t(f"advanced_tab.{key}") == display:
+            return legacy_id
+    # 3. Match cross-lingua (carica tutte le traduzioni)
+    for lang in SUPPORTED_LANGS:
+        lang_dict = _I18n._load_file(lang)
+        adv = lang_dict.get("advanced_tab", {}) if isinstance(lang_dict, dict) else {}
+        for legacy_id, key in _RENAME_PATTERN_LEGACY_TO_KEY.items():
+            if adv.get(key) == display:
+                return legacy_id
+    # 4. Fallback: assume sia gia' un ID o stringa custom
+    return display
