@@ -33,6 +33,10 @@ if not ico_path.exists() and src_png.exists():
     except Exception as e:
         print(f"[spec] WARNING: impossibile generare {ico_path}: {e}")
 
+# v1095.1 (R9 hotfix): UPGRADES.md gitignored — bundla solo se esiste
+# sul filesystem. Necessario per build via CI cloud che fa checkout
+# repo (no docs/ privati). In locale per Pedro funziona uguale perche'
+# il file c'e'. Vedi tracklab_macos.spec per il pattern originale.
 datas = [
     ('config',       'config'),
     ('services',     'services'),
@@ -40,8 +44,14 @@ datas = [
     ('gui',          'gui'),
     ('icons',        'icons'),
     ('translations', 'translations'),   # R6.0: bundle file IT/EN i18n
-    ('../docs/UPGRADES.md', '.'),       # R2: bundlato per Help → Changelog
 ]
+_upgrades_md = project_root.parent / 'docs' / 'UPGRADES.md'
+if _upgrades_md.exists():
+    datas.append(('../docs/UPGRADES.md', '.'))
+    print(f"[spec] UPGRADES.md bundlato")
+else:
+    print(f"[spec] UPGRADES.md non trovato → skip (graceful fallback "
+          f"a runtime nel dialog Help → Changelog)")
 
 hiddenimports = [
     'config.secrets', 'config.settings', 'config.user_plans',
