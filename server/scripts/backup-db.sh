@@ -1,38 +1,35 @@
 #!/bin/bash
 # backup-db.sh — Backup quotidiano DB TrackLab Server su Synology NAS.
 #
-# v0.2.5 (R5 rebrand): nome prodotto cambiato in TrackLab, ma i path
-# filesystem NAS restano /volume1/docker/music-cataloger/... per non
-# spostare il DB in produzione. Migrazione path rimandata a branch
-# dedicato (vedi ROADMAP).
+# v0.2.6 (R14): migrazione path NAS completata.
+#   /volume1/docker/music-cataloger -> /volume1/docker/tracklab
 #
 # Cosa fa:
-#   1. Copia /volume1/docker/music-cataloger/data/app.db
-#      in /volume1/docker/music-cataloger/data/backups/app-YYYY-MM-DD.db
+#   1. Copia /volume1/docker/tracklab/data/app.db
+#      in /volume1/docker/tracklab/data/backups/app-YYYY-MM-DD.db
 #   2. Comprime con gzip per risparmiare spazio
 #   3. Cancella backup più vecchi di KEEP_DAYS (default 30)
-#   4. Logga ogni run in /volume1/docker/music-cataloger/data/backups/backup.log
+#   4. Logga ogni run in /volume1/docker/tracklab/data/backups/backup.log
 #
-# Setup cron (DSM Synology):
-#   1. Carica questo file in /volume1/docker/music-cataloger/scripts/backup-db.sh
-#   2. chmod +x /volume1/docker/music-cataloger/scripts/backup-db.sh
-#   3. DSM → Pannello di controllo → Utilità di pianificazione → Crea
-#      → "Attività pianificata" → "Script definito dall'utente"
-#         Generale: nome "DB Backup TrackLab", utente: root
-#         Pianificazione: Giornaliera, alle 03:30
+# Setup cron (DSM Synology) — DOPO la migrazione path:
+#   1. Carica questo file in /volume1/docker/tracklab/scripts/backup-db.sh
+#   2. chmod +x /volume1/docker/tracklab/scripts/backup-db.sh
+#   3. DSM → Pannello di controllo → Utilità di pianificazione →
+#      MODIFICA il task "DB Backup TrackLab" esistente:
 #         Impostazioni attività: comando =
-#            /volume1/docker/music-cataloger/scripts/backup-db.sh
+#            /volume1/docker/tracklab/scripts/backup-db.sh
+#         (era /volume1/docker/music-cataloger/scripts/backup-db.sh)
 #   4. (opzionale) Email su errore: nel pannello "Notifica" inserisci
 #      la tua email per ricevere alert se il backup fallisce.
 #
 # Test manuale:
-#   sudo /volume1/docker/music-cataloger/scripts/backup-db.sh
-#   ls -lh /volume1/docker/music-cataloger/data/backups/
+#   sudo /volume1/docker/tracklab/scripts/backup-db.sh
+#   ls -lh /volume1/docker/tracklab/data/backups/
 
 set -euo pipefail
 
-# Config
-DATA_DIR="/volume1/docker/music-cataloger/data"
+# Config (v0.2.6 — R14 migrazione path completata)
+DATA_DIR="/volume1/docker/tracklab/data"
 DB_FILE="${DATA_DIR}/app.db"
 BACKUP_DIR="${DATA_DIR}/backups"
 LOG_FILE="${BACKUP_DIR}/backup.log"

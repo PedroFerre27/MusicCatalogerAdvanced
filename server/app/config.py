@@ -18,7 +18,7 @@ class Settings(BaseSettings):
 
     # ── Generale ──────────────────────────────────────────────────
     APP_NAME: str = "TrackLab Server"
-    APP_VERSION: str = "0.2.5"
+    APP_VERSION: str = "0.2.6"
     ENV: str = "production"    # development | production
     DEBUG: bool = False
 
