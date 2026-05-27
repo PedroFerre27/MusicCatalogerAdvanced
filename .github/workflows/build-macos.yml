@@ -34,6 +34,15 @@ on:
         required: false
         type: string
 
+# v1095.2 (R9 hotfix): permessi minimi sufficienti per creare/aggiornare
+# le GitHub Release e allegare il .dmg come asset. Il GITHUB_TOKEN
+# built-in ha di default solo contents:read; senza questa override
+# action-gh-release fallisce con HTTP 403 "Resource not accessible by
+# integration". Best practice GitHub: dichiarare permessi minimi
+# espliciti (principle of least privilege).
+permissions:
+  contents: write   # create/update release + upload asset
+
 jobs:
   build-macos-arm64:
     name: Build TrackLab.dmg (arm64)
