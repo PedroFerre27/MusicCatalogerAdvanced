@@ -27,6 +27,8 @@ ico_png = project_root / 'icons' / 'app' / 'taskbar_active.png'
 if not ico_png.exists():
     print(f"[spec] WARNING: {ico_png} non trovato. Build proseguira' senza icona.")
 
+# v1095.1 (R9 hotfix): UPGRADES.md gitignored — bundla solo se esiste
+# sul filesystem. Stesso pattern di tracklab_macos.spec per CI cloud.
 datas = [
     ('icons',                  'icons'),
     ('config',                 'config'),
@@ -36,8 +38,13 @@ datas = [
     ('translations',           'translations'),   # R6.0: bundle i18n
     ('run_cataloger.py',       '.'),
     ('version.py',             '.'),
-    ('../docs/UPGRADES.md',    '.'),   # R2: bundlato per Help → Changelog
 ]
+_upgrades_md = project_root.parent / 'docs' / 'UPGRADES.md'
+if _upgrades_md.exists():
+    datas.append(('../docs/UPGRADES.md', '.'))
+    print(f"[spec linux] UPGRADES.md bundlato")
+else:
+    print(f"[spec linux] UPGRADES.md non trovato → skip")
 
 hiddenimports = [
     'config.secrets', 'config.settings', 'config.user_plans',

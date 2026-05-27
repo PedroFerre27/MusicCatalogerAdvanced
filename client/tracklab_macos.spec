@@ -78,21 +78,36 @@ elif not _icns_path.exists():
           f"({_icns_path} e {_src_png} mancanti)")
     _icns_path = None
 
+# v1095.1 (R9 hotfix): UPGRADES.md e' gitignored (doc interna). Sul
+# cloud runner GitHub Actions il file NON esiste → pyinstaller falliva
+# con "Unable to find docs/UPGRADES.md". Soluzione: bundlalo solo se
+# esiste sul filesystem (in locale per Pedro c'e', sul runner no).
+# Il dialog Help → Changelog gestisce gia' graceful il file mancante
+# con un messaggio fallback (vedi _show_help_changelog in main_window).
+_datas_list = [
+    ('icons',                  'icons'),
+    ('config',                 'config'),
+    ('services',               'services'),
+    ('core',                   'core'),
+    ('gui',                    'gui'),
+    ('translations',           'translations'),   # R6.0: bundle i18n
+    ('run_cataloger.py',       '.'),
+    ('version.py',             '.'),
+]
+_upgrades_md = project_root.parent / 'docs' / 'UPGRADES.md'
+if _upgrades_md.exists():
+    _datas_list.append(('../docs/UPGRADES.md', '.'))
+    print(f"[spec macos] UPGRADES.md bundlato")
+else:
+    print(f"[spec macos] UPGRADES.md non trovato ({_upgrades_md}) → "
+          f"skip (il dialog Help mostrera' messaggio 'changelog non "
+          f"disponibile')")
+
 a = Analysis(
     ['run_gui.py'],
     pathex=[],
     binaries=[],
-    datas=[
-        ('icons',                  'icons'),
-        ('config',                 'config'),
-        ('services',               'services'),
-        ('core',                   'core'),
-        ('gui',                    'gui'),
-        ('translations',           'translations'),   # R6.0: bundle i18n
-        ('run_cataloger.py',       '.'),
-        ('version.py',             '.'),
-        ('../docs/UPGRADES.md',    '.'),   # R2: bundlato per Help → Changelog
-    ],
+    datas=_datas_list,
     hiddenimports=[
         'customtkinter',
         'PIL._tkinter_finder',
