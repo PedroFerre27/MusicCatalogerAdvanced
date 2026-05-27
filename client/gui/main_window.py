@@ -6294,11 +6294,13 @@ class TrackLabGUI:
         pat_var = ctk.StringVar(value="{artist} - {title}")
         ctk.CTkEntry(win, textvariable=pat_var, width=380,
                      font=FONT_SMALL).pack(pady=8)
-        ctk.CTkLabel(win, text="Applica a cartella (vuoto = tutte):",
+        ctk.CTkLabel(win, text=_t("maint_dialogs.batch_rename_folder_label"),
                      font=FONT_SMALL).pack(pady=(8,4))
         folder_var = ctk.StringVar()
         ctk.CTkEntry(win, textvariable=folder_var, width=380,
-                     font=FONT_SMALL, placeholder_text="es. Latin/Salsa").pack()
+                     font=FONT_SMALL,
+                     placeholder_text=_t("maint_dialogs.batch_rename_folder_placeholder")
+                     ).pack()
         def _do_rename():
             import re as _re
             base = Path(path)
@@ -6330,8 +6332,10 @@ class TrackLabGUI:
                 except Exception:
                     errors += 1
             win.destroy()
-            messagebox.showinfo("Rinomina", f"Rinominati {count} file. Errori: {errors}")
-        ctk.CTkButton(win, text="✓  Applica Rinomina",
+            messagebox.showinfo(_t("maint_dialogs.batch_rename_done_title"),
+                                _t("maint_dialogs.batch_rename_done_body",
+                                   count=count, errors=errors))
+        ctk.CTkButton(win, text=_t("maint_dialogs.batch_rename_btn_apply"),
                       fg_color=PALETTE["primary"],
                       hover_color=PALETTE["primary_hover"],
                       font=FONT_SMALL, command=_do_rename).pack(pady=16)
@@ -6344,9 +6348,8 @@ class TrackLabGUI:
             messagebox.showwarning(_t("maint_dialogs.warn_select_dir_title"),
                                    _t("maint_dialogs.warn_select_dir_body"))
             return
-        if not messagebox.askyesno("ReplayGain",
-                "Analizza e applica ReplayGain a tutti i file MP3?\n"
-                "Questa operazione modifica i tag dei file — potrebbe richiedere tempo."):
+        if not messagebox.askyesno(_t("maint_dialogs.rg_title"),
+                                   _t("maint_dialogs.rg_confirm_body")):
             return
         import threading
         def _rg_thread():
@@ -6358,17 +6361,18 @@ class TrackLabGUI:
                     capture_output=True, text=True
                 )
                 if result.returncode == 0:
-                    self.root.after(0, lambda: messagebox.showinfo("ReplayGain",
-                        "ReplayGain applicato con successo."))
+                    self.root.after(0, lambda: messagebox.showinfo(
+                        _t("maint_dialogs.rg_title"),
+                        _t("maint_dialogs.rg_done_body")))
                 else:
                     # Fallback: usa mutagen per scrivere solo il tag RVA2
-                    self.root.after(0, lambda: messagebox.showinfo("ReplayGain",
-                        "mp3gain non trovato. Installa mp3gain per la normalizzazione\n"
-                        "oppure usa: pip install mutagen"))
+                    self.root.after(0, lambda: messagebox.showinfo(
+                        _t("maint_dialogs.rg_title"),
+                        _t("maint_dialogs.rg_no_mp3gain_body")))
             except FileNotFoundError:
-                self.root.after(0, lambda: messagebox.showwarning("ReplayGain",
-                    "mp3gain non trovato nel PATH.\n"
-                    "Scarica da: https://mp3gain.sourceforge.net/"))
+                self.root.after(0, lambda: messagebox.showwarning(
+                    _t("maint_dialogs.rg_title"),
+                    _t("maint_dialogs.rg_not_in_path_body")))
         threading.Thread(target=_rg_thread, daemon=True).start()
 
     def _maint_check_integrity(self):
@@ -6394,19 +6398,24 @@ class TrackLabGUI:
                     except Exception:
                         corrupted.append(fp.name)
             except ImportError:
-                self.root.after(0, lambda: messagebox.showerror("Errore",
-                    "mutagen non installato: pip install mutagen"))
+                self.root.after(0, lambda: messagebox.showerror(
+                    _t("maint_dialogs.integrity_err_title"),
+                    _t("maint_dialogs.integrity_err_no_mutagen")))
                 return
             if corrupted:
-                msg = f"Trovati {len(corrupted)} file corrotti o problematici:\n"
-                msg += "\n".join(f"  \u2022 {f}" for f in corrupted[:20])
+                items = "\n".join(f"  \u2022 {f}" for f in corrupted[:20])
                 if len(corrupted) > 20:
-                    msg += f"\n  ...e altri {len(corrupted)-20}"
+                    items += _t("maint_dialogs.integrity_truncate_more",
+                                n=len(corrupted)-20)
+                msg = _t("maint_dialogs.integrity_corrupted_body",
+                         count=len(corrupted), list=items)
             else:
-                msg = f"✓ Tutti i {len(files)} file MP3 sono integri."
-            self.root.after(0, lambda: messagebox.showinfo("Integrità MP3", msg))
+                msg = _t("maint_dialogs.integrity_ok_body", count=len(files))
+            self.root.after(0, lambda: messagebox.showinfo(
+                _t("maint_dialogs.integrity_title"), msg))
         threading.Thread(target=_check_thread, daemon=True).start()
-        messagebox.showinfo("Verifica", "Analisi avviata in background... attendere.")
+        messagebox.showinfo(_t("maint_dialogs.integrity_starting_title"),
+                            _t("maint_dialogs.integrity_starting_body"))
 
     def _refresh_cache_info(self):
         """Aggiorna le info sulla dimensione della cache (v1086.3 schema)."""

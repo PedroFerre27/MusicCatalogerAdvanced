@@ -240,10 +240,26 @@
     "dups_found_title_fmt":   "Duplicati trovati — {count} nomi",
     "dups_found_header":      "⚠️  {count} file con nome duplicato",
     "dups_found_intro":       "Seleziona per ciascun gruppo il file da mantenere (gli altri verranno eliminati).",
-    "rg_title":               "Normalizza volume",
-    "rg_body":                "Funzione in arrivo. Richiede installazione di mp3gain o rsgain.",
-    "integrity_title":        "Verifica integrità",
-    "integrity_body":         "Funzione in arrivo. Userà mutagen per verificare header e frame MP3."
+    "batch_rename_folder_label":   "Applica a cartella (vuoto = tutte):",
+    "batch_rename_folder_placeholder": "es. Latin/Salsa",
+    "batch_rename_btn_apply":      "✓  Applica Rinomina",
+    "batch_rename_done_title":     "Rinomina",
+    "batch_rename_done_body":      "Rinominati {count} file. Errori: {errors}",
+
+    "rg_title":                    "ReplayGain",
+    "rg_confirm_body":             "Analizza e applica ReplayGain a tutti i file MP3?\nQuesta operazione modifica i tag dei file — potrebbe richiedere tempo.",
+    "rg_done_body":                "ReplayGain applicato con successo.",
+    "rg_no_mp3gain_body":          "mp3gain non trovato. Installa mp3gain per la normalizzazione\noppure usa: pip install mutagen",
+    "rg_not_in_path_body":         "mp3gain non trovato nel PATH.\nScarica da: https://mp3gain.sourceforge.net/",
+
+    "integrity_title":             "Integrità MP3",
+    "integrity_starting_title":    "Verifica",
+    "integrity_starting_body":     "Analisi avviata in background... attendere.",
+    "integrity_err_title":         "Errore",
+    "integrity_err_no_mutagen":    "mutagen non installato: pip install mutagen",
+    "integrity_corrupted_body":    "Trovati {count} file corrotti o problematici:\n{list}",
+    "integrity_truncate_more":     "\n  ...e altri {n}",
+    "integrity_ok_body":           "✓ Tutti i {count} file MP3 sono integri."
   },
 
   "progress_bar": {

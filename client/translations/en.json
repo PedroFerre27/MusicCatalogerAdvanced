@@ -240,10 +240,26 @@
     "dups_found_title_fmt":   "Duplicates found — {count} names",
     "dups_found_header":      "⚠️  {count} files with duplicate name",
     "dups_found_intro":       "For each group, select the file to keep (the others will be deleted).",
-    "rg_title":               "Normalize volume",
-    "rg_body":                "Coming soon. Requires mp3gain or rsgain.",
-    "integrity_title":        "Integrity check",
-    "integrity_body":         "Coming soon. Will use mutagen to check MP3 headers and frames."
+    "batch_rename_folder_label":   "Apply to folder (empty = all):",
+    "batch_rename_folder_placeholder": "e.g. Latin/Salsa",
+    "batch_rename_btn_apply":      "✓  Apply rename",
+    "batch_rename_done_title":     "Rename",
+    "batch_rename_done_body":      "Renamed {count} files. Errors: {errors}",
+
+    "rg_title":                    "ReplayGain",
+    "rg_confirm_body":             "Analyze and apply ReplayGain to all MP3 files?\nThis modifies the file tags — may take a while.",
+    "rg_done_body":                "ReplayGain applied successfully.",
+    "rg_no_mp3gain_body":          "mp3gain not found. Install mp3gain for normalization\nor use: pip install mutagen",
+    "rg_not_in_path_body":         "mp3gain not in PATH.\nDownload from: https://mp3gain.sourceforge.net/",
+
+    "integrity_title":             "MP3 integrity",
+    "integrity_starting_title":    "Check",
+    "integrity_starting_body":     "Analysis started in background... please wait.",
+    "integrity_err_title":         "Error",
+    "integrity_err_no_mutagen":    "mutagen not installed: pip install mutagen",
+    "integrity_corrupted_body":    "Found {count} corrupted or problematic files:\n{list}",
+    "integrity_truncate_more":     "\n  ...and {n} more",
+    "integrity_ok_body":           "✓ All {count} MP3 files are intact."
   },
 
   "progress_bar": {
