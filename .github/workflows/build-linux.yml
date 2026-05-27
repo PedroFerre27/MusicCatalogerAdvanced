@@ -157,11 +157,11 @@ jobs:
 
           echo "APPIMG_FILE=client/dist/${APPIMG_NAME}" >> $GITHUB_ENV
 
-      - name: Smoke test AppImage (--help equivalente: chmod + check syntax)
+      - name: Smoke test AppImage
+        # Non possiamo lanciare la GUI in CI (no display), ma verifichiamo
+        # che il file sia eseguibile e ben formato.
         working-directory: client
         run: |
-          # Non possiamo lanciare la GUI in CI (no display), ma verifichiamo
-          # che il file sia eseguibile e ben formato
           chmod +x "${APPIMG_FILE#client/}"
           file "${APPIMG_FILE#client/}"
 
