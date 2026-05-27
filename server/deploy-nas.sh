@@ -7,36 +7,27 @@
 # installato su DSM 7.1.1 standard). Usa solo "docker" V1.
 #
 # Prerequisiti:
-#   - Stare nella cartella server/ del repo TrackLab
-#   - Aver creato /volume1/docker/music-cataloger/{data,output}
+#   - Stare nella cartella /volume1/docker/tracklab-server/ del NAS
+#   - Aver creato /volume1/docker/tracklab/{data,output}
 #   - File .env presente con SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD
 #
 # Uso:
 #   chmod +x deploy-nas.sh
 #   sudo ./deploy-nas.sh
 #
-# v0.2.5 (R5 rebrand "TrackLab"): IMAGE_NAME e CONTAINER_NAME cambiano
-# da "music-cataloger-server" a "tracklab-server". Al PRIMO deploy
-# dopo l'upgrade, il vecchio container resta orfano:
-#   docker stop music-cataloger-server || true
-#   docker rm   music-cataloger-server || true
-#   docker rmi  music-cataloger-server:latest || true
-# Lo script nuovo creera' il container "tracklab-server" che monta
-# gli stessi path "/volume1/docker/music-cataloger/..." — il DB e
-# i dati utente NON vengono toccati (path filesystem invariati).
-# La migrazione dei path da "music-cataloger" a "tracklab" sotto
-# /volume1/docker/ e' rimandata a un branch dedicato (vedi ROADMAP).
+# v0.2.6 (R14): migrazione path NAS completata.
+#   /volume1/docker/music-cataloger        -> /volume1/docker/tracklab
+#   /volume1/docker/music-cataloger-server -> /volume1/docker/tracklab-server
+# IMAGE_NAME e CONTAINER_NAME erano gia' "tracklab-server" da v0.2.5.
 
 set -euo pipefail
 
 IMAGE_NAME="tracklab-server:latest"
 CONTAINER_NAME="tracklab-server"
 
-# Path sul NAS — INTENZIONALMENTE invariati nel rebrand R5 perche'
-# contengono il DB e i dati degli utenti esistenti. Migrazione a
-# /volume1/docker/tracklab/... rimandata a un branch dedicato.
-DATA_DIR="/volume1/docker/music-cataloger/data"
-OUTPUT_DIR="/volume1/docker/music-cataloger/output"
+# Path sul NAS (v0.2.6 — R14 migrazione path completata)
+DATA_DIR="/volume1/docker/tracklab/data"
+OUTPUT_DIR="/volume1/docker/tracklab/output"
 MUSIC_DIR="/volume1/Multimedia/Musica"
 
 # ── 1. Verifica prerequisiti ──────────────────────────────────────
@@ -45,7 +36,7 @@ if [ ! -f .env ]; then
     exit 1
 fi
 if [ ! -f Dockerfile ]; then
-    echo "ERRORE: eseguire dentro la cartella music-cataloger-server/"
+    echo "ERRORE: eseguire dentro la cartella /volume1/docker/tracklab-server/"
     exit 1
 fi
 
