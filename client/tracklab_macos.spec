@@ -1,31 +1,82 @@
 # tracklab_macos.spec — Build macOS (Intel + Apple Silicon)
 #
 # USAGE su una macchina macOS:
-#   pip install pyinstaller customtkinter Pillow eyed3 mutagen requests
-#   pyinstaller tracklab_macos.spec --clean
+#   pip install pyinstaller customtkinter Pillow eyed3 mutagen requests pyjwt
+#   pyinstaller tracklab_macos.spec --clean --noconfirm
 #
 # Output:
 #   dist/TrackLab.app   (bundle .app)
-#   dist/TrackLab       (binary nudo, dentro al .app)
 #
-# IMPORTANTE per gli amici di Pedro:
+# Lo spec genera anche l'icona .icns da PNG se manca (vedi blocco
+# inizio file). Su Linux/macOS si usa `iconutil` (macOS) o Pillow
+# (cross-platform). Il workflow GitHub Actions `build-macos.yml`
+# automatizza tutto.
+#
+# IMPORTANTE per gli amici di Pedro (R9 v1095.0):
 # - L'app NON è firmata col certificato Apple Developer ($99/anno).
 #   Al primo avvio macOS bloccherà con "App di sviluppatore non
 #   identificato". Per aprirla la prima volta:
 #       Click destro sull'app → Apri → Apri (conferma)
 #   Da lì in poi macOS la ricorda.
-# - Se vuoi distribuirla "professionalmente" servono certificato Apple
-#   Developer + notarizzazione (post-MVP).
+# - Firma + notarization saranno aggiunte in R19 (pagamenti) quando
+#   il costo Apple Dev (~99 €/anno) è giustificato dal lancio
+#   commerciale.
 #
 # Apple Silicon vs Intel:
 # - PyInstaller fa build per l'architettura della macchina su cui gira
-# - Su un Mac M1/M2/M3 ottieni un binario arm64
-# - Su un Mac Intel ottieni un binario x86_64
-# - Per UN bundle universal (entrambe arch) serve:
-#   `target_arch="universal2"` MA tutte le wheel pip devono essere
-#   universal2 — molte non lo sono. Più semplice fare 2 build.
+# - GitHub Actions usa `macos-14` runner → Apple Silicon (arm64).
+#   Per supportare anche Intel servirebbe un secondo job con
+#   `macos-13` (Intel) o usare `target_arch="universal2"` (richiede
+#   tutte le wheel universal2, fragile).
+# - Per ora: build single-arch arm64. Se servirà Intel, aggiungere
+#   un job parallelo nel workflow.
+
+import sys
+from pathlib import Path
 
 block_cipher = None
+project_root = Path('.').absolute()
+
+# v1095.0 (R9): legge la versione da version.py per non hard-coding
+# nel bundle Info.plist.
+try:
+    _version_globals = {}
+    exec((project_root / 'version.py').read_text(encoding='utf-8'),
+         _version_globals)
+    _APP_VERSION = _version_globals.get('APP_VERSION', 'v0.0.0').lstrip('v')
+    # CFBundleShortVersionString richiede formato N.N.N(.N)
+    # version.py usa "v1095.0" → estraggo i numeri
+    _parts = _APP_VERSION.replace('.', '_').split('_')
+    if len(_parts) >= 2 and _parts[0].isdigit():
+        _SHORT_VER = f"1.0.{_parts[0]}.{_parts[1]}"
+    else:
+        _SHORT_VER = "1.0.0.0"
+except Exception:
+    _APP_VERSION = "0.0.0"
+    _SHORT_VER = "1.0.0.0"
+
+# v1095.0 (R9): genera icons/tracklab.icns dal PNG sorgente se manca.
+# Pillow funziona cross-platform (no `iconutil` macOS-only required).
+_icns_path = project_root / 'icons' / 'tracklab.icns'
+_src_png = project_root / 'icons' / 'app' / 'app_icon_256.png'
+if not _icns_path.exists() and _src_png.exists():
+    print(f"[spec macos] {_icns_path} non trovato, lo genero da {_src_png}")
+    try:
+        from PIL import Image
+        img = Image.open(str(_src_png)).convert("RGBA")
+        # Pillow supporta save in .icns con dimensioni multiple.
+        # macOS richiede 16, 32, 64, 128, 256, 512, 1024 (subset OK)
+        sizes = [(16,16), (32,32), (64,64), (128,128), (256,256), (512,512)]
+        _icns_path.parent.mkdir(parents=True, exist_ok=True)
+        img.save(str(_icns_path), format='ICNS', sizes=sizes)
+        print(f"[spec macos] {_icns_path} generato OK")
+    except Exception as e:
+        print(f"[spec macos] WARNING: impossibile generare .icns: {e}")
+        _icns_path = None
+elif not _icns_path.exists():
+    print(f"[spec macos] WARNING: nessuna icona disponibile "
+          f"({_icns_path} e {_src_png} mancanti)")
+    _icns_path = None
 
 a = Analysis(
     ['run_gui.py'],
@@ -103,15 +154,19 @@ exe = EXE(
 app = BUNDLE(
     exe,
     name='TrackLab.app',
-    icon='icons/tracklab.icns',  # se presente, altrimenti None
-    bundle_identifier='com.pedromarques.musiccataloger',
+    icon=str(_icns_path) if _icns_path else None,
+    bundle_identifier='com.pedromarques.tracklab',
     info_plist={
-        'CFBundleShortVersionString': '1.0.85',
-        'CFBundleVersion': '1.0.85.7',
-        'NSHighResolutionCapable': 'True',
-        'LSMinimumSystemVersion': '10.13.0',
+        'CFBundleShortVersionString': _SHORT_VER,
+        'CFBundleVersion':            _SHORT_VER,
+        'CFBundleName':               'TrackLab',
+        'CFBundleDisplayName':        'TrackLab',
+        'NSHighResolutionCapable':    True,
+        'LSMinimumSystemVersion':     '11.0',   # Big Sur+ (2020+)
         # Necessario per Tk + accesso alla cartella musica utente
         'NSAppleEventsUsageDescription':
             'TrackLab needs to access music files to organize them.',
+        # macOS 13+ usa la chiave nuova; vecchie 12- la ignorano
+        'LSApplicationCategoryType':  'public.app-category.music',
     },
 )
