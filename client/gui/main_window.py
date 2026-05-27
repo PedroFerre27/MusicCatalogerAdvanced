@@ -7608,7 +7608,8 @@ class TrackLabGUI:
             footer.pack(fill="x", side="bottom")
             footer.pack_propagate(False)
 
-            count_var = ctk.StringVar(value=f"0 di {len(dups)} gruppi selezionati")
+            count_var = ctk.StringVar(value=_t("maint_dialogs.dups_counter",
+                                                 n=0, total=len(dups)))
             ctk.CTkLabel(footer, textvariable=count_var,
                          font=FONT_SMALL, text_color=PALETTE["text_dim"]
                          ).pack(side="left", padx=16)
@@ -7618,22 +7619,23 @@ class TrackLabGUI:
             # quindi .get() diretto (non _v[0].get())
             def _refresh_count(*_):
                 n = sum(1 for _v, _ in group_choices.values() if _v.get())
-                count_var.set(f"{n} di {len(group_choices)} gruppi selezionati")
+                count_var.set(_t("maint_dialogs.dups_counter",
+                                 n=n, total=len(group_choices)))
             for _var, _paths in group_choices.values():
                 _var.trace_add("write", lambda *a: _refresh_count())
 
             def _apply_batch():
                 selections = [(fn, v.get(), pl) for fn, (v, pl) in group_choices.items() if v.get()]
                 if not selections:
-                    messagebox.showwarning("Nessuna selezione",
-                        "Seleziona almeno un file da mantenere prima di confermare.")
+                    messagebox.showwarning(
+                        _t("maint_dialogs.dups_no_selection_title"),
+                        _t("maint_dialogs.dups_no_selection_body"))
                     return
                 tot_del = sum(len(pl) - 1 for _, _, pl in selections)
-                msg = (f"Applicare le selezioni?\n\n"
-                       f"• Mantieni:  {len(selections)} file\n"
-                       f"• Elimina:   {tot_del} file\n\n"
-                       f"L'azione è irreversibile.")
-                if not messagebox.askyesno("Conferma", msg):
+                if not messagebox.askyesno(
+                        _t("maint_dialogs.dups_apply_title"),
+                        _t("maint_dialogs.dups_apply_body",
+                           keep=len(selections), del_count=tot_del)):
                     return
                 base = Path(self._selected_path.get().strip())
                 errors = []
@@ -7657,30 +7659,33 @@ class TrackLabGUI:
                 except Exception:
                     pass
                 if errors:
+                    err_text = "\n".join(errors[:8]) + ("\n…" if len(errors) > 8 else "")
                     messagebox.showwarning(
-                        "Completato con errori",
-                        f"Eliminati {deleted_total} file, {len(errors)} errori:\n\n"
-                        + "\n".join(errors[:8]) + ("\n…" if len(errors) > 8 else ""))
+                        _t("maint_dialogs.dups_done_with_errors_title"),
+                        _t("maint_dialogs.dups_done_with_errors_body",
+                           deleted=deleted_total, err_count=len(errors),
+                           errors=err_text))
                 else:
                     messagebox.showinfo(
-                        "Completato",
-                        f"Eliminati {deleted_total} file.\nDB locale aggiornato.")
+                        _t("maint_dialogs.dups_done_ok_title"),
+                        _t("maint_dialogs.dups_done_ok_body",
+                           deleted=deleted_total))
                 win.destroy()
 
-            ctk.CTkButton(footer, text="✓  Conferma selezioni",
+            ctk.CTkButton(footer, text=_t("maint_dialogs.dups_btn_confirm"),
                           fg_color=PALETTE["success"], hover_color="#27ae60",
                           text_color="#ffffff", font=FONT_BODY,
                           height=BTN_H, width=180,
                           command=_apply_batch
                           ).pack(side="right", padx=(6, 16), pady=10)
-            ctk.CTkButton(footer, text="Chiudi",
+            ctk.CTkButton(footer, text=_t("maint_dialogs.dups_btn_close"),
                           fg_color="transparent", hover_color=PALETTE["surface"],
                           text_color=PALETTE["text_dim"], font=FONT_SMALL,
                           height=BTN_H, width=100,
                           command=win.destroy
                           ).pack(side="right", padx=0, pady=10)
         except Exception as e:
-            messagebox.showerror("Errore", str(e))
+            messagebox.showerror(_t("maint_dialogs.dups_generic_error"), str(e))
 
     # ─── v1086.1: persistenza preferenze sorgenti ───────────────────
     def _sources_prefs_path(self):
@@ -7902,7 +7907,9 @@ class TrackLabGUI:
     # ─── STRUMENTI ───────────────────────────────────────────────────────
 
     def _test_config(self):
-        self._log.append("\n=== TEST CONFIGURAZIONE ===", "INFO")
+        # v1092.1 (R6.1 hotfix): i18n
+        from services.i18n import t as _t
+        self._log.append(_t("maint_dialogs.test_cfg_log_header"), "INFO")
         try:
             project_root = Path(__file__).parent.parent
             sys.path.insert(0, str(project_root))
@@ -7911,13 +7918,21 @@ class TrackLabGUI:
             validation = api_keys.validate_keys()
             ok = sum(validation.values())
             total = len(validation)
-            self._log.append(f"✓  API Keys: {ok}/{total} configurate", "SUCCESS")
+            self._log.append(
+                _t("maint_dialogs.test_cfg_log_api_keys", ok=ok, total=total),
+                "SUCCESS")
             for svc, valid in validation.items():
                 icon = "✓" if valid else "✗"
                 self._log.append(f"  {icon}  {svc.capitalize()}", "SUCCESS" if valid else "WARNING")
-            self._log.append(f"✓  Generi mappati: {len(settings.genre.genre_mapping)}", "SUCCESS")
-            self._log.append(f"✓  Livelli Salsa: {len(settings.bpm.difficulty_ranges)}", "SUCCESS")
-            self._log.append(f"✓  Artisti Bachata Dom.: {len(settings.bachata.dominicana_artists)}", "SUCCESS")
+            self._log.append(
+                _t("maint_dialogs.test_cfg_log_genres",
+                   n=len(settings.genre.genre_mapping)), "SUCCESS")
+            self._log.append(
+                _t("maint_dialogs.test_cfg_log_salsa_levels",
+                   n=len(settings.bpm.difficulty_ranges)), "SUCCESS")
+            self._log.append(
+                _t("maint_dialogs.test_cfg_log_bachata_artists",
+                   n=len(settings.bachata.dominicana_artists)), "SUCCESS")
             from services.external_apis import ExternalAPIs
             from services.bpm_services import BPMServices
             from services.cover_service import CoverService
@@ -7925,12 +7940,14 @@ class TrackLabGUI:
             from core.genre_classifier import GenreClassifier
             from core.file_manager import FileManager
             from core.cataloger import TrackLab
-            self._log.append("✓  Tutti i moduli caricati correttamente", "SUCCESS")
-            self._log.append("=== TEST OK ===", "SUCCESS")
-            messagebox.showinfo("Test OK", f"Configurazione valida!\n\nAPI: {ok}/{total}\nModuli: tutti OK")
+            self._log.append(_t("maint_dialogs.test_cfg_log_modules_ok"), "SUCCESS")
+            self._log.append(_t("maint_dialogs.test_cfg_log_test_ok"), "SUCCESS")
+            messagebox.showinfo(_t("maint_dialogs.test_cfg_msg_ok_title"),
+                                _t("maint_dialogs.test_cfg_msg_ok_body",
+                                   ok=ok, total=total))
         except Exception as e:
-            self._log.append(f"✗  ERRORE: {e}", "ERROR")
-            messagebox.showerror("Test Fallito", str(e))
+            self._log.append(_t("maint_dialogs.test_cfg_log_error", detail=str(e)), "ERROR")
+            messagebox.showerror(_t("maint_dialogs.test_cfg_msg_err_title"), str(e))
 
     def _open_log_folder(self):
         folder = Path(__file__).parent.parent
