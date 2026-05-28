@@ -1,0 +1,56 @@
+# Dockerfile.linux-build — Builder Linux per TrackLab.AppImage (R9.b)
+#
+# Permette di buildare l'AppImage Linux in LOCALE (Windows/Mac/NAS con
+# Docker) senza dipendere dal workflow GitHub Actions. Utile per
+# iterazione veloce su bug Linux-specifici.
+#
+# Uso (da dentro la cartella client/):
+#   docker build -f Dockerfile.linux-build -t tracklab-linux-builder .
+#   # Windows (PowerShell/CMD):
+#   docker run --rm -v "%cd%:/src" -v "%cd%\dist:/out" tracklab-linux-builder
+#   # Linux/Mac/NAS:
+#   docker run --rm -v "$PWD:/src" -v "$PWD/dist:/out" tracklab-linux-builder
+#
+# Output: dist/TrackLab-<versione>-linux-x86_64.AppImage
+#
+# Vedi docs/BUILD_LOCAL.md per la guida completa con tutte le opzioni.
+
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Python 3.11 (Ubuntu 22.04 default) + Tk + AppImage runtime deps.
+# NB: il workflow CI usa Python 3.13; qui 3.11 per semplicita' (no PPA).
+# Il binario PyInstaller funziona comunque — Python e' bundlato dentro.
+RUN apt-get update -qq && apt-get install -y -qq \
+    python3.11 python3.11-venv python3.11-dev python3-pip \
+    python3-tk tk-dev \
+    libfuse2 wget file \
+    && rm -rf /var/lib/apt/lists/*
+
+# appimagetool standalone
+RUN wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage \
+    -O /usr/local/bin/appimagetool && \
+    chmod +x /usr/local/bin/appimagetool
+
+WORKDIR /src
+VOLUME ["/src", "/out"]
+
+# Entry: installa deps, builda binario, impacchetta AppImage in /out
+CMD ["bash", "-c", "set -e && \
+    python3.11 -m pip install --upgrade pip -q && \
+    python3.11 -m pip install -r requirements.txt pyinstaller Pillow -q && \
+    pyinstaller tracklab_linux.spec --clean --noconfirm && \
+    APP_VER=$(python3.11 -c \"import re; print(re.search(r'APP_VERSION\\s*=\\s*.v?([^\\x27\\x22]+)', open('version.py').read()).group(1))\") && \
+    APPIMG=TrackLab-${APP_VER}-linux-x86_64.AppImage && \
+    APPDIR=/tmp/TrackLab.AppDir && \
+    rm -rf $APPDIR && mkdir -p $APPDIR/usr/bin && \
+    cp dist/TrackLab $APPDIR/usr/bin/TrackLab && \
+    cp tracklab.desktop $APPDIR/tracklab.desktop && \
+    cp icons/app/app_icon_256.png $APPDIR/tracklab.png && \
+    printf '#!/bin/bash\\nHERE=\"$(dirname \"$(readlink -f \"${0}\")\")\"\\nexport PATH=\"${HERE}/usr/bin:${PATH}\"\\nexec \"${HERE}/usr/bin/TrackLab\" \"$@\"\\n' > $APPDIR/AppRun && \
+    chmod +x $APPDIR/AppRun && \
+    ARCH=x86_64 /usr/local/bin/appimagetool $APPDIR /out/$APPIMG && \
+    echo \"=== BUILD OK: /out/$APPIMG ===\" && \
+    ls -lh /out/$APPIMG \
+"]
