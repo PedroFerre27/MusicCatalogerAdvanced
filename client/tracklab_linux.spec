@@ -11,7 +11,7 @@
 #   2. VM VirtualBox con Ubuntu 22.04
 #   3. La macchina Linux dell'amico (lui builda da source)
 #
-# Output: dist/tracklab-advanced (singolo binario, ~80-130MB)
+# Output: dist/TrackLab (singolo binario, ~80-130MB)
 #
 # Per compatibilita' max-distro: build su Ubuntu 22.04 LTS
 # (glibc 2.35) → compatibile con Ubuntu 22.04+, Debian 12+, Fedora 36+
@@ -63,7 +63,9 @@ hiddenimports = [
     'customtkinter',
     'PIL', 'PIL._tkinter_finder', 'PIL.Image', 'PIL.ImageTk',
     'eyed3', 'mutagen', 'mutagen.mp3',
-    'musicbrainzngs', 'requests', 'urllib3', 'jwt',
+    'musicbrainzngs', 'requests', 'urllib3',
+    # NB: 'jwt' rimosso in v1096.2 — il client non usa PyJWT (decodifica
+    # JWT manuale via base64). Era residuo morto.
 ]
 
 a = Analysis(
@@ -93,7 +95,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='tracklab-advanced',
+    name='TrackLab',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

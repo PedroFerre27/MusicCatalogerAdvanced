@@ -118,7 +118,8 @@ a = Analysis(
         'mutagen.mp3',
         'requests',
         'urllib3',
-        'jwt',
+        # 'jwt' rimosso in v1096.2 — il client decodifica JWT manuale
+        # (base64+json), non usa PyJWT. Era residuo morto.
         'services.i18n',                    # R6.0
         'services.spotify_oauth',
         'services.spotify_store',

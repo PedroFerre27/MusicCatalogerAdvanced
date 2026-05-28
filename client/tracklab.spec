@@ -68,7 +68,11 @@ hiddenimports = [
     'gui.icons', 'gui.widgets', 'gui.styles',
     'customtkinter', 'eyed3', 'mutagen', 'mutagen.mp3',
     'PIL', 'PIL.Image', 'PIL.ImageTk',
-    'musicbrainzngs', 'requests', 'jwt',
+    'musicbrainzngs', 'requests',
+    # NB: 'jwt' (PyJWT) NON e' un hidden import: il client decodifica i
+    # JWT manualmente (base64 + json) in api_client.decode_jwt_payload,
+    # non usa la libreria. Rimosso in v1096.2 (era residuo morto che
+    # causava 'Hidden import jwt not found' nei build cloud).
 ]
 
 a = Analysis(
